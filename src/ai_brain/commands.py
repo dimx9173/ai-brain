@@ -73,6 +73,10 @@ def full_init(paths) -> bool:
     register_all(paths)
     configure_minimax_provider(paths)
 
+    from . import plugins
+    plugins.install_opencode_plugins()
+    plugins.install_kilo_skill_stub()
+
     _maybe_append_global_claude_md()
     print(green("====== 🎉 終極全自動大腦配置完成！ ======"))
     return True
@@ -126,6 +130,11 @@ def uninstall_all(paths) -> bool:
     from .mcp import remove_minimax_provider
     remove_minimax_provider(paths)
     deregister_all(paths)
+
+    from . import plugins
+    plugins.uninstall_opencode_plugins()
+    plugins.uninstall_kilo_skill()
+
     _remove_global_cognitive_principles()
 
     print(green("====== 🎉 全域 AI 大腦配置已完成解除安裝！ ======"))
