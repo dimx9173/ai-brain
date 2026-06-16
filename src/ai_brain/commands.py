@@ -228,8 +228,14 @@ def manage_exclude(pattern: str | None) -> bool:
 
 
 def manage_include(pattern: str | None) -> bool:
+    if not pattern:
+        # `include` with no pattern — show the same status list as `exclude`
+        # so the user can pick a target.
+        _print_archive_status()
+        return True
+
     # `include all` ≡ `include-all` — enable every active project.
-    if pattern and pattern.lower() in _BULK_TOKENS:
+    if pattern.lower() in _BULK_TOKENS:
         return registry.archive_all_active()
 
     target = _resolve_target(pattern)

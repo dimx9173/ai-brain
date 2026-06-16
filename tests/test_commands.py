@@ -113,5 +113,52 @@ class TestKeywordStillWorks(_RegisterSeveralMixin):
         self.assertNotIn("/Users/me/work/api-server", registry.list_archived())
 
 
+class TestNoArgsShowsList(_RegisterSeveralMixin):
+    """Both `ai-brain include` and `ai-brain exclude` (no pattern) show the list.
+
+    Regression test for the requirement that users can always see
+    "which projects are auto-archived right now" without first having
+    to remember a subcommand.
+    """
+
+    def _capture(self, fn, *args, **kwargs) -> str:
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            fn(*args, **kwargs)
+        return buf.getvalue()
+
+    def test_include_no_args_prints_list_header(self) -> None:
+        self._register(["/proj-alpha", "/proj-beta"])
+        registry.enable_archive("/proj-alpha")
+        out = self._capture(commands.manage_include, None)
+        # Header line + at least one numbered project line.
+        self.assertIn("全域自動記憶歸檔狀態清單", out)
+        self.assertIn("[1]", out)
+        self.assertIn("proj-alpha", out)
+        self.assertIn("proj-beta", out)
+        # The active project should be tagged as enabled.
+        self.assertIn("已啟用自動歸檔", out)
+        # The inactive one should be tagged as not enabled.
+        self.assertIn("預設不歸檔", out)
+
+    def test_exclude_no_args_still_works(self) -> None:
+        # Smoke test: the previous behaviour is preserved.
+        self._register(["/proj-x"])
+        out = self._capture(commands.manage_exclude, None)
+        self.assertIn("全域自動記憶歸檔狀態清單", out)
+        self.assertIn("proj-x", out)
+
+    def test_include_no_args_does_not_mutate_archive(self) -> None:
+        # Showing the list must not enable or disable anything.
+        self._register(["/proj-a", "/proj-b"])
+        registry.enable_archive("/proj-a")
+        archived_before = set(registry.list_archived())
+        self._capture(commands.manage_include, None)
+        archived_after = set(registry.list_archived())
+        self.assertEqual(archived_before, archived_after)
+
+
 if __name__ == "__main__":
     unittest.main()
