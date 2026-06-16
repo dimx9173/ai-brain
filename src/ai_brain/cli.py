@@ -42,6 +42,7 @@ def _show_help() -> None:
         ("include [key]", "[啟用歸檔] 啟用指定專案定時自動歸檔"),
         ("exclude-all", "[全部停用] 一鍵停用所有專案的自動歸檔"),
         ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
+        ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
     ]
     for name, desc in rows:
         print(f"  {green(name):<24} - {desc}")
@@ -79,6 +80,15 @@ def _cmd_include(args, _paths) -> int:
     return 0 if commands.manage_include(args.pattern) else 1
 
 
+def _cmd_completions(args) -> int:
+    """Dispatch to ai_brain.completions.main for the completions subcommand."""
+    from . import completions as _completions
+    sub_argv = [args.action]
+    if getattr(args, "shell", None):
+        sub_argv.append(args.shell)
+    return _completions.main(sub_argv)
+
+
 # --- Dispatch table: name -> (callable, takes_args_and_paths) ------------------
 # Using a dict + dict of factory functions so the argparse binding stays explicit.
 COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
@@ -100,6 +110,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "include": _cmd_include,
     "exclude-all": lambda a, p: (commands.exclude_all(), 0)[1],
     "include-all": lambda a, p: (commands.include_all(), 0)[1],
+    "completions": lambda a, p: _cmd_completions(a),
 }
 
 
@@ -142,6 +153,16 @@ def _build_parser() -> argparse.ArgumentParser:
     ):
         _add_common(name, help_text)
 
+    # --- completions subcommand (with sub-actions) ----------------------------
+    p = sub.add_parser(
+        "completions",
+        help="Manage shell tab-completion scripts (bash/zsh/fish)",
+        add_help=False,
+    )
+    p.add_argument("action", choices=["show", "install", "uninstall"], help="what to do")
+    p.add_argument("shell", nargs="?", choices=["bash", "zsh", "fish"],
+                   help="target shell (default: all)")
+
     return parser
 
 
@@ -180,6 +201,10 @@ class _Namespace_for:
     def __init__(self, cmd: str, rest: list[str]) -> None:
         self.cmd = cmd
         self.pattern = rest[0] if rest else None
+        # `completions` subcommand uses action + optional shell positional.
+        # We only populate these when relevant; other commands ignore them.
+        self.action = rest[0] if rest else None
+        self.shell = rest[1] if len(rest) > 1 else None
 
 
 if __name__ == "__main__":
