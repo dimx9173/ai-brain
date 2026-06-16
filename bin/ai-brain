@@ -1,0 +1,1479 @@
+#!/bin/bash
+# ai-brain - 簡化 AI 代理多代理協作管理工具
+# 用途: 封裝 MemPalace, Graphify, claude-mem 等複雜指令
+
+# 確保 $HOME/.local/bin 與常用路徑在 PATH 中 (解決非互動式 SSH 或 Cron 執行時找不到工具的問題)
+export PATH="$HOME/.local/bin:$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# 終端機顏色輸出
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+show_help() {
+    echo -e "${BLUE}🧠 AI Brain Orchestrator v1.1.0${NC}"
+    echo "這款工具幫您一鍵搞定 Claude Code / Cowork / OpenClaw / OpenCode 與 Gemini/Antigravity IDE 的架構地圖與記憶同步。"
+    echo ""
+    echo -e "${YELLOW}用法:${NC}"
+    echo "  ai-brain [指令]"
+    echo ""
+    echo -e "${YELLOW}可用指令:${NC}"
+    echo -e "  ${GREEN}init${NC}      - [一次性] 初始化專案 AI 大腦配置（MemPalace、Graphify、記憶鉤子與引導指南）"
+    echo -e "  ${GREEN}full-init${NC} - [一次性] 初始化配置，並一併在系統中註冊深夜 23:30 自動記憶歸檔 Cron Job"
+    echo -e "  ${GREEN}install${NC}   - [全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH (同 update)"
+    echo -e "  ${GREEN}version${NC}   - [顯示版本] 顯示目前安裝的 ai-brain 工具版本"
+    echo -e "  ${GREEN}start${NC}     - [每日晨間] 更新最新的代碼地圖圖譜（讓 AI 開發時不迷路且省 Token）"
+    echo -e "  ${GREEN}stop${NC}      - [下班收尾] 安全掃描並歸檔一整天的對話到長期記憶中樞（防死鎖）"
+    echo -e "  ${GREEN}status${NC}    - [狀態檢查] 查看目前專案的大腦配置狀態"
+    echo -e "  ${GREEN}verify${NC}    - [一鍵驗證] 檢測所有 AI 記憶套件與守護行程是否正確配置且運行正常"
+    echo -e "  ${GREEN}clean${NC}     - [專案清理] 移除目前專案的 AI 大腦與記憶配置"
+    echo -e "  ${GREEN}uninstall${NC} - [全域移除] 清理目前的專案配置、全域排程、MCP 註冊與全域軟連結"
+    echo -e "  ${GREEN}stop-cron${NC} - [停止排程] 僅移除定時自動歸檔的 Cron Job"
+    echo -e "  ${GREEN}exclude${NC}   - [停用歸檔] 停用指定專案自動歸檔，或查看歸檔狀態清單 (e.g. ai-brain exclude [project-key])"
+    echo -e "  ${GREEN}include${NC}   - [啟用歸檔] 啟用指定專案定時自動歸檔 (e.g. ai-brain include [project-key])"
+    echo -e "  ${GREEN}exclude-all${NC} - [全部停用] 一鍵停用所有專案的自動歸檔 (清空歸檔名單)"
+    echo -e "  ${GREEN}include-all${NC} - [全部啟用] 一鍵啟用所有註冊專案的自動歸檔"
+    echo ""
+}
+
+register_project() {
+    local proj_path=$(pwd)
+    local registry="$HOME/.claude/ai_brain_active_projects.txt"
+    mkdir -p "$HOME/.claude"
+    touch "$registry"
+    
+    if grep -q -F "$proj_path" "$registry"; then
+        return 0
+    else
+        echo "$proj_path" >> "$registry"
+        echo -e "--> ${GREEN}已將此專案註冊至 AI 大腦活躍清單中！${NC}"
+    fi
+}
+
+deregister_project() {
+    local proj_path=$(pwd)
+    local registry="$HOME/.claude/ai_brain_active_projects.txt"
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    
+    if [ -f "$registry" ]; then
+        python3 -c "
+import os
+path = os.path.expanduser('~/.claude/ai_brain_active_projects.txt')
+target = '$proj_path'
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        lines = f.read().splitlines()
+    if target in lines:
+        lines.remove(target)
+        with open(path, 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+"
+        echo -e "--> ${YELLOW}已將此專案自 AI 大腦活躍清單註銷。${NC}"
+    fi
+
+    if [ -f "$archive_enabled_file" ]; then
+        python3 -c "
+import os
+path = os.path.expanduser('~/.claude/ai_brain_auto_archive.txt')
+target = '$proj_path'
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        lines = f.read().splitlines()
+    if target in lines:
+        lines.remove(target)
+        with open(path, 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+"
+    fi
+}
+
+init_brain() {
+    echo -e "${BLUE}====== 🧠 開始初始化專案 AI 大腦配置 ======${NC}"
+
+    # 1. 初始化 MemPalace 專案 Wing (自動模擬 Enter 鍵入以防非互動式環境掛起，使用 yes 預防 EOFError)
+    mempalace init --yes --auto-mine --no-llm .
+    
+    # 2. 初始化 Graphify 技能與各工具引導規則
+    echo -e "--> ${YELLOW}安裝 Graphify 本地技能與各工具引導規則...${NC}"
+    graphify install --project
+    graphify antigravity install > /dev/null 2>&1 || true
+    graphify kilo install > /dev/null 2>&1 || true
+    graphify cursor install > /dev/null 2>&1 || true
+    graphify claude install > /dev/null 2>&1 || true
+    graphify opencode install > /dev/null 2>&1 || true
+    
+    # 3. 建立 .claude/config.json 以配置 claude-mem 接管生命週期
+    echo -e "--> ${YELLOW}設定 .claude/config.json 記憶生命週期鉤子...${NC}"
+    mkdir -p .claude
+    cat << 'EOF' > .claude/config.json
+{
+  "hooks": {
+    "preCompact": "claude-mem compress --target local",
+    "onStop": "claude-mem checkpoint"
+  }
+}
+EOF
+
+    # 4. 建立 CLAUDE.md 大腦引導指南
+    echo -e "--> ${YELLOW}建立 CLAUDE.md 大腦引導指南...${NC}"
+    cat << 'EOF' > CLAUDE.md
+# AI Agent 認知工作流與大腦記憶指引
+
+## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)
+1. **主動記憶檢索（不需用戶指定）**：在回答任何關於「系統設計」、「過去的問題/除錯記錄」、「環境配置」、「特定業務邏輯」的提問前，**你必須在第一步主動調用 `mempalace_search` 工具**，檢索相關歷史記憶。嚴禁完全依賴內建知識庫憑空猜測。
+2. **架構變更防線**：在修改任何代碼檔案或進行重構前，**你必須主動調用 `query_graph` 或查閱 `./graphify-out/` 索引**，以確保理解模組之間的上下游相依性。
+3. **短期記憶遵循**：遵循 `claude-mem` 注入的局部 Checkpoint 與開發習慣。
+
+## 🗺️ Graphify 技能與指令整合
+- **`/graphify` 快捷指令**：當用戶在對話中輸入 `/graphify` 時，請在執行任何其他動作前，優先調用 Skill 工具並指定 `skill: "graphify"`。
+EOF
+
+    # 5. 配置 Git Hooks 以在 git pull (post-merge) 或 git checkout 後自動更新代碼圖譜
+    if [ -d ".git" ]; then
+        echo -e "--> ${YELLOW}配置 Git Hooks 自動更新圖譜...${NC}"
+        mkdir -p .git/hooks
+        
+        # post-merge hook
+        cat << 'EOF' > .git/hooks/post-merge
+#!/bin/bash
+echo -e "\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜 ======\033[0m"
+# 優先使用全域 ai-brain 指令，其次尋找專案本地指令
+if command -v ai-brain &> /dev/null; then
+    ai-brain start
+elif [ -f "./bin/ai-brain" ]; then
+    ./bin/ai-brain start
+elif [ -f "./PC/Knowhow/ai-brain.sh" ]; then
+    ./PC/Knowhow/ai-brain.sh start
+elif [ -f "./ai-brain.sh" ]; then
+    ./ai-brain.sh start
+else
+    command -v graphify &> /dev/null && graphify .
+fi
+EOF
+        chmod +x .git/hooks/post-merge
+        
+        # post-checkout hook
+        cat << 'EOF' > .git/hooks/post-checkout
+#!/bin/bash
+# 只在切換分支時觸發（引數 $3 為 1 代表切換分支，0 代表檢出單一檔案）
+if [ "$3" -eq 1 ]; then
+    echo -e "\033[0;34m====== 🌅 Git Branch 切換偵測：自動更新代碼架構圖譜 ======\033[0m"
+    if command -v ai-brain &> /dev/null; then
+        ai-brain start
+    elif [ -f "./bin/ai-brain" ]; then
+        ./bin/ai-brain start
+    elif [ -f "./PC/Knowhow/ai-brain.sh" ]; then
+        ./PC/Knowhow/ai-brain.sh start
+    elif [ -f "./ai-brain.sh" ]; then
+        ./ai-brain.sh start
+    else
+        command -v graphify &> /dev/null && graphify .
+    fi
+fi
+EOF
+        chmod +x .git/hooks/post-checkout
+    fi
+
+    echo -e "${GREEN}====== 🎉 專案 AI 大腦配置成功！ ======${NC}"
+    echo "💡 提示: 已自動配置 Git Hook，當您進行 git pull (merge) 或 git checkout 時，圖譜將自動在背景更新！"
+    echo "💡 提示: 手動重建圖譜只需執行: ai-brain start"
+    
+    # 註冊專案至活躍清單
+    register_project
+}
+
+full_init() {
+    init_brain
+    
+    echo ""
+    echo -e "${BLUE}====== ⏰ 開始配置全自動定時歸檔 Cron Job ======${NC}"
+    # 全域定時任務：每天 23:30 呼叫一次 ai-brain stop，由大腦決定哪些專案進行自動歸檔
+    local cron_cmd="30 23 * * * \$HOME/.local/bin/ai-brain stop > /dev/null 2>&1"
+    
+    # 檢查是否已經存在全域 Cron Job
+    if crontab -l 2>/dev/null | grep -F -q "ai-brain stop" && ! crontab -l 2>/dev/null | grep -F -q "cd \""; then
+        echo -e "${GREEN}✅ 全域 Cron Job 已經配置過，跳過。${NC}"
+    else
+        # 備份並移除可能舊有的 project-specific cron jobs，改為單一全域排程
+        crontab -l 2>/dev/null | grep -F -v "ai-brain stop" | crontab -
+        (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
+        echo -e "${GREEN}✅ 全域 Cron Job 註冊成功！每天 23:30 將自動執行全域記憶歸檔。${NC}"
+    fi
+
+    # 自動寫入 ~/.gemini/config/mcp_config.json 與 ~/.gemini/antigravity/mcp_config.json (若偵測到 Gemini / Antigravity IDE 環境)
+    if [ -d "$HOME/.gemini" ]; then
+        echo -e "---> ${YELLOW}偵測到 Gemini / Antigravity IDE 環境，自動寫入 MCP 設定...${NC}"
+        python3 -c "
+import json, os
+for folder in ['~/.gemini/config', '~/.gemini/antigravity']:
+    path = os.path.expanduser(os.path.join(folder, 'mcp_config.json'))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+    if 'mcpServers' not in data:
+        data['mcpServers'] = {}
+    
+    changed = False
+    if 'mempalace' not in data['mcpServers']:
+        data['mcpServers']['mempalace'] = {
+            'command': 'mempalace-mcp',
+            'args': [],
+            'env': {}
+        }
+        changed = True
+        print(f'Successfully registered mempalace in {path}')
+    if 'graphify' not in data['mcpServers']:
+        data['mcpServers']['graphify'] = {
+            'command': 'python3',
+            'args': ['-m', 'graphify.serve']
+        }
+        changed = True
+        print(f'Successfully registered graphify in {path}')
+    
+    if changed:
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+"
+    fi
+
+    # 自動寫入 ~/.mcp.json (OpenCode 與標準 MCP 用戶端)
+    echo -e "---> ${YELLOW}自動寫入 ~/.mcp.json MCP 設定...${NC}"
+    python3 -c "
+import json, os
+path = os.path.expanduser('~/.mcp.json')
+try:
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+    else:
+        data = {}
+except Exception:
+    data = {}
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+
+changed = False
+if 'mempalace' not in data['mcpServers']:
+    data['mcpServers']['mempalace'] = {
+        'command': 'mempalace-mcp',
+        'args': [],
+        'env': {}
+    }
+    changed = True
+    print('Successfully registered mempalace in ~/.mcp.json')
+if 'graphify' not in data['mcpServers']:
+    data['mcpServers']['graphify'] = {
+        'command': 'python3',
+        'args': ['-m', 'graphify.serve']
+    }
+    changed = True
+    print('Successfully registered graphify in ~/.mcp.json')
+
+if changed:
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+"
+
+    # 自動設定 Graphify 自訂 LLM 後端 (~/.graphify/providers.json)
+    # 說明：Graphify 預設支援 OpenAI/Anthropic/Gemini 等後端。若要使用 MiniMax，需要建立自訂 provider 定義。
+    # 這裡我們將 MiniMax 配置為符合 OpenAI API 格式的自訂 LLM 後端，對應環境變數為 MINIMAX_API_KEY。
+    echo -e "---> ${YELLOW}自動設定 Graphify 自訂 LLM 後端 (~/.graphify/providers.json)...${NC}"
+    python3 -c "
+import json, os
+path = os.path.expanduser('~/.graphify/providers.json')
+os.makedirs(os.path.dirname(path), exist_ok=True)
+try:
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+    else:
+        data = {}
+except Exception:
+    data = {}
+
+if 'minimax' not in data:
+    data['minimax'] = {
+        'base_url': 'https://api.minimax.io/v1',
+        'default_model': 'minimax-m2.5',
+        'env_key': 'MINIMAX_API_KEY',
+        'temperature': 0
+    }
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    print('Successfully configured MiniMax provider in ~/.graphify/providers.json')
+else:
+    print('MiniMax provider already configured in ~/.graphify/providers.json, skipped')
+"
+    echo -e "    ${BLUE}💡 MiniMax 後端使用說明:${NC}"
+    echo -e "      1. 請先在環境中設定您的 API 金鑰: ${GREEN}export MINIMAX_API_KEY=\"your-api-key\"${NC}"
+    echo -e "      2. 執行 Graphify 提取時指定 minimax 後端: ${GREEN}graphify extract . --backend minimax --model minimax-m2.5${NC}"
+
+    # 自動寫入 ~/.claude.json (Claude Code 全域 MCP 設定)
+    if [ -f "$HOME/.claude.json" ]; then
+        echo -e "---> ${YELLOW}偵測到 Claude Code 設定檔，自動寫入 ~/.claude.json MCP 設定...${NC}"
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/.claude.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'mcpServers' not in data:
+        data['mcpServers'] = {}
+    
+    changed = False
+    if 'mempalace' not in data['mcpServers']:
+        data['mcpServers']['mempalace'] = {
+            'type': 'stdio',
+            'command': 'mempalace-mcp',
+            'args': [],
+            'env': {}
+        }
+        changed = True
+        print('Successfully registered mempalace in ~/.claude.json')
+    if 'graphify' not in data['mcpServers']:
+        data['mcpServers']['graphify'] = {
+            'type': 'stdio',
+            'command': 'python3',
+            'args': ['-m', 'graphify.serve'],
+            'env': {}
+        }
+        changed = True
+        print('Successfully registered graphify in ~/.claude.json')
+    
+    if changed:
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+except Exception as e:
+    print(f'Error registering in ~/.claude.json: {e}')
+"
+    fi
+
+    # 自動寫入 ~/Library/Application Support/Claude/claude_desktop_config.json (若為 macOS 系統)
+    if [ "$(uname)" = "Darwin" ]; then
+        echo -e "---> ${YELLOW}偵測到 macOS 系統，自動寫入 Claude Desktop App 設定...${NC}"
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json')
+os.makedirs(os.path.dirname(path), exist_ok=True)
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+except Exception:
+    data = {}
+if 'mcpServers' not in data:
+    data['mcpServers'] = {}
+if 'mempalace' not in data['mcpServers']:
+    mempalace_path = os.path.expanduser('~/.local/bin/mempalace-mcp')
+    data['mcpServers']['mempalace'] = {
+        'command': mempalace_path,
+        'args': [],
+        'env': {}
+    }
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    print('Successfully registered mempalace in Claude Desktop App config')
+else:
+    print('mempalace already registered in Claude Desktop App config, skipped')
+"
+    fi
+
+    # 自動寫入 Kilo 設定 (若偵測到 Kilo 環境或目錄)
+    if [ -d "$HOME/.config/kilo" ] || [ -d "$HOME/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code" ]; then
+        echo -e "---> ${YELLOW}偵測到 Kilo 環境，自動寫入 Kilo 設定...${NC}"
+        python3 -c "
+import json, os
+mempalace_path = os.path.expanduser('~/.local/bin/mempalace-mcp')
+
+# 1. Kilo CLI 設定 (~/.config/kilo/kilo.json)
+kilo_dir = os.path.expanduser('~/.config/kilo')
+if os.path.exists(kilo_dir):
+    kilo_path = os.path.join(kilo_dir, 'kilo.json')
+    try:
+        if os.path.exists(kilo_path):
+            with open(kilo_path, 'r') as f:
+                data = json.load(f)
+        else:
+            data = {}
+    except Exception:
+        data = {}
+    if 'mcp' not in data:
+        data['mcp'] = {}
+    
+    changed = False
+    if 'mempalace' not in data['mcp']:
+        data['mcp']['mempalace'] = {
+            'type': 'local',
+            'command': [mempalace_path]
+        }
+        changed = True
+        print('Successfully registered mempalace in ~/.config/kilo/kilo.json')
+    if 'graphify' not in data['mcp']:
+        data['mcp']['graphify'] = {
+            'type': 'local',
+            'command': ['python3', '-m', 'graphify.serve']
+        }
+        changed = True
+        print('Successfully registered graphify in ~/.config/kilo/kilo.json')
+    
+    if changed:
+        with open(kilo_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+# 2. Kilo VS Code Extension 設定 (globalStorage/kilocode.kilo-code/settings/mcp_settings.json)
+vscode_kilo_dir = os.path.expanduser('~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings')
+if os.path.exists(vscode_kilo_dir):
+    vscode_kilo_path = os.path.join(vscode_kilo_dir, 'mcp_settings.json')
+    try:
+        if os.path.exists(vscode_kilo_path):
+            with open(vscode_kilo_path, 'r') as f:
+                data = json.load(f)
+        else:
+            data = {}
+    except Exception:
+        data = {}
+    if 'mcpServers' not in data:
+        data['mcpServers'] = {}
+    
+    changed = False
+    if 'mempalace' not in data['mcpServers']:
+        data['mcpServers']['mempalace'] = {
+            'type': 'local',
+            'command': mempalace_path,
+            'args': [],
+            'enabled': True
+        }
+        changed = True
+        print('Successfully registered mempalace in Kilo VS Code settings')
+    if 'graphify' not in data['mcpServers']:
+        data['mcpServers']['graphify'] = {
+            'type': 'local',
+            'command': 'python3',
+            'args': ['-m', 'graphify.serve'],
+            'enabled': True
+        }
+        changed = True
+        print('Successfully registered graphify in Kilo VS Code settings')
+        
+    if changed:
+        with open(vscode_kilo_path, 'w') as f:
+            json.dump(data, f, indent=2)
+"
+    fi
+
+    # 6. 自動配置 ~/.claude/CLAUDE.md 全域大腦引導指南
+    if [ -d "$HOME/.claude" ]; then
+        echo -e "---> ${YELLOW}自動設定 ~/.claude/CLAUDE.md 全域大腦引導指南...${NC}"
+        python3 -c "
+import os
+path = os.path.expanduser('~/.claude/CLAUDE.md')
+rules = '''
+## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)
+1. **主動記憶檢索（不需用戶指定）**：在回答任何關於「系統設計」、「過去的問題/除錯記錄」、「環境配置」、「特定業務邏輯」的提問前，**你必須在第一步主動調用 \`mempalace_search\` 工具**，檢索相關歷史記憶。嚴禁完全依賴內建知識庫憑空猜測。
+2. **架構變更防線**：在修改任何代碼檔案或進行重構前，**你必須主動調用 \`query_graph\` 或查閱 \`./graphify-out/\` 索引**，以確保理解模組之間的上下游相依性。
+3. **短期記憶遵循**：遵循 \`claude-mem\` 注入的局部 Checkpoint 與開發習慣。
+'''
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        content = f.read()
+    if 'Mandatory Cognitive Principles' not in content:
+        with open(path, 'a') as f:
+            f.write('\n' + rules.strip() + '\n')
+        print('Successfully appended global cognitive rules to ~/.claude/CLAUDE.md')
+else:
+    with open(path, 'w') as f:
+        f.write('# AI Agent 全域引導指南\n\n' + rules.strip() + '\n')
+    print('Successfully created ~/.claude/CLAUDE.md with global cognitive rules')
+"
+    fi
+
+    echo -e "${GREEN}====== 🎉 終極全自動大腦配置完成！ ======${NC}"
+}
+
+show_version() {
+    echo -e "${BLUE}🧠 AI Brain Orchestrator v1.1.0${NC}"
+}
+
+install_globally() {
+    local script_path
+    script_path=$(python3 -c "import os, sys; print(os.path.abspath(sys.argv[1]))" "$0")
+    local target_path="$HOME/.local/bin/ai-brain"
+    local source_registry="$HOME/.claude/ai_brain_install_source.txt"
+    
+    # 如果目前執行的就是已安裝的全域指令，則執行「從源路徑更新」邏輯
+    if [ "$script_path" = "$target_path" ]; then
+        if [ -f "$source_registry" ]; then
+            local source_path
+            source_path=$(cat "$source_registry")
+            if [ -f "$source_path" ]; then
+                echo -e "${BLUE}====== 更新全域 ai-brain 指令 ======${NC}"
+                echo -e "正在從源路徑更新: $source_path"
+                # 尋找包含 .git 的倉庫目錄並執行 git pull
+                local repo_dir
+                repo_dir=$(dirname "$source_path")
+                while [ "$repo_dir" != "/" ] && [ ! -d "$repo_dir/.git" ]; do
+                    repo_dir=$(dirname "$repo_dir")
+                done
+                if [ -d "$repo_dir/.git" ]; then
+                    echo -e "--> 偵測到 Git 倉庫 ($repo_dir)，正在同步最新代碼..."
+                    git -C "$repo_dir" pull origin master >/dev/null 2>&1 || true
+                fi
+                rm -f "$target_path"
+                cp "$source_path" "$target_path"
+                chmod +x "$target_path"
+                echo -e "${GREEN}✅ 成功自源路徑同步並更新至最新版本！${NC}"
+                return 0
+            else
+                echo -e "${RED}⚠️ 找不到安裝源路徑：$source_path${NC}"
+                echo -e "請回到原本的 ai-brain 倉庫目錄執行：${YELLOW}./bin/ai-brain install${NC}"
+                return 1
+            fi
+        else
+            echo -e "${RED}⚠️ 找不到安裝記錄，無法進行全域更新。${NC}"
+            echo -e "請回到原本的 ai-brain 倉庫目錄執行：${YELLOW}./bin/ai-brain install${NC}"
+            return 1
+        fi
+    fi
+
+    echo -e "${BLUE}====== 安裝/更新全域 ai-brain 指令 ======${NC}"
+    mkdir -p "$HOME/.local/bin"
+    mkdir -p "$HOME/.claude"
+    
+    rm -f "$target_path"
+    cp "$script_path" "$target_path"
+    chmod +x "$target_path"
+    echo "$script_path" > "$source_registry"
+    echo -e "${GREEN}✅ 成功將 ai-brain 複製/更新至 $target_path${NC}"
+    echo -e "--> ${BLUE}已紀錄安裝來源：$script_path${NC}"
+    
+    if echo "$PATH" | tr ':' '\n' | grep -q '\.local/bin'; then
+        echo -e "${GREEN}✅ 您的 PATH 已包含 ~/.local/bin，您現在可以在任何目錄直接執行: ${YELLOW}ai-brain [指令]${NC}"
+    else
+        echo -e "${YELLOW}⚠️ 您的 PATH 尚未包含 ~/.local/bin！${NC}"
+        echo -e "建議執行以下指令將其加入您的 Shell 設定檔（如 ~/.zshenv 或 ~/.zshrc）："
+        echo -e "  ${BLUE}echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshenv${NC}"
+        echo -e "  ${BLUE}source ~/.zshenv${NC}"
+    fi
+}
+
+find_claude_folder_by_path() {
+    local proj_path="$1"
+    local pattern
+    pattern=$(echo "$proj_path" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
+    pattern="${pattern#-}"
+    pattern="${pattern%-}"
+    
+    for proj_dir in "$HOME/.claude/projects"/*; do
+        [ -d "$proj_dir" ] || continue
+        local folder_name=$(basename "$proj_dir" | tr '[:upper:]' '[:lower:]')
+        if [[ "$folder_name" == *"$pattern"* ]] || [[ "$pattern" == *"$folder_name"* ]]; then
+            echo "$proj_dir"
+            return 0
+        fi
+    done
+    return 1
+}
+
+find_claude_project_folder() {
+    local current_dir=$(pwd)
+    find_claude_folder_by_path "$current_dir"
+}
+
+run_sweep() {
+    local silent="$1"
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    
+    # 如果自動歸檔白名單存在且不為空，僅掃描歸檔白名單中的專案
+    if [ -f "$archive_enabled_file" ] && [ -s "$archive_enabled_file" ]; then
+        [ "$silent" != "silent" ] && echo -e "--> ${YELLOW}讀取自動歸檔白名單，僅自動歸檔啟用之專案...${NC}"
+        while IFS= read -r proj_path || [ -n "$proj_path" ]; do
+            [[ -z "${proj_path// }" ]] && continue
+            [ -d "$proj_path" ] || continue # 專案路徑必須存在
+            
+            local target_proj_dir
+            target_proj_dir=$(find_claude_folder_by_path "$proj_path")
+            
+            if [ -n "$target_proj_dir" ]; then
+                local base_name=$(basename "$target_proj_dir")
+                [ "$silent" != "silent" ] && echo -e "--> ${GREEN}掃描歸檔活躍專案: $base_name${NC}"
+                if [ "$silent" = "silent" ]; then
+                    mempalace sweep "$target_proj_dir" >/dev/null 2>&1
+                else
+                    mempalace sweep "$target_proj_dir"
+                fi
+            fi
+        done < "$archive_enabled_file"
+    else
+        [ "$silent" != "silent" ] && echo -e "--> ${YELLOW}自動歸檔白名單為空，不執行任何自動歸檔。${NC}"
+        [ "$silent" != "silent" ] && echo -e "💡 提示: 若要為此專案啟用自動定時歸檔，請執行: ${GREEN}ai-brain include${NC}"
+    fi
+}
+
+start_day() {
+    # --- 💡 智能背景自癒歸檔 (當大於 12 小時未歸檔時，於今日首次啟動/git pull時自動背景沉澱昨日記憶) ---
+    local current_time
+    current_time=$(date +%s)
+    local last_sweep=0
+    if [ -f "$HOME/.claude/last_sweep_timestamp" ]; then
+        last_sweep=$(cat "$HOME/.claude/last_sweep_timestamp" 2>/dev/null || echo 0)
+    fi
+    local time_diff=$((current_time - last_sweep))
+    # 12 小時 = 43200 秒
+    if [ $time_diff -gt 43200 ]; then
+        echo -e "--> ${YELLOW}偵測到大於 12 小時未進行對話歸檔，正在背景自動沉澱昨日對話記憶...${NC}"
+        # 靜默背景執行歸檔，不阻塞前台地圖重建
+        (
+            run_sweep silent
+            # 寫入最後歸檔時間戳
+            mkdir -p "$HOME/.claude"
+            date +%s > "$HOME/.claude/last_sweep_timestamp"
+        ) &
+    fi
+
+    echo -e "${BLUE}====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======${NC}"
+    if command -v graphify &> /dev/null; then
+        graphify .
+        echo -e "${GREEN}✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。${NC}"
+    elif [ -f "./node_modules/.bin/graphify" ]; then
+        ./node_modules/.bin/graphify .
+        echo -e "${GREEN}✅ 代碼圖譜更新完成！${NC}"
+    else
+        # 嘗試全域或使用 /graphify
+        /graphify . 2>/dev/null || echo -e "${RED}⚠️ 未能自動執行 graphify，請確認是否有安裝全域 graphifyy 工具。${NC}"
+    fi
+}
+
+stop_day() {
+    echo -e "${BLUE}====== 🌇 下班收尾：記憶封存與去衝突歸檔 ======${NC}"
+    echo -e "${YELLOW}正在掃描今日所有工具產生的對話歷史，並安全打包存入長期記憶宮殿...${NC}"
+    run_sweep normal
+    # 寫入最後歸檔時間戳
+    mkdir -p "$HOME/.claude"
+    date +%s > "$HOME/.claude/last_sweep_timestamp"
+    echo -e "${GREEN}✅ 長期記憶歸檔完成！無死鎖風險，您可以安全關閉所有終端機。${NC}"
+}
+
+check_status() {
+    echo -e "${BLUE}====== 📊 專案 AI 大腦狀態檢查 ======${NC}"
+    
+    # 檢查 MemPalace
+    if [ -d ".mempalace" ] || [ -f "mempalace.json" ]; then
+        echo -e "MemPalace 狀態: ${GREEN}已初始化 (Active)${NC}"
+    else
+        echo -e "MemPalace 狀態: ${RED}未初始化${NC}"
+    fi
+    
+    # 檢查 Graphify
+    if [ -d "graphify-out" ]; then
+        echo -e "Graphify 地圖: ${GREEN}已生成 (Active)${NC}"
+    else
+        echo -e "Graphify 地圖: ${YELLOW}尚未生成地圖 (請執行 ai-brain start)${NC}"
+    fi
+    
+    # 檢查 CLAUDE.md
+    if [ -f "CLAUDE.md" ]; then
+        echo -e "CLAUDE.md 指南: ${GREEN}已配置${NC}"
+    else
+        echo -e "CLAUDE.md 指南: ${RED}遺失${NC}"
+    fi
+    
+    # 檢查 .claude/config.json
+    if [ -f ".claude/config.json" ]; then
+        echo -e "記憶生命週期鉤子: ${GREEN}已配置 (Active)${NC}"
+    else
+        echo -e "記憶生命週期鉤子: ${RED}未配置${NC}"
+    fi
+
+    # 檢查是否啟用自動歸檔
+    local current_dir=$(pwd)
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    if [ -f "$archive_enabled_file" ] && grep -q -F "$current_dir" "$archive_enabled_file"; then
+        echo -e "定時自動歸檔: ${GREEN}已啟用 (Active)${NC}"
+    else
+        echo -e "定時自動歸檔: ${RED}停用中 (預設不歸檔)${NC}"
+    fi
+}
+
+verify_brain() {
+    echo -e "${BLUE}====== 🔍 AI 協作大腦一鍵自我驗證流程 ======${NC}"
+    local errors=0
+
+    # 1. 驗證 mempalace
+    echo -n "1. 檢查 MemPalace CLI 工具... "
+    if command -v mempalace &> /dev/null; then
+        echo -e "[ ${GREEN}OK${NC} ]"
+    else
+        echo -e "[ ${RED}FAIL${NC} ] (未安裝或未加入 PATH)"
+        ((errors++))
+    fi
+
+    # 2. 驗證 claude-mem (Claude Code 專屬短期記憶鉤子，非 Claude Code 環境可忽略)
+    echo -n "2. 檢查 claude-mem CLI 工具... "
+    if command -v claude-mem &> /dev/null; then
+        echo -e "[ ${GREEN}OK${NC} ]"
+    else
+        echo -e "[ ${YELLOW}WARN${NC} ] (未安裝或未加入 PATH，此工具僅 Claude Code 需要)"
+    fi
+
+    # 3. 驗證 graphify
+    echo -n "3. 檢查 Graphify CLI 工具... "
+    if command -v graphify &> /dev/null || [ -f "./node_modules/.bin/graphify" ]; then
+        echo -e "[ ${GREEN}OK${NC} ]"
+    else
+        echo -e "[ ${RED}FAIL${NC} ] (未安裝或未加入 PATH)"
+        ((errors++))
+    fi
+
+    # 4. 驗證 Claude Code / OpenCode MCP 註冊狀態
+    echo -n "4. 檢查 Claude Code MCP 記憶註冊與內容正確性... "
+    local check_res4
+    check_res4=$(python3 -c "
+import json, os, shutil
+path = os.path.expanduser('~/.claude.json')
+local_path = '.claude.json'
+file_path = path if os.path.exists(path) else (local_path if os.path.exists(local_path) else None)
+if not file_path:
+    print('FAIL:找不到 ~/.claude.json 或專案 .claude.json')
+    exit(1)
+try:
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+except Exception as e:
+    print(f'FAIL:JSON 格式損壞 ({e})')
+    exit(1)
+mcp_servers = data.get('mcpServers', {})
+if 'mempalace' not in mcp_servers:
+    print('FAIL:未註冊 mempalace')
+    exit(1)
+cmd = mcp_servers['mempalace'].get('command')
+if not cmd or not shutil.which(cmd):
+    print(f'FAIL:mempalace 執行檔 ({cmd}) 無效或不可執行')
+    exit(1)
+print('OK')
+" 2>/dev/null)
+
+    if [[ "$check_res4" == OK* ]]; then
+        echo -e "[ ${GREEN}OK${NC} ]"
+    else
+        echo -e "[ ${RED}FAIL${NC} ] (${check_res4#FAIL:})"
+        ((errors++))
+    fi
+
+    # 5. 驗證 OpenClaw Daemon 狀態
+    echo -n "5. 檢查 OpenClaw 運行狀態... "
+    local oc_cmd="openclaw"
+    if ! command -v openclaw &> /dev/null; then
+        # 尋找 NVM 中的 openclaw (為相容非互動式 SSH 殼層，自動尋找 NVM 目錄)
+        local nvm_oc
+        nvm_oc=$(find "$HOME/.nvm/versions/node" -maxdepth 3 -name "openclaw" 2>/dev/null | head -n 1)
+        if [ -n "$nvm_oc" ]; then
+            oc_cmd="$nvm_oc"
+            # 暫時將對應版本的 Node.js bin 目錄加入 PATH 以防 Node.js 版本不符
+            local nvm_node_bin
+            nvm_node_bin=$(dirname "$nvm_oc")
+            export PATH="$nvm_node_bin:$PATH"
+        fi
+    fi
+
+    if command -v "$oc_cmd" &> /dev/null || [ -x "$oc_cmd" ]; then
+        local oc_status
+        oc_status=$("$oc_cmd" daemon status 2>/dev/null)
+        if echo "$oc_status" | grep -q "running"; then
+            echo -e "[ ${GREEN}OK${NC} ] (已啟動)"
+        else
+            echo -e "[ ${YELLOW}WARN${NC} ] (OpenClaw 已安裝但未啟動)"
+        fi
+    else
+        echo -e "[ ${YELLOW}INFO${NC} ] (此環境未安裝 OpenClaw CLI，跳過檢查)"
+    fi
+
+    # 6. 驗證 OpenCode CLI 工具與 MCP 記憶載入
+    echo -n "6. 檢查 OpenCode MCP 記憶載入與內容正確性... "
+    local ocode_cmd="opencode"
+    if ! command -v opencode &> /dev/null; then
+        if [ -f "$HOME/bin/opencode" ]; then
+            ocode_cmd="$HOME/bin/opencode"
+        fi
+    fi
+
+    if command -v "$ocode_cmd" &> /dev/null || [ -x "$ocode_cmd" ]; then
+        local check_res6
+        check_res6=$(python3 -c "
+import json, os, shutil, subprocess
+path = os.path.expanduser('~/.mcp.json')
+if not os.path.exists(path):
+    print('FAIL:找不到 ~/.mcp.json')
+    exit(1)
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+except Exception as e:
+    print(f'FAIL:JSON 格式損壞 ({e})')
+    exit(1)
+mcp_servers = data.get('mcpServers', {})
+for s in ['mempalace', 'graphify']:
+    if s not in mcp_servers:
+        print(f'FAIL:未註冊 {s}')
+        exit(1)
+    info = mcp_servers[s]
+    cmd = info.get('command')
+    if not cmd:
+        print(f'FAIL:{s} command 缺失')
+        exit(1)
+    if cmd in ['python3', 'python']:
+        args = info.get('args', [])
+        if args and 'graphify.serve' in args:
+            res = subprocess.run([cmd, '-c', 'import graphify.serve'], capture_output=True)
+            if res.returncode != 0:
+                print('FAIL:python 環境未安裝 graphify')
+                exit(1)
+    elif not shutil.which(cmd):
+        print(f'FAIL:{s} 執行檔 ({cmd}) 無效或不可執行')
+        exit(1)
+print('OK')
+" 2>/dev/null)
+        if [[ "$check_res6" == OK* ]]; then
+            echo -e "[ ${GREEN}OK${NC} ]"
+        else
+            echo -e "[ ${RED}FAIL${NC} ] (${check_res6#FAIL:})"
+            ((errors++))
+        fi
+    else
+        echo -e "[ ${YELLOW}INFO${NC} ] (此環境未安裝 OpenCode CLI，跳過檢查)"
+    fi
+
+    # 7. 驗證 Gemini / Antigravity IDE 與 MCP 記憶載入
+    echo -n "7. 檢查 Gemini / Antigravity IDE MCP 記憶載入與內容正確性... "
+    local gemini_cmd="gemini"
+    if ! command -v gemini &> /dev/null; then
+        if [ -f "$HOME/bin/gemini" ]; then
+            gemini_cmd="$HOME/bin/gemini"
+        fi
+    fi
+
+    if command -v "$gemini_cmd" &> /dev/null || [ -x "$gemini_cmd" ]; then
+        local check_res7
+        check_res7=$(python3 -c "
+import json, os, shutil, subprocess
+paths = [os.path.expanduser('~/.gemini/config/mcp_config.json'), os.path.expanduser('~/.gemini/antigravity/mcp_config.json')]
+valid_paths = [p for p in paths if os.path.exists(p)]
+if not valid_paths:
+    print('FAIL:找不到 mcp_config.json')
+    exit(1)
+for p in valid_paths:
+    try:
+        with open(p, 'r') as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f'FAIL:{os.path.basename(p)} JSON 格式損壞 ({e})')
+        exit(1)
+    mcp_servers = data.get('mcpServers', {})
+    for s in ['mempalace', 'graphify']:
+        if s not in mcp_servers:
+            if len(valid_paths) > 1 and p == valid_paths[0]:
+                continue
+            print(f'FAIL:{os.path.basename(p)} 未註冊 {s}')
+            exit(1)
+        info = mcp_servers[s]
+        cmd = info.get('command')
+        if not cmd:
+            print(f'FAIL:{s} command 缺失')
+            exit(1)
+        if cmd in ['python3', 'python']:
+            args = info.get('args', [])
+            if args and 'graphify.serve' in args:
+                res = subprocess.run([cmd, '-c', 'import graphify.serve'], capture_output=True)
+                if res.returncode != 0:
+                    print('FAIL:python 環境未安裝 graphify')
+                    exit(1)
+        elif not shutil.which(cmd):
+            print(f'FAIL:{s} 執行檔 ({cmd}) 無效或不可執行')
+            exit(1)
+print('OK')
+" 2>/dev/null)
+        if [[ "$check_res7" == OK* ]]; then
+            echo -e "[ ${GREEN}OK${NC} ]"
+        else
+            echo -e "[ ${RED}FAIL${NC} ] (${check_res7#FAIL:})"
+            ((errors++))
+        fi
+    else
+        echo -e "[ ${YELLOW}INFO${NC} ] (此環境未安裝 Gemini CLI，跳過檢查)"
+    fi
+
+    # 8. 檢查 Claude Desktop App 與 MCP 記憶載入
+    echo -n "8. 檢查 Claude Desktop App MCP 記憶載入與內容正確性... "
+    local claude_desktop_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    if [ -f "$claude_desktop_config" ]; then
+        local check_res8
+        check_res8=$(python3 -c "
+import json, os, shutil
+path = os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+except Exception as e:
+    print(f'FAIL:JSON 格式損壞 ({e})')
+    exit(1)
+mcp_servers = data.get('mcpServers', {})
+if 'mempalace' not in mcp_servers:
+    print('FAIL:未註冊 mempalace')
+    exit(1)
+cmd = mcp_servers['mempalace'].get('command')
+if not cmd or not shutil.which(cmd):
+    print(f'FAIL:mempalace 執行檔 ({cmd}) 無效或不可執行')
+    exit(1)
+print('OK')
+" 2>/dev/null)
+        if [[ "$check_res8" == OK* ]]; then
+            echo -e "[ ${GREEN}OK${NC} ]"
+        else
+            echo -e "[ ${RED}FAIL${NC} ] (${check_res8#FAIL:})"
+            ((errors++))
+        fi
+    elif [ -d "$HOME/Library/Application Support/Claude" ]; then
+        echo -e "[ ${RED}FAIL${NC} ] (已安裝 Claude Desktop 但未於設定檔中註冊 mempalace)"
+        ((errors++))
+    else
+        echo -e "[ ${YELLOW}INFO${NC} ] (此環境未安裝 Claude Desktop App，跳過檢查)"
+    fi
+
+    # 9. 驗證 Kilo 與 MCP 記憶載入
+    echo -n "9. 檢查 Kilo MCP 記憶載入與內容正確性... "
+    local kilo_config="$HOME/.config/kilo/kilo.json"
+    local vscode_kilo_config="$HOME/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"
+    local kilo_installed=0
+
+    # 檢查 Kilo CLI
+    if [ -d "$HOME/.config/kilo" ] || [ -d "$HOME/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code" ]; then
+        kilo_installed=1
+    fi
+
+    if [ $kilo_installed -eq 1 ]; then
+        local check_res9
+        check_res9=$(python3 -c "
+import json, os, shutil, subprocess
+paths = [os.path.expanduser('~/.config/kilo/kilo.json'), os.path.expanduser('~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json')]
+valid_paths = [p for p in paths if os.path.exists(p)]
+if not valid_paths:
+    print('FAIL:找不到 Kilo 設定檔')
+    exit(1)
+for p in valid_paths:
+    try:
+        with open(p, 'r') as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f'FAIL:{os.path.basename(p)} JSON 格式損壞 ({e})')
+        exit(1)
+    mcp_servers = data.get('mcpServers', {}) if 'mcpServers' in data else data.get('mcp', {})
+    for s in ['mempalace', 'graphify']:
+        if s not in mcp_servers:
+            if len(valid_paths) > 1 and p == valid_paths[0]:
+                continue
+            print(f'FAIL:{os.path.basename(p)} 未註冊 {s}')
+            exit(1)
+        info = mcp_servers[s]
+        cmd = info.get('command')
+        if isinstance(cmd, list):
+            cmd = cmd[0]
+        if not cmd:
+            print(f'FAIL:{s} command 缺失')
+            exit(1)
+        if cmd in ['python3', 'python']:
+            args = info.get('args', []) if 'args' in info else info.get('command', [])
+            if args and any('graphify.serve' in str(a) for a in args):
+                res = subprocess.run([cmd, '-c', 'import graphify.serve'], capture_output=True)
+                if res.returncode != 0:
+                    print('FAIL:python 環境未安裝 graphify')
+                    exit(1)
+        elif not shutil.which(cmd):
+            print(f'FAIL:{s} 執行檔 ({cmd}) 無效或不可執行')
+            exit(1)
+print('OK')
+" 2>/dev/null)
+        if [[ "$check_res9" == OK* ]]; then
+            echo -e "[ ${GREEN}OK${NC} ]"
+        else
+            echo -e "[ ${RED}FAIL${NC} ] (${check_res9#FAIL:})"
+            ((errors++))
+        fi
+    else
+        echo -e "[ ${YELLOW}INFO${NC} ] (此環境未安裝 Kilo，跳過檢查)"
+    fi
+
+    echo ""
+    if [ $errors -eq 0 ]; then
+        echo -e "${GREEN}🎉 恭喜！一鍵驗證全部通過！您的 AI 多代理協作大腦與記憶套件處於完美狀態！${NC}"
+    else
+        echo -e "${RED}⚠️ 驗證未完全通過，共有 $errors 項錯誤。請參考上述 FAIL 提示進行排查。${NC}"
+    fi
+}
+
+clean_brain() {
+    echo -e "${BLUE}====== 🗑️ 開始清除此專案的 AI 大腦配置 ======${NC}"
+    
+    # 1. 移除 mempalace 本地配置
+    if [ -f "mempalace.yaml" ] || [ -f "entities.json" ]; then
+        echo -e "--> 移除 MemPalace 專案配置文件..."
+        rm -f mempalace.yaml entities.json
+    fi
+    
+    # 2. 移除 graphify 輸出與本地技能
+    if [ -d "graphify-out" ]; then
+        echo -e "--> 移除 Graphify 輸出目錄..."
+        rm -rf graphify-out
+    fi
+    if [ -d ".claude/skills/graphify" ]; then
+        echo -e "--> 移除 .claude 中的 Graphify 技能..."
+        rm -rf .claude/skills/graphify
+    fi
+
+    # 2b. 移除各工具的 Graphify 規則與工作流配置
+    echo -e "--> 移除各工具的 Graphify 本地配置..."
+    graphify antigravity uninstall > /dev/null 2>&1 || true
+    graphify kilo uninstall > /dev/null 2>&1 || true
+    graphify cursor uninstall > /dev/null 2>&1 || true
+    graphify claude uninstall > /dev/null 2>&1 || true
+    graphify opencode uninstall > /dev/null 2>&1 || true
+    
+    # 3. 移除/還原 .claude 配置
+    if [ -f ".claude/config.json" ]; then
+        echo -e "--> 移除 .claude/config.json 記憶生命週期鉤子..."
+        rm -f .claude/config.json
+    fi
+    if [ -f ".claude/settings.json" ]; then
+        echo -e "--> 移除 .claude/settings.json 中的 Hook 註冊..."
+        rm -f .claude/settings.json
+    fi
+    if [ -d ".claude" ] && [ -z "$(ls -A .claude 2>/dev/null)" ]; then
+        rm -rf .claude
+    fi
+
+    # 4. 移除 CLAUDE.md 中的記憶指引
+    if [ -f "CLAUDE.md" ]; then
+        echo -e "--> 清理 CLAUDE.md 導引指南..."
+        if grep -q "AI Agent 認知工作流與大腦記憶指引" "CLAUDE.md" || grep -q "AI Agent 大腦與記憶指引" "CLAUDE.md"; then
+            rm -f CLAUDE.md
+        fi
+    fi
+
+    # 5. 移除 Git Hooks
+    if [ -d ".git/hooks" ]; then
+        echo -e "--> 移除 Git Hooks 自動更新圖譜腳本..."
+        rm -f .git/hooks/post-merge .git/hooks/post-checkout
+    fi
+
+    # 6. 自活躍專案註冊表中移除
+    deregister_project
+
+    echo -e "${GREEN}====== 🎉 專案 AI 大腦配置已成功清除！ ======${NC}"
+}
+
+uninstall_all() {
+    clean_brain
+    
+    echo ""
+    echo -e "${BLUE}====== 🗑️ 開始解除安裝全域 AI 大腦配置與定時排程 ======${NC}"
+    
+    # 1. 移除 Cron Job
+    if crontab -l 2>/dev/null | grep -F -q "ai-brain stop"; then
+        echo -e "--> 移除 Crontab 中的 stop 自動歸檔排程..."
+        crontab -l 2>/dev/null | grep -F -v "ai-brain stop" | crontab -
+        echo -e "${GREEN}✅ Cron Job 已移除。${NC}"
+    else
+        echo -e "--> 未偵測到 ai-brain 相關 Cron Job，跳過。"
+    fi
+    
+    # 2. 移除全域指令檔
+    if [ -e "$HOME/.local/bin/ai-brain" ]; then
+        echo -e "--> 移除全域指令檔 $HOME/.local/bin/ai-brain..."
+        rm -f "$HOME/.local/bin/ai-brain"
+    fi
+    
+    # 2b. 移除 ~/.graphify/providers.json 中的 minimax 設定
+    local graphify_providers="$HOME/.graphify/providers.json"
+    if [ -f "$graphify_providers" ] && grep -q "minimax" "$graphify_providers"; then
+        echo -e "--> 自 ~/.graphify/providers.json 移除 MiniMax 自訂 LLM 後端..."
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/.graphify/providers.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'minimax' in data:
+        del data['minimax']
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        print('Successfully removed MiniMax provider from ~/.graphify/providers.json')
+except Exception as e:
+    print(f'Error removing MiniMax provider: {e}')
+"
+    fi
+
+    # 3. 移除 ~/.mcp.json 中的 mempalace 與 graphify 註冊 (此動作將影響 OpenCode 與 Gemini / Antigravity IDE)
+    local mcp_config="$HOME/.mcp.json"
+    if [ -f "$mcp_config" ] && (grep -q "mempalace" "$mcp_config" || grep -q "graphify" "$mcp_config"); then
+        echo -e "--> 自 ~/.mcp.json 註銷 MemPalace / Graphify MCP 伺服器 (將同步移除 OpenCode 與 Gemini / Antigravity IDE 的記憶連結)..."
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/.mcp.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'mcpServers' in data:
+        if 'mempalace' in data['mcpServers']: del data['mcpServers']['mempalace']
+        if 'graphify' in data['mcpServers']: del data['mcpServers']['graphify']
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        print('Successfully deregistered servers from ~/.mcp.json')
+except Exception as e:
+    print(f'Error deregistering: {e}')
+"
+    fi
+
+    # 4. 移除 ~/.claude.json 中的 mempalace 與 graphify 註冊
+    local claude_config="$HOME/.claude.json"
+    if [ -f "$claude_config" ] && (grep -q "mempalace" "$claude_config" || grep -q "graphify" "$claude_config"); then
+        echo -e "--> 自 ~/.claude.json 註銷 MemPalace / Graphify MCP 伺服器..."
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/.claude.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'mcpServers' in data:
+        if 'mempalace' in data['mcpServers']: del data['mcpServers']['mempalace']
+        if 'graphify' in data['mcpServers']: del data['mcpServers']['graphify']
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        print('Successfully deregistered servers from ~/.claude.json')
+except Exception as e:
+    print(f'Error deregistering: {e}')
+"
+    fi
+
+    # 5. 移除 ~/.gemini/config/mcp_config.json 與 ~/.gemini/antigravity/mcp_config.json 中的 mempalace 與 graphify 註冊
+    for folder in "$HOME/.gemini/config" "$HOME/.gemini/antigravity"; do
+        local path="$folder/mcp_config.json"
+        if [ -f "$path" ] && (grep -q "mempalace" "$path" || grep -q "graphify" "$path"); then
+            echo -e "--> 自 $folder/mcp_config.json 註銷 MemPalace / Graphify MCP 伺服器..."
+            python3 -c "
+import json, os
+path = '$path'
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'mcpServers' in data:
+        if 'mempalace' in data['mcpServers']: del data['mcpServers']['mempalace']
+        if 'graphify' in data['mcpServers']: del data['mcpServers']['graphify']
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        print('Successfully deregistered servers')
+except Exception as e:
+    print(f'Error deregistering: {e}')
+"
+        fi
+    done
+
+    # 6. 移除 ~/Library/Application Support/Claude/claude_desktop_config.json 中的 mempalace 註冊
+    local claude_desktop_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    if [ -f "$claude_desktop_config" ] && grep -q "mempalace" "$claude_desktop_config"; then
+        echo -e "--> 自 Claude Desktop App 註銷 MemPalace MCP 伺服器..."
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json')
+try:
+    with open(path, 'r') as f:
+        data = json.load(f)
+    if 'mcpServers' in data and 'mempalace' in data['mcpServers']:
+        del data['mcpServers']['mempalace']
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        print('Successfully deregistered mempalace from Claude Desktop App config')
+except Exception as e:
+    print(f'Error deregistering from Claude Desktop App config: {e}')
+"
+    fi
+
+    # 7. 移除 Kilo 中的 mempalace 與 graphify 註冊
+    local kilo_config="$HOME/.config/kilo/kilo.json"
+    local vscode_kilo_config="$HOME/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"
+    if ([ -f "$kilo_config" ] && (grep -q "mempalace" "$kilo_config" || grep -q "graphify" "$kilo_config")) || ([ -f "$vscode_kilo_config" ] && (grep -q "mempalace" "$vscode_kilo_config" || grep -q "graphify" "$vscode_kilo_config")); then
+        echo -e "--> 自 Kilo 註銷 MemPalace / Graphify MCP 伺服器..."
+        python3 -c "
+import json, os
+
+# 1. Kilo CLI 設定
+kilo_path = os.path.expanduser('~/.config/kilo/kilo.json')
+if os.path.exists(kilo_path):
+    try:
+        with open(kilo_path, 'r') as f:
+            data = json.load(f)
+        if 'mcp' in data:
+            if 'mempalace' in data['mcp']: del data['mcp']['mempalace']
+            if 'graphify' in data['mcp']: del data['mcp']['graphify']
+            with open(kilo_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            print('Successfully deregistered servers from ~/.config/kilo/kilo.json')
+    except Exception as e:
+        print(f'Error deregistering from Kilo CLI config: {e}')
+
+# 2. Kilo VS Code Extension 設定
+vscode_kilo_path = os.path.expanduser('~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json')
+if os.path.exists(vscode_kilo_path):
+    try:
+        with open(vscode_kilo_path, 'r') as f:
+            data = json.load(f)
+        if 'mcpServers' in data:
+            if 'mempalace' in data['mcpServers']: del data['mcpServers']['mempalace']
+            if 'graphify' in data['mcpServers']: del data['mcpServers']['graphify']
+            with open(vscode_kilo_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            print('Successfully deregistered servers from Kilo VS Code settings')
+    except Exception as e:
+        print(f'Error deregistering from Kilo VS Code config: {e}')
+"
+    fi
+
+    # 8. 自 ~/.claude/CLAUDE.md 移除全域大腦引導原則
+    if [ -f "$HOME/.claude/CLAUDE.md" ]; then
+        echo -e "--> 自 ~/.claude/CLAUDE.md 移除全域大腦引導原則..."
+        python3 -c "
+import os
+path = os.path.expanduser('~/.claude/CLAUDE.md')
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        content = f.read()
+    marker = '## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)'
+    if marker in content:
+        parts = content.split(marker)
+        clean_content = parts[0].strip() + '\n'
+        with open(path, 'w') as f:
+            f.write(clean_content)
+        print('Successfully removed global cognitive rules from ~/.claude/CLAUDE.md')
+"
+    fi
+
+    echo -e "${GREEN}====== 🎉 全域 AI 大腦配置已完成解除安裝！ ======${NC}"
+    echo "💡 提示: 若要完全移除相關 CLI 套件，您可以手動執行以下指令："
+    echo "  uv tool uninstall mempalace"
+    echo "  uv tool uninstall claude-mem"
+    echo "  uv tool uninstall graphifyy"
+}
+
+disable_cron() {
+    echo -e "${BLUE}====== ⏰ 開始移除全自動定時歸檔 Cron Job ======${NC}"
+    if crontab -l 2>/dev/null | grep -F -q "ai-brain stop"; then
+        crontab -l 2>/dev/null | grep -F -v "ai-brain stop" | crontab -
+        echo -e "${GREEN}✅ Cron Job 已成功移除！已停止自動記憶歸檔。${NC}"
+    else
+        echo -e "${YELLOW}⚠️ 未偵測到 ai-brain 相關 Cron Job，無須移除。${NC}"
+    fi
+}
+
+manage_exclude() {
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    local registry="$HOME/.claude/ai_brain_active_projects.txt"
+    mkdir -p "$HOME/.claude"
+    touch "$archive_enabled_file"
+    touch "$registry"
+
+    # 如果沒有帶參數，則列出所有狀態
+    if [ -z "$1" ]; then
+        echo -e "${BLUE}====== 🗂️ 全域自動記憶歸檔狀態清單 ======${NC}"
+        echo "目前註冊的專案與其自動歸檔狀態："
+        echo ""
+        
+        local i=1
+        while IFS= read -r proj_path || [ -n "$proj_path" ]; do
+            [[ -z "${proj_path// }" ]] && continue
+            local base_name=$(basename "$proj_path")
+            
+            if [ -f "$archive_enabled_file" ] && grep -q -F "$proj_path" "$archive_enabled_file"; then
+                echo -e "  [$i] ${GREEN}[ 已啟用自動歸檔 (Active) ]${NC} $base_name ($proj_path)"
+            else
+                echo -e "  [$i] ${RED}[ 預設不歸檔 (Inactive) ]${NC} $base_name ($proj_path)"
+            fi
+            ((i++))
+        done < "$registry"
+        
+        echo ""
+        echo -e "${YELLOW}用法提示:${NC}"
+        echo -e "  啟用當前專案自動歸檔: ${GREEN}ai-brain include${NC}"
+        echo -e "  停用當前專案自動歸檔: ${GREEN}ai-brain exclude current${NC} 或 ${GREEN}ai-brain exclude .${NC}"
+        echo -e "  啟用指定專案自動歸檔: ${GREEN}ai-brain include [專案關鍵字]${NC}"
+        echo -e "  停用指定專案自動歸檔: ${GREEN}ai-brain exclude [專案關鍵字]${NC}"
+        echo ""
+    else
+        local target_path=""
+        local pattern="$1"
+        
+        if [ "$pattern" = "." ] || [ "$pattern" = "current" ]; then
+            local current_dir=$(pwd)
+            if grep -q -F "$current_dir" "$registry"; then
+                target_path="$current_dir"
+            else
+                echo -e "${RED}⚠️ 當前目錄未在 AI 大腦活躍清單中註冊。${NC}"
+                return 1
+            fi
+        else
+            # 尋找匹配關鍵字的路徑
+            while IFS= read -r proj_path || [ -n "$proj_path" ]; do
+                [[ -z "${proj_path// }" ]] && continue
+                if [[ "$proj_path" == *"$pattern"* ]]; then
+                    target_path="$proj_path"
+                    break
+                fi
+            done < "$registry"
+        fi
+
+        if [ -n "$target_path" ]; then
+            if grep -q -F "$target_path" "$archive_enabled_file"; then
+                # 自白名單移除
+                python3 -c "
+import os
+path = os.path.expanduser('~/.claude/ai_brain_auto_archive.txt')
+target = '$target_path'
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        lines = f.read().splitlines()
+    if target in lines:
+        lines.remove(target)
+        with open(path, 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+"
+                echo -e "${GREEN}✅ 已成功將專案 \"$(basename "$target_path")\" 自自動歸檔白名單中移除！${NC}"
+            else
+                echo -e "${YELLOW}⚠️ 專案 \"$(basename "$target_path")\" 本就未啟用自動歸檔。${NC}"
+            fi
+        else
+            echo -e "${RED}⚠️ 活躍專案清單中找不到匹配關鍵字 \"$1\" 的專案。${NC}"
+            return 1
+        fi
+    fi
+}
+
+manage_include() {
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    local registry="$HOME/.claude/ai_brain_active_projects.txt"
+    mkdir -p "$HOME/.claude"
+    touch "$archive_enabled_file"
+    touch "$registry"
+    
+    local target_path=""
+    if [ -z "$1" ] || [ "$1" = "." ] || [ "$1" = "current" ]; then
+        # 預設啟用當前目錄
+        local current_dir=$(pwd)
+        if grep -q -F "$current_dir" "$registry"; then
+            target_path="$current_dir"
+        else
+            echo -e "${RED}⚠️ 當前目錄未在 AI 大腦活躍清單中註冊。${NC}"
+            echo -e "請先執行 ${GREEN}ai-brain init${NC} 或指定專案關鍵字：${GREEN}ai-brain include [專案關鍵字]${NC}"
+            return 1
+        fi
+    else
+        # 尋找匹配關鍵字的路徑
+        local pattern="$1"
+        while IFS= read -r proj_path || [ -n "$proj_path" ]; do
+            [[ -z "${proj_path// }" ]] && continue
+            if [[ "$proj_path" == *"$pattern"* ]]; then
+                target_path="$proj_path"
+                break
+            fi
+        done < "$registry"
+    fi
+    
+    if [ -n "$target_path" ]; then
+        if grep -q -F "$target_path" "$archive_enabled_file"; then
+            echo -e "${YELLOW}⚠️ 專案 \"$(basename "$target_path")\" 已經在自動歸檔白名單中。${NC}"
+        else
+            echo "$target_path" >> "$archive_enabled_file"
+            echo -e "${GREEN}✅ 已成功將專案 \"$(basename "$target_path")\" 加入自動歸檔白名單！${NC}"
+            echo "該專案現在起將會定時進行自動記憶歸檔。"
+        fi
+    else
+        echo -e "${RED}⚠️ 活躍專案清單中找不到匹配關鍵字 \"$1\" 的專案。${NC}"
+        return 1
+    fi
+}
+
+exclude_all() {
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    mkdir -p "$HOME/.claude"
+    
+    echo -e "${BLUE}====== 🗑️ 一鍵停用所有專案自動歸檔 ======${NC}"
+    > "$archive_enabled_file"
+    echo -e "${GREEN}✅ 已成功停用所有專案的定時自動歸檔！自動歸檔白名單已清空。${NC}"
+}
+
+include_all() {
+    local archive_enabled_file="$HOME/.claude/ai_brain_auto_archive.txt"
+    local registry="$HOME/.claude/ai_brain_active_projects.txt"
+    mkdir -p "$HOME/.claude"
+    touch "$registry"
+    
+    echo -e "${BLUE}====== 🌅 一鍵啟用所有專案自動歸檔 ======${NC}"
+    if [ -f "$registry" ] && [ -s "$registry" ]; then
+        cp "$registry" "$archive_enabled_file"
+        echo -e "${GREEN}✅ 已成功將所有活躍註冊專案加入自動歸檔白名單！${NC}"
+    else
+        > "$archive_enabled_file"
+        echo -e "${YELLOW}⚠️ 活躍專案註冊表為空，無專案可啟用。${NC}"
+    fi
+}
+
+# 根據引數執行對應功能
+case "$1" in
+    init)
+        init_brain
+        ;;
+    full-init)
+        full_init
+        ;;
+    install|update)
+        install_globally
+        ;;
+    version|-v|--version)
+        show_version
+        ;;
+    start)
+        start_day
+        ;;
+    stop)
+        stop_day
+        ;;
+    status)
+        check_status
+        ;;
+    verify)
+        verify_brain
+        ;;
+    clean)
+        clean_brain
+        ;;
+    uninstall)
+        uninstall_all
+        ;;
+    stop-cron)
+        disable_cron
+        ;;
+    exclude)
+        manage_exclude "$2"
+        ;;
+    include)
+        manage_include "$2"
+        ;;
+    exclude-all)
+        exclude_all
+        ;;
+    include-all)
+        include_all
+        ;;
+    *)
+        show_help
+        ;;
+esac
