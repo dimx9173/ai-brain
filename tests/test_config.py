@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ai_brain.config import modify_json_file
-from tests.conftest import InTempDir
+from ai_brain._testing import InTempDir
 
 
 class TestConfigManager(InTempDir):
