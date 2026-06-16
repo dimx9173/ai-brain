@@ -206,11 +206,20 @@ def check_status() -> bool:
 
 
 # --- include / exclude ----------------------------------------------------------
+# Special tokens recognised by `_resolve_target` in addition to the existing
+# "." / "current" / keyword behaviour.
+_ALL_TOKEN = "all"
+_BULK_TOKENS = (_ALL_TOKEN,)
+
 
 def manage_exclude(pattern: str | None) -> bool:
     if not pattern:
         _print_archive_status()
         return True
+
+    if pattern.lower() in _BULK_TOKENS:
+        # `exclude all` ≡ `exclude-all` — disable every archived project.
+        return registry.clear_archive()
 
     target = _resolve_target(pattern)
     if not target:
@@ -219,6 +228,10 @@ def manage_exclude(pattern: str | None) -> bool:
 
 
 def manage_include(pattern: str | None) -> bool:
+    # `include all` ≡ `include-all` — enable every active project.
+    if pattern and pattern.lower() in _BULK_TOKENS:
+        return registry.archive_all_active()
+
     target = _resolve_target(pattern)
     if not target:
         return False
@@ -472,18 +485,42 @@ def _print_archive_status() -> None:
     from .ui import GREEN as G, NC as RST
     print(f"  啟用當前專案自動歸檔: {G}ai-brain include{RST}")
     print(f"  停用當前專案自動歸檔: {G}ai-brain exclude current{RST} 或 {G}ai-brain exclude .{RST}")
-    print(f"  啟用指定專案自動歸檔: {G}ai-brain include [專案關鍵字]{RST}")
-    print(f"  停用指定專案自動歸檔: {G}ai-brain exclude [專案關鍵字]{RST}\n")
+    print(f"  啟用指定專案自動歸檔: {G}ai-brain include [專案關鍵字|編號|all]{RST}")
+    print(f"  停用指定專案自動歸檔: {G}ai-brain exclude [專案關鍵字|編號|all]{RST}")
+    print(f"  全部啟用: {G}ai-brain include all{RST}  (同 {G}include-all{RST})")
+    print(f"  全部停用: {G}ai-brain exclude all{RST}  (同 {G}exclude-all{RST})\n")
 
 
 def _resolve_target(pattern: str | None) -> str | None:
-    """Resolve `exclude [pattern]` / `include [pattern]` to a project path."""
+    """Resolve `exclude [pattern]` / `include [pattern]` to a project path.
+
+    Accepts, in order of precedence:
+    - "." / "current" → the current working directory (must be registered)
+    - a positive integer (1-based) → that position in the active list,
+      matching the numbers shown by `ai-brain exclude` (no args)
+    - any other string → substring match against the active list
+    """
     if not pattern or pattern in (".", "current"):
         proj_path = registry.current_project_path()
         if proj_path not in registry.list_active():
             print(red("⚠️ 當前目錄未在 AI 大腦活躍清單中註冊。"))
             return None
         return proj_path
+
+    # 1-based numeric index — checked *before* keyword matching so "2"
+    # never accidentally matches a project whose path contains "2".
+    if pattern.isdigit():
+        idx = int(pattern)
+        target = registry.find_active_by_index(idx)
+        if target is None:
+            active_count = len(registry.list_active())
+            print(red(
+                f'⚠️ 編號 {idx} 超出範圍:活躍名單只有 {active_count} 個專案。'
+            ))
+            print(yellow("💡 執行 `ai-brain exclude` 查看編號清單。"))
+            return None
+        return target
+
     target = registry.find_active_by_keyword(pattern)
     if not target:
         print(red(f'⚠️ 活躍專案清單中找不到匹配關鍵字 "{pattern}" 的專案。'))

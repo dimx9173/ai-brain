@@ -96,6 +96,21 @@ def find_active_by_keyword(keyword: str) -> Optional[str]:
     return None
 
 
+def find_active_by_index(index_1based: int) -> Optional[str]:
+    """Return the project at the given 1-based position in the active list.
+
+    Used by `ai-brain exclude 3` / `ai-brain include 3` so the user can
+    refer to a project by the number they saw in `ai-brain exclude` (no args).
+    Returns None for out-of-range indices.
+    """
+    if index_1based < 1:
+        return None
+    active = list_active()
+    if not active or index_1based > len(active):
+        return None
+    return active[index_1based - 1]
+
+
 def is_archived(proj_path: str) -> bool:
     return proj_path in list_archived()
 

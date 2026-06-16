@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ai_brain import registry
-from tests.conftest import InTempDir
+from ai_brain._testing import InTempDir
 
 
 class TestRegistry(InTempDir):
@@ -33,6 +33,16 @@ class TestRegistry(InTempDir):
         registry.register_current()
         found = registry.find_active_by_keyword(Path(self.tmpdir).name)
         self.assertEqual(found, registry.current_project_path())
+
+    def test_find_active_by_index(self) -> None:
+        registry.register_current()
+        # 1-based: first project
+        self.assertEqual(registry.find_active_by_index(1), registry.current_project_path())
+        # Out of range returns None
+        self.assertIsNone(registry.find_active_by_index(99))
+        # Zero / negative is invalid (1-based)
+        self.assertIsNone(registry.find_active_by_index(0))
+        self.assertIsNone(registry.find_active_by_index(-1))
 
     def test_clear_then_archive_all(self) -> None:
         registry.register_current()

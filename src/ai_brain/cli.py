@@ -129,12 +129,12 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common("stop-cron", "Remove the daily auto-archive cron job")
 
     for name, help_text in (
-        ("exclude", "Disable auto-archive for a project (or list statuses)"),
-        ("include", "Enable auto-archive for a project"),
+        ("exclude", "Disable auto-archive (pattern can be a keyword, 1-based index, or 'all')"),
+        ("include", "Enable auto-archive (pattern can be a keyword, 1-based index, or 'all')"),
     ):
         p = _add_common(name, help_text)
         p.add_argument("pattern", nargs="?", default=None,
-                       help="project keyword, '.', 'current', or omitted for list")
+                       help="project keyword, 1-based index, '.', 'current', 'all', or omitted for list")
 
     for name, help_text in (
         ("exclude-all", "Disable auto-archive for all projects"),
