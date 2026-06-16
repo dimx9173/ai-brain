@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-brain"
+version = "1.2.0"
+description = "AI Brain Orchestrator — unified CLI for AI agent memory & code graph tools"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "Carlos Tseng" }]
+keywords = ["ai", "cli", "mcp", "mempalace", "graphify", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+]
+
+# No runtime deps — everything in the stdlib on purpose.
+dependencies = []
+
+[project.scripts]
+ai-brain = "ai_brain.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/carlos/ai-brain"
+
+# --- Setuptools config (no auto-discovery; explicit) -----------------------------
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ai_brain = ["py.typed"]
+
+# --- Dev / tooling ---------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: requires real user environment (registry files, git repo)",
+    "slow: >1s test",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/ai_brain"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+fail_under = 60

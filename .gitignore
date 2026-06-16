@@ -1,4 +1,40 @@
+# OS / editor noise
 .DS_Store
 *.log
 *.swp
 *~
+.idea/
+.vscode/
+.cursor/
+.kilo/
+.opencode/
+*.bak
+*.backup
+*.tmp
+.mypy_cache/
+.ruff_cache/
+
+
+# Python build / install artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Dev planning scratch
+dev_docs/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+# Graphify cache (regenerated on demand)
+graphify-out/cache/
