@@ -42,6 +42,7 @@ def _show_help() -> None:
         ("include [key]", "[啟用歸檔] 啟用指定專案定時自動歸檔"),
         ("exclude-all", "[全部停用] 一鍵停用所有專案的自動歸檔"),
         ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
+        ("list", "[查詢狀態] 顯示當前專案的自動歸檔狀態（Active / Inactive）"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
     ]
     for name, desc in rows:
@@ -110,6 +111,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "include": _cmd_include,
     "exclude-all": lambda a, p: (commands.exclude_all(), 0)[1],
     "include-all": lambda a, p: (commands.include_all(), 0)[1],
+    "list": lambda a, p: (commands.manage_list(), 0)[1],
     "completions": lambda a, p: _cmd_completions(a),
 }
 
@@ -150,6 +152,7 @@ def _build_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("exclude-all", "Disable auto-archive for all projects"),
         ("include-all", "Enable auto-archive for all registered projects"),
+        ("list", "Show auto-archive status of the current project"),
     ):
         _add_common(name, help_text)
 

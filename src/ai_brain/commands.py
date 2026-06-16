@@ -254,6 +254,44 @@ def include_all() -> bool:
     return registry.archive_all_active()
 
 
+def manage_list() -> bool:
+    """Show the auto-archive status of the **current** project only.
+
+    Differs from `ai-brain include` / `ai-brain exclude` (no args), which
+    print the *full* active project list with 1-based indices for
+    subsequent index-based operations. `list` is a quick at-a-glance
+    check: "is THIS project on or off?".
+
+    Returns True on success, False if the current project is not
+    registered (the user is in an unregistered directory).
+    """
+    from .ui import GREEN, RED, NC
+    RST = NC  # alias to match the style used in `_print_archive_status`
+    proj_path = registry.current_project_path()
+    active = registry.list_active()
+    if proj_path not in active:
+        print(red("⚠️ 當前目錄未在 AI 大腦活躍清單中註冊。"))
+        return False
+
+    archived = registry.is_archived(proj_path)
+    base = Path(proj_path).name
+    if archived:
+        print(blue("====== 📋 當前專案自動歸檔狀態 ======"))
+        print(f"  專案: {base} ({proj_path})")
+        print(f"  狀態: {GREEN}已啟用自動歸檔 (Active){NC}")
+        print()
+        print(yellow("若要停用: "), end="")
+        print(f"{GREEN}ai-brain exclude current{RST}")
+    else:
+        print(blue("====== 📋 當前專案自動歸檔狀態 ======"))
+        print(f"  專案: {base} ({proj_path})")
+        print(f"  狀態: {RED}預設不歸檔 (Inactive){NC}")
+        print()
+        print(yellow("若要啟用: "), end="")
+        print(f"{GREEN}ai-brain include current{RST}")
+    return True
+
+
 # --- Internal helpers -----------------------------------------------------------
 
 def _run_mempalace_init() -> bool:
