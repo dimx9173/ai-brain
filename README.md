@@ -3,7 +3,7 @@
 > **AI Brain Orchestrator** — A unified CLI tool for AI agent memory management, codebase indexing, and multi-agent workspace synchronization.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](#)
 [![Shell](https://img.shields.io/badge/shell-bash-4EAA25.svg)](#)
 
 `ai-brain` simplifies multi-agent development by packaging complex setup and routines for MemPalace, Graphify, and claude-mem into a single, cohesive command-line interface. It ensures that any AI agent entering your project (Claude Code, Rufus, Cursor, Gemini, Antigravity IDE, etc.) instantly understands your codebase structure, developer habits, and shares a persistent long-term memory palace.
@@ -83,6 +83,8 @@ ai-brain full-init
 | `stop` | Safe scan, sweep, and archive of the day's local chat context to the long-term SQLite memory palace. | Run at end of day | ✅ Safe |
 | `status` | Print current project memory status (MemPalace, Graphify, CLAUDE.md, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
 | `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
+| `doctor` | Perform comprehensive workspace diagnostics (gitignore check, mempalace config, stale locks, CLI path, etc.). | Run for deep troubleshooting | 🔍 Read-only |
+| `doctor --fix` | Diagnoses and automatically heals any configuration issues. | Run to auto-fix systems | 🔧 Modifying |
 | `version` | Display the installed version of `ai-brain`. | Run to check version | 🔍 Read-only |
 | `clean` | Remove all local `ai-brain` configuration directories, map directories, and Git hooks. | Run to strip configuration | 🗑️ Destructive |
 | `uninstall` | Global removal of all local configurations, registered Cron Jobs, global executables, and MCP server listings. | Run to completely uninstall | 🗑️ Destructive |
@@ -103,7 +105,7 @@ ai-brain exclude-all       # Disable auto-archiving for all registered active pr
 ## 🦾 Editor Integrations
 
 - **Claude Code / Rufus / OpenClaw**: Automatically registered on `full-init` via stdio command configuration.
-- **Gemini / Antigravity IDE / OpenCode**: Registered in `~/.gemini/config/mcp_config.json` and `~/.mcp.json`.
+- **Gemini / Antigravity IDE / OpenCode**: Registered in `~/.gemini/config/mcp_config.json` and `~/.mcp.json`. It automatically configures and uses `graphify-mcp-wrapper` as the MCP command for `graphify` to dynamically detect and resolve active project workspace paths (CWD).
 - **Cursor / VS Code**: Integrates with local `.git/hooks`, `CLAUDE.md`, and `graphify-out/` automatically. To add the Memory Palace MCP server manually, navigate to `Settings` -> `Features` -> `MCP` and add a new stdio command Server targeting `mempalace-mcp`.
 
 ---
