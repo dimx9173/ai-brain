@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 1200px;
+    height: 750px;
+    overflow: hidden;
+    background-color: #05070f;
+    font-family: 'Inter', -apple-system, sans-serif;
+  }
+  svg {
+    width: 1200px;
+    height: 750px;
+    display: block;
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750">
+  <defs>
+    <!-- Glow Filters -->
+    <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="grad-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#00ff88" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="grad-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9f1c" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#ff9f1c" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="grad-purple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bf5af2" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#bf5af2" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="50%" stop-color="#bf5af2" />
+      <stop offset="100%" stop-color="#00ff88" />
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#121829" stroke-width="1"/>
+      <path d="M 200 0 L 200 200 M 0 200 L 200 200" fill="none" stroke="#1c253d" stroke-width="1.5" stroke-opacity="0.4"/>
+    </pattern>
+
+    <!-- Markers for arrows -->
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#00f0ff" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#00ff88" />
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#bf5af2" />
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#ff9f1c" />
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#4a5568" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#05070f"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- Futuristic Corner Highlights and Frame Details -->
+  <path d="M 20 50 L 20 20 L 50 20" fill="none" stroke="#1f2937" stroke-width="2"/>
+  <path d="M 1180 50 L 1180 20 L 1150 20" fill="none" stroke="#1f2937" stroke-width="2"/>
+  <path d="M 20 700 L 20 730 L 50 730" fill="none" stroke="#1f2937" stroke-width="2"/>
+  <path d="M 1180 700 L 1180 730 L 1150 730" fill="none" stroke="#1f2937" stroke-width="2"/>
+  
+  <line x1="20" y1="375" x2="35" y2="375" stroke="#1f2937" stroke-width="1"/>
+  <line x1="1180" y1="375" x2="1165" y2="375" stroke="#1f2937" stroke-width="1"/>
+
+  <!-- Top Title Bar -->
+  <text x="50" y="55" font-family="'Orbitron', sans-serif" font-size="24" font-weight="900" fill="url(#title-grad)" letter-spacing="3">AI-BRAIN ORCHESTRATION ARCHITECTURE</text>
+  <text x="50" y="80" font-family="'JetBrains Mono', monospace" font-size="11" fill="#4a5d85" letter-spacing="1">SYSTEM MEMORY TOPOLOGY &amp; AGENT COGNITION LAYER</text>
+  <line x1="50" y1="95" x2="1150" y2="95" stroke="#1a233a" stroke-width="2"/>
+
+  <!-- Futuristic HUD Info Box (Top Right) -->
+  <rect x="920" y="35" width="230" height="50" fill="#0b0e1a" stroke="#1a233a" stroke-width="1" rx="4"/>
+  <text x="935" y="52" font-family="'JetBrains Mono', monospace" font-size="10" fill="#00f0ff">SYS_STATUS: <tspan fill="#00ff88">ACTIVE</tspan></text>
+  <text x="935" y="67" font-family="'JetBrains Mono', monospace" font-size="10" fill="#00f0ff">VERSION: <tspan fill="#bf5af2">v2.0.0 (STABLE)</tspan></text>
+  <circle cx="1125" cy="50" r="4" fill="#00ff88" filter="url(#glow-green)"/>
+  <text x="1060" y="77" font-family="'JetBrains Mono', monospace" font-size="8" fill="#4a5d85">MEM_PALACE: SYNCED</text>
+
+  <!-- ==================== LEFT COLUMN: DEVELOPER & IDE ==================== -->
+  <g id="dev-workspace">
+    <!-- Main Panel shadow and background -->
+    <rect x="50" y="140" width="280" height="520" fill="url(#grad-cyan)" fill-opacity="0.2" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.3" rx="8" filter="url(#glow-cyan)" />
+    <rect x="50" y="140" width="280" height="520" fill="#080c16" fill-opacity="0.85" stroke="#00f0ff" stroke-width="1.5" rx="8" />
+    
+    <!-- Title Area -->
+    <path d="M 50 180 L 330 180" stroke="#00f0ff" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="65" y="152" width="8" height="15" fill="#00f0ff"/>
+    <text x="82" y="165" font-family="'Orbitron', sans-serif" font-weight="700" font-size="14" fill="#00f0ff" letter-spacing="1">IDE &amp; WORKSPACE</text>
+
+    <!-- IDE Elements -->
+    <!-- Card 1: Antigravity IDE / Gemini -->
+    <rect x="70" y="200" width="240" height="95" fill="#0b132b" stroke="#00f0ff" stroke-width="1" stroke-opacity="0.5" rx="6"/>
+    <text x="85" y="222" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#e2e8f0">Antigravity IDE &amp; Gemini</text>
+    <text x="85" y="240" font-family="'Inter', sans-serif" font-size="10" fill="#94a3b8">• Spawns global MCP servers</text>
+    <text x="85" y="255" font-family="'Inter', sans-serif" font-size="10" fill="#94a3b8">• Launches CWD in root context (/)</text>
+    <text x="85" y="270" font-family="'Inter', sans-serif" font-size="10" fill="#94a3b8">• Passes active workspace IDs</text>
+
+    <!-- Card 2: Claude Code & Rufus -->
+    <rect x="70" y="310" width="240" height="80" fill="#0b132b" stroke="#1e293b" stroke-width="1" rx="6"/>
+    <text x="85" y="332" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#cbd5e1">Claude Code &amp; Rufus</text>
+    <text x="85" y="350" font-family="'Inter', sans-serif" font-size="10" fill="#64748b">• Standard CLI terminal environment</text>
+    <text x="85" y="365" font-family="'Inter', sans-serif" font-size="10" fill="#64748b">• Auto-sweeps chat sessions via hooks</text>
+
+    <!-- Card 3: Cursor & VS Code -->
+    <rect x="70" y="405" width="240" height="80" fill="#0b132b" stroke="#1e293b" stroke-width="1" rx="6"/>
+    <text x="85" y="427" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#cbd5e1">Cursor / VS Code</text>
+    <text x="85" y="445" font-family="'Inter', sans-serif" font-size="10" fill="#64748b">• Integrates with local .git/hooks</text>
+    <text x="85" y="460" font-family="'Inter', sans-serif" font-size="10" fill="#64748b">• Manual MemPalace MCP bindings</text>
+
+    <!-- Card 4: Dev Chat History & Context -->
+    <rect x="70" y="500" width="240" height="75" fill="#0b132b" stroke="#00f0ff" stroke-width="1" stroke-opacity="0.2" rx="6"/>
+    <text x="85" y="522" font-family="'Inter', sans-serif" font-weight="600" font-size="11" fill="#00f0ff">Active Context Stream</text>
+    <text x="85" y="540" font-family="'Inter', sans-serif" font-size="10" fill="#94a3b8">• Current active file buffers</text>
+    <text x="85" y="555" font-family="'Inter', sans-serif" font-size="10" fill="#94a3b8">• Conversational logs &amp; scratchpad</text>
+
+    <!-- Cyberpunk Deco on Panel -->
+    <path d="M 60 630 L 100 630 L 110 640 L 320 640" fill="none" stroke="#00f0ff" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="300" y="625" width="10" height="4" fill="#00f0ff" fill-opacity="0.5"/>
+  </g>
+
+  <!-- ==================== MIDDLE COLUMN: COGNITIVE LAYERS ==================== -->
+
+  <!-- LAYER 0: WORKING MEMORY -->
+  <g id="layer-0">
+    <rect x="410" y="140" width="380" height="150" fill="url(#grad-cyan)" fill-opacity="0.2" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.3" rx="8" filter="url(#glow-cyan)" />
+    <rect x="410" y="140" width="380" height="150" fill="#080c16" fill-opacity="0.85" stroke="#00f0ff" stroke-width="1.5" rx="8" />
+    
+    <path d="M 410 175 L 790 175" stroke="#00f0ff" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="425" y="150" width="8" height="15" fill="#00f0ff"/>
+    <text x="442" y="162" font-family="'Orbitron', sans-serif" font-weight="700" font-size="12" fill="#00f0ff" letter-spacing="1">🧠 L0: WORKING MEMORY (SESSION STATE)</text>
+
+    <!-- Content boxes -->
+    <rect x="430" y="190" width="160" height="80" fill="#091225" stroke="#00f0ff" stroke-width="0.8" rx="4"/>
+    <text x="442" y="210" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#e2e8f0">claude-mem</text>
+    <text x="442" y="228" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Session state keeper</text>
+    <text x="442" y="242" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Short-term prompt logs</text>
+    <text x="442" y="256" font-family="'Inter', sans-serif" font-size="9" fill="#00f0ff">Active Context</text>
+
+    <rect x="610" y="190" width="160" height="80" fill="#091225" stroke="#1e293b" stroke-width="0.8" rx="4"/>
+    <text x="622" y="210" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#cbd5e1">Local Scratchpad</text>
+    <text x="622" y="228" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">Temporary notes</text>
+    <text x="622" y="242" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">Current task checklists</text>
+    <text x="622" y="256" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">`task.md` sync</text>
+  </g>
+
+  <!-- LAYER 1: STRUCTURAL MEMORY -->
+  <g id="layer-1">
+    <rect x="410" y="315" width="380" height="170" fill="url(#grad-green)" fill-opacity="0.2" stroke="#00ff88" stroke-width="1.5" stroke-opacity="0.3" rx="8" filter="url(#glow-green)" />
+    <rect x="410" y="315" width="380" height="170" fill="#080c16" fill-opacity="0.85" stroke="#00ff88" stroke-width="1.5" rx="8" />
+    
+    <path d="M 410 350 L 790 350" stroke="#00ff88" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="425" y="325" width="8" height="15" fill="#00ff88"/>
+    <text x="442" y="338" font-family="'Orbitron', sans-serif" font-weight="700" font-size="12" fill="#00ff88" letter-spacing="1">🗺️ L1: STRUCTURAL MEMORY (TOPOLOGY)</text>
+
+    <!-- Content boxes -->
+    <rect x="430" y="365" width="160" height="100" fill="#091819" stroke="#00ff88" stroke-width="0.8" rx="4"/>
+    <text x="442" y="385" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#e2e8f0">Graphify AST Extractor</text>
+    <text x="442" y="403" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Parses source code files</text>
+    <text x="442" y="417" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Indexes relationships</text>
+    <text x="442" y="431" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Updates AST on demand</text>
+    <text x="442" y="448" font-family="'Inter', sans-serif" font-size="9" fill="#00ff88">Runs CLI `graphify`</text>
+
+    <rect x="610" y="365" width="160" height="100" fill="#091819" stroke="#00ff88" stroke-width="0.8" stroke-opacity="0.5" rx="4"/>
+    <text x="622" y="385" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#e2e8f0">graph.json</text>
+    <text x="622" y="403" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">`graphify-out/graph.json`</text>
+    <text x="622" y="417" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Contains code node map</text>
+    <text x="622" y="431" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Fast community lookup</text>
+    <text x="622" y="448" font-family="'Inter', sans-serif" font-size="9" fill="#00ff88">Locally Stored in Repo</text>
+  </g>
+
+  <!-- LAYER 2: LONG-TERM MEMORY -->
+  <g id="layer-2">
+    <rect x="410" y="510" width="380" height="150" fill="url(#grad-orange)" fill-opacity="0.2" stroke="#ff9f1c" stroke-width="1.5" stroke-opacity="0.3" rx="8" filter="url(#glow-orange)" />
+    <rect x="410" y="510" width="380" height="150" fill="#080c16" fill-opacity="0.85" stroke="#ff9f1c" stroke-width="1.5" rx="8" />
+    
+    <path d="M 410 545 L 790 545" stroke="#ff9f1c" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="425" y="520" width="8" height="15" fill="#ff9f1c"/>
+    <text x="442" y="533" font-family="'Orbitron', sans-serif" font-weight="700" font-size="12" fill="#ff9f1c" letter-spacing="1">🏰 L2: LONG-TERM MEMORY (KNOWLEDGE)</text>
+
+    <!-- Content boxes -->
+    <rect x="430" y="560" width="160" height="85" fill="#14110f" stroke="#ff9f1c" stroke-width="0.8" rx="4"/>
+    <text x="442" y="580" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#e2e8f0">MemPalace DB</text>
+    <text x="442" y="598" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Shared SQLite Database</text>
+    <text x="442" y="612" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">Unified long-term history</text>
+    <text x="442" y="626" font-family="'Inter', sans-serif" font-size="9" fill="#ff9f1c">Persistent across sessions</text>
+
+    <rect x="610" y="560" width="160" height="85" fill="#14110f" stroke="#ff9f1c" stroke-width="0.8" stroke-opacity="0.5" rx="4"/>
+    <text x="622" y="580" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#cbd5e1">mempalace-mcp</text>
+    <text x="622" y="598" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">Stdio MCP Server wrapper</text>
+    <text x="622" y="612" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">Exposes search / updates</text>
+    <text x="622" y="626" font-family="'Inter', sans-serif" font-size="9" fill="#ff9f1c">IDE Direct Integration</text>
+  </g>
+
+  <!-- ==================== RIGHT COLUMN: AI-BRAIN ORCHESTRATOR ==================== -->
+  <g id="orchestrator">
+    <rect x="850" y="140" width="300" height="520" fill="url(#grad-purple)" fill-opacity="0.2" stroke="#bf5af2" stroke-width="1.5" stroke-opacity="0.3" rx="8" filter="url(#glow-purple)" />
+    <rect x="850" y="140" width="300" height="520" fill="#080c16" fill-opacity="0.85" stroke="#bf5af2" stroke-width="1.5" rx="8" />
+    
+    <path d="M 850 180 L 1150 180" stroke="#bf5af2" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="865" y="152" width="8" height="15" fill="#bf5af2"/>
+    <text x="882" y="165" font-family="'Orbitron', sans-serif" font-weight="700" font-size="13" fill="#bf5af2" letter-spacing="1">⚙️ AI-BRAIN ORCHESTRATOR</text>
+
+    <!-- Component 1: ai-brain CLI -->
+    <rect x="870" y="200" width="260" height="120" fill="#130b20" stroke="#bf5af2" stroke-width="1" stroke-opacity="0.5" rx="6"/>
+    <text x="885" y="222" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#e2e8f0">ai-brain CLI Core</text>
+    <text x="885" y="240" font-family="'Inter', sans-serif" font-size="10" fill="#bf5af2">Commands: init | start | stop | doctor</text>
+    <text x="885" y="258" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Configures git-hooks (L1 start)</text>
+    <text x="885" y="272" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Triggers daily Cron Job (L2 stop)</text>
+    <text x="885" y="286" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Self-heals environment via verifier</text>
+    <text x="885" y="300" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Excludes/includes projects dynamically</text>
+
+    <!-- Component 2: graphify-mcp-wrapper -->
+    <rect x="870" y="335" width="260" height="145" fill="#130b20" stroke="#bf5af2" stroke-width="1" rx="6"/>
+    <text x="885" y="357" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#cbd5e1">graphify-mcp-wrapper</text>
+    <text x="885" y="375" font-family="'Inter', sans-serif" font-size="10" fill="#bf5af2">Dynamic Workspace Resolver</text>
+    <text x="885" y="393" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">• Intercepts IDE server start (CWD = /)</text>
+    <text x="885" y="407" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">• Scans parent &amp; sibling OS processes</text>
+    <text x="885" y="421" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">• Extracts active workspace parameters</text>
+    <text x="885" y="435" font-family="'Inter', sans-serif" font-size="9" fill="#64748b">• Matches registry -> chdir(workspace)</text>
+    <text x="885" y="449" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Launches Graphify on target root</text>
+    <text x="885" y="463" font-family="'Inter', sans-serif" font-size="9" fill="#00f0ff" font-weight="600">Resolves CWD issue globally</text>
+
+    <!-- Component 3: Self-Healer / Verifier -->
+    <rect x="870" y="495" width="260" height="80" fill="#130b20" stroke="#bf5af2" stroke-width="1" stroke-opacity="0.3" rx="6"/>
+    <text x="885" y="515" font-family="'Inter', sans-serif" font-weight="700" font-size="11" fill="#e2e8f0">Self-Healer Verifier</text>
+    <text x="885" y="533" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Tests path dependencies, gitignore entries</text>
+    <text x="885" y="547" font-family="'Inter', sans-serif" font-size="9" fill="#94a3b8">• Re-builds missing MCP configuration files</text>
+    <text x="885" y="561" font-family="'Inter', sans-serif" font-size="9" fill="#bf5af2">Runs via `ai-brain doctor --fix`</text>
+
+    <!-- Cyberpunk Deco on Panel -->
+    <path d="M 860 630 L 900 630 L 910 640 L 1120 640" fill="none" stroke="#bf5af2" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="1100" y="625" width="10" height="4" fill="#bf5af2" fill-opacity="0.5"/>
+  </g>
+
+  <!-- ==================== PIPES / FLOW LINES (CONNECTIONS) ==================== -->
+
+  <!-- Flow 1: IDE -> L0 Working Memory (Cyan) -->
+  <path d="M 330 220 L 370 220 L 370 190 L 410 190" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-cyan)"/>
+  <text x="340" y="180" font-family="'JetBrains Mono', monospace" font-size="9" fill="#00f0ff" opacity="0.8">session read/write</text>
+
+  <!-- Flow 2: IDE -> Orchestrator Wrapper (Purple / Cyan) -->
+  <path d="M 330 270 L 390 270 L 390 305 L 830 305 L 830 400 L 870 400" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-cyan)"/>
+  <text x="342" y="295" font-family="'JetBrains Mono', monospace" font-size="9" fill="#00f0ff" opacity="0.8">query_graph</text>
+
+  <!-- Flow 3: IDE -> L2 MemPalace MCP (Orange) -->
+  <path d="M 330 460 L 350 460 L 350 600 L 410 600" fill="none" stroke="#ff9f1c" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-orange)"/>
+  <text x="335" y="490" font-family="'JetBrains Mono', monospace" font-size="9" fill="#ff9f1c" opacity="0.8">mempalace_search</text>
+
+  <!-- Flow 4: Wrapper -> L1 Graphify graph.json (Green) -->
+  <line x1="870" y1="410" x2="820" y2="410" stroke="#bf5af2" stroke-width="1.5"/>
+  <path d="M 820 410 L 820 420 L 790 420" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-green)"/>
+  <text x="800" y="395" font-family="'JetBrains Mono', monospace" font-size="9" fill="#00ff88" opacity="0.8">resolves path</text>
+
+  <!-- Flow 5: CLI -> L1 Git Hooks & Cron (Purple) -->
+  <!-- CLI to Git Hooks -->
+  <path d="M 870 240 L 810 240 L 810 330 L 790 330" fill="none" stroke="#bf5af2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="802" y="228" font-family="'JetBrains Mono', monospace" font-size="9" fill="#bf5af2" opacity="0.8">init hooks</text>
+
+  <!-- CLI to Cron (downwards) -->
+  <path d="M 970 320 L 970 680 L 750 680 L 750 660" fill="none" stroke="#bf5af2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="850" y="675" font-family="'JetBrains Mono', monospace" font-size="9" fill="#bf5af2" opacity="0.8">stop auto-archive cron</text>
+
+  <!-- Flow 6: Git Hook triggers Graphify (Green) -->
+  <path d="M 770 365 L 770 335 L 590 335 L 590 365" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="2 2" marker-end="url(#arrow-green)"/>
+  <text x="635" y="328" font-family="'JetBrains Mono', monospace" font-size="9" fill="#00ff88" opacity="0.8">git trigger</text>
+
+  <!-- Flow 7: Cron auto-archive L0 sweep to L2 (Orange) -->
+  <path d="M 510 290 L 510 315" fill="none" stroke="#ff9f1c" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arrow-orange)"/>
+  <path d="M 510 485 L 510 510" fill="none" stroke="#ff9f1c" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arrow-orange)"/>
+  <text x="515" y="502" font-family="'JetBrains Mono', monospace" font-size="9" fill="#ff9f1c" opacity="0.8">daily archive sweep</text>
+
+</svg>
+
+</body>
+</html>
