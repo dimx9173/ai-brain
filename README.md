@@ -21,86 +21,30 @@
 
 `ai-brain` connects three distinct cognitive layers of memory to ensure that AI agents have full workspace awareness, code topography understanding, and historical context.
 
-```mermaid
-graph TB
-    %% Styling definitions
-    classDef default fill:#1e1e2e,stroke:#cdd6f4,stroke-width:1px,color:#cdd6f4;
-    classDef user fill:#313244,stroke:#f5c2e7,stroke-width:2px,color:#f5c2e7;
-    classDef l0 fill:#181825,stroke:#89b4fa,stroke-width:2px,color:#89b4fa;
-    classDef l1 fill:#181825,stroke:#a6e3a1,stroke-width:2px,color:#a6e3a1;
-    classDef l2 fill:#181825,stroke:#f9e2af,stroke-width:2px,color:#f9e2af;
-    classDef tool fill:#11111b,stroke:#f38ba8,stroke-dasharray: 5 5,color:#f38ba8;
-
-    subgraph UserSpace ["💻 Developer & IDE Workspace"]
-        IDE["Gemini / Antigravity IDE / Cursor / Claude Code"]:::user
-        Docs["Active File & Chat History"]:::user
-    end
-
-    subgraph L0 ["🧠 L0: Working Memory (Session State)"]
-        CM["claude-mem"]:::l0
-        Scratch["Local Scratchpad & Context"]:::l0
-        IDE -->|Reads/Writes Session| CM
-        Docs -->|Context Injection| Scratch
-    end
-
-    subgraph L1 ["🗺️ L1: Structural Memory (Codebase Topology)"]
-        Graphify["Graphify AST Extractor"]:::l1
-        GraphJson["graphify-out/graph.json"]:::l1
-        GitHooks["🌅 Git Hooks (post-checkout/merge)"]:::l1
-        
-        GitHooks -->|Triggers| Graphify
-        Graphify -->|Builds| GraphJson
-    end
-
-    subgraph L2 ["🏰 L2: Long-Term Memory (Persistent Knowledge)"]
-        MP["MemPalace SQLite Database"]:::l2
-        MP_mcp["mempalace-mcp (Stdio Server)"]:::l2
-        Cron["🌇 Cron Job (Daily 23:30 Archive)"]:::l2
-        
-        Cron -->|Auto Archive| MP
-        MP_mcp -->|Queries/Updates| MP
-    end
-
-    subgraph Orchestrator ["⚙️ ai-brain (Core Orchestrator)"]
-        CLI["ai-brain CLI"]:::tool
-        Wrapper["graphify-mcp-wrapper"]:::tool
-        
-        CLI -->|init / full-init| GitHooks
-        CLI -->|start| Graphify
-        CLI -->|stop| Cron
-        CLI -->|doctor| verifier["Verifier & Self-Healer"]:::tool
-        
-        Wrapper -->|Resolves workspace path| GraphJson
-    end
-
-    %% Cross-layer relations
-    IDE -->|query_graph| Wrapper
-    IDE -->|mempalace_search| MP_mcp
-    CM -->|Compress & Sweep| CLI
-    
-    %% Style links
-    linkStyle default stroke:#6c7086,stroke-width:1px;
-```
+<p align="center">
+  <img src="./docs/images/architecture.png" alt="AI Brain System Architecture" width="850px" style="border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.4);" />
+</p>
 
 ---
 
 ## 🧠 Dynamic Workspace Detection (MCP Wrapper)
 
-For global MCP servers launched by IDEs (like Antigravity IDE) where the default working directory is set to `/`, `ai-brain` automatically registers and installs the custom `graphify-mcp-wrapper`. 
+For global MCP servers launched by IDEs (like Antigravity IDE) where the default working directory is set to `/`, `ai-brain` automatically registers and installs the custom `graphify-mcp-wrapper` to resolve the active workspace path on the fly.
 
-```mermaid
-sequenceDiagram
-    participant IDE as Antigravity IDE
-    participant Wrapper as graphify-mcp-wrapper
-    participant Graphify as Graphify Serve
-    
-    IDE->>Wrapper: Spawn process (CWD = /)
-    Wrapper->>Wrapper: Scan sibling processes of parent PID
-    Wrapper->>Wrapper: Extract workspace ID from language_server arguments
-    Wrapper->>Wrapper: Match workspace ID in active projects registry
-    Wrapper->>Wrapper: Resolve path & chdir(workspace_root)
-    Wrapper->>Graphify: Launch Graphify server with correct CWD
-```
+### 🔄 Resolution Lifecycle & Flow
+
+1. **Spawn Request** 🚀
+   Antigravity IDE spawns the global `graphify-mcp-wrapper` executable with the current working directory (`CWD`) set to `/`.
+2. **Process Analysis** 🔍
+   The wrapper scans the active operating system processes to locate the parent IDE Extension Host and its sibling processes (`language_server_macos_arm`).
+3. **Parameter Extraction** 🧬
+   It parses the process arguments to extract the active workspace identifier (e.g., `--workspace_id file_Users_carlos_cwork_ai-brain`).
+4. **Registry Matching** 🗺️
+   It decodes and matches the workspace ID against registered active projects inside the centralized registry (`~/.claude/ai_brain_active_projects.txt`).
+5. **Context Switch** ⚙️
+   The wrapper dynamically switches the active working directory of the process (`chdir`) to the matching project root.
+6. **Server Handover** 🤝
+   It launches the standard `graphify` service, ensuring the IDE can seamlessly query the AST codebase topology of the active workspace.
 
 ---
 
