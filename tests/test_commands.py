@@ -225,16 +225,18 @@ class TestDoctor(_RegisterSeveralMixin):
         from ai_brain.verifier import CheckResult, PASS
         
         with patch("ai_brain.verifier.run_all_checks") as mock_checks, \
-             patch("ai_brain.commands.subprocess.run") as mock_run:
-             
+             patch("ai_brain.commands.subprocess.run") as mock_run, \
+             patch("ai_brain.commands.shutil.which") as mock_which:
+
             mock_checks.return_value = [
                 CheckResult("Mock Check", PASS)
             ]
-            
+
             mock_sync = MagicMock()
             mock_sync.stdout = "Gitignored: 0\nMissing: 0"
             mock_run.return_value = mock_sync
-            
+            mock_which.return_value = "/usr/local/bin/mock"
+
             ok = commands.run_doctor(paths, fix=False)
             self.assertTrue(ok)
 

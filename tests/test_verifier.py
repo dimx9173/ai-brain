@@ -45,9 +45,11 @@ class TestMcpConfigChecker(unittest.TestCase):
         finally:
             target.unlink(missing_ok=True)
 
+    @unittest.mock.patch("ai_brain.verifier.shutil.which")
     @unittest.mock.patch("ai_brain.verifier.subprocess.run")
-    def test_returns_pass_for_well_formed_config(self, mock_run) -> None:
+    def test_returns_pass_for_well_formed_config(self, mock_run, mock_which) -> None:
         mock_run.return_value = unittest.mock.MagicMock(returncode=0)
+        mock_which.return_value = "/usr/local/bin/mock"
         target = Path("/tmp/_ai_brain_test_good.json")
         _write(target, {
             "mcpServers": {
