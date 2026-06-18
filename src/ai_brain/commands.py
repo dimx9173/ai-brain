@@ -41,6 +41,8 @@ from .ui import blue, green, red, yellow
 def init_brain() -> bool:
     print(blue(f"====== {APP_EMOJI} 開始初始化專案 AI 大腦配置 ======"))
 
+    _ensure_graphify_out_ignored()
+
     if not _run_mempalace_init():
         return False
 
@@ -149,6 +151,7 @@ def uninstall_all(paths) -> bool:
 
 def start_day() -> bool:
     """Morning routine: kick off a background sweep if stale, then refresh graph."""
+    _ensure_graphify_out_ignored()
     if _should_run_background_sweep():
         print(yellow("--> 偵測到大於 12 小時未進行對話歸檔，正在背景自動沉澱昨日對話記憶..."))
         try:
@@ -178,6 +181,7 @@ def stop_day() -> bool:
 
 
 def check_status() -> bool:
+    _ensure_graphify_out_ignored()
     print(blue("====== 📊 專案 AI 大腦狀態檢查 ======"))
     from .ui import GREEN, RED, YELLOW, NC
 
@@ -292,11 +296,325 @@ def manage_list() -> bool:
     return True
 
 
+def run_doctor(paths, fix: bool = False) -> bool:
+    import os
+    print(blue(f"====== {APP_EMOJI} 開始執行 AI 大腦全面健康診斷 ======"))
+    if fix:
+        print(yellow("💡 診斷修復模式已啟用，將會自動修正可修復之問題。"))
+    print()
+
+    try:
+        import fcntl
+        has_fcntl = True
+    except ImportError:
+        has_fcntl = False
+        
+    def is_file_locked(filepath: Path) -> bool:
+        if has_fcntl:
+            try:
+                with open(filepath, "r") as f:
+                    try:
+                        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        fcntl.flock(f, fcntl.LOCK_UN)
+                        return False
+                    except (BlockingIOError, PermissionError):
+                        return True
+            except Exception:
+                return False
+        else:
+            try:
+                with open(filepath, "r+") as f:
+                    return False
+            except IOError:
+                return True
+
+    all_pass = True
+
+    # 1. Check .gitignore
+    print(blue("1. 檢查 .gitignore 排除設定..."))
+    gitignore = Path(".gitignore")
+    gi_ok = True
+    content = ""
+    if gitignore.is_file():
+        try:
+            content = gitignore.read_text(encoding="utf-8")
+        except Exception:
+            pass
+    lines = content.splitlines()
+    normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
+    
+    if "graphify-out" not in normalized:
+        gi_ok = False
+        print(red("  [ FAIL ] .gitignore 中未忽略 graphify-out/ 目錄"))
+        if fix:
+            _ensure_graphify_out_ignored()
+            print(green("    [ FIXED ] 已自動將 graphify-out/ 加入 .gitignore"))
+            gi_ok = True
+        else:
+            all_pass = False
+    else:
+        print(green("  [ PASS ] .gitignore 已正確排除 graphify-out/"))
+
+    # Check other massive unignored folders
+    for folder in ("node_modules", "venv", ".venv"):
+        if Path(folder).is_dir() and folder not in normalized:
+            print(yellow(f"  [ WARN ] 偵測到本機存在 {folder}/ 但未在 .gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
+            if fix:
+                print_yellow(f"    --> 建議您手動將 {folder}/ 加入 .gitignore 排除名單。")
+
+    print()
+
+    # 2. Check mempalace.yaml
+    print(blue("2. 檢查 mempalace.yaml 房間配置..."))
+    my_yaml = Path("mempalace.yaml")
+    yaml_ok = True
+    if my_yaml.is_file():
+        try:
+            yaml_content = my_yaml.read_text(encoding="utf-8")
+        except Exception:
+            yaml_content = ""
+        
+        if "graphify_out" in yaml_content or "graphify-out" in yaml_content:
+            yaml_ok = False
+            print(red("  [ FAIL ] mempalace.yaml 中仍包含已廢棄之 graphify_out 房間"))
+            if fix:
+                try:
+                    lines = yaml_content.splitlines()
+                    new_lines = []
+                    skip_mode = False
+                    for line in lines:
+                        if line.strip().startswith("- name: graphify_out") or line.strip().startswith("- name: graphify-out"):
+                            skip_mode = True
+                            continue
+                        if skip_mode:
+                            if line.startswith("- name:"):
+                                skip_mode = False
+                            else:
+                                continue
+                        new_lines.append(line)
+                    my_yaml.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                    print(green("    [ FIXED ] 已自動自 mempalace.yaml 中移除 graphify_out 房間"))
+                    yaml_ok = True
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 無法修復 mempalace.yaml ({e})"))
+            else:
+                all_pass = False
+        else:
+            print(green("  [ PASS ] mempalace.yaml 配置正常"))
+    else:
+        print(green("  [ PASS ] mempalace.yaml 未初始化 (略過)"))
+
+    print()
+
+    # 3. Check locks
+    print(blue("3. 檢查 MemPalace 鎖定鎖狀態..."))
+    locks_dir = Path.home() / ".mempalace" / "locks"
+    lock_ok = True
+    if locks_dir.is_dir():
+        for lock_file in locks_dir.glob("*.lock"):
+            active = is_file_locked(lock_file)
+            
+            if not active:
+                # Dormant lock file — harmless. Clean it up quietly in fix mode.
+                if fix:
+                    try:
+                        lock_file.unlink()
+                    except Exception:
+                        pass
+                continue
+                
+            pid = None
+            cmd = ""
+            content = ""
+            try:
+                content = lock_file.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+                
+            if content:
+                parts = content.split(maxsplit=1)
+                if parts and parts[0].isdigit():
+                    pid = int(parts[0])
+                    if len(parts) > 1:
+                        cmd = parts[1]
+            
+            if pid:
+                try:
+                    os.kill(pid, 0)
+                    print(yellow(f"  [ INFO ] 背景記憶寫入任務正在執行中 (PID: {pid}) {cmd}"))
+                except OSError:
+                    lock_ok = False
+                    print(red(f"  [ FAIL ] 發現正在佔用但 PID {pid} 已不存在的死鎖 {lock_file.name}"))
+                    if fix:
+                        try:
+                            lock_file.unlink()
+                            print(green(f"    [ FIXED ] 已自動刪除死鎖 {lock_file.name}"))
+                            lock_ok = True
+                        except Exception as e:
+                            print(red(f"    [ ERROR ] 無法刪除鎖定檔案 {lock_file.name} ({e})"))
+                    else:
+                        all_pass = False
+            else:
+                print(yellow(f"  [ INFO ] 佔用鎖定檔案 {lock_file.name} 中"))
+        if lock_ok:
+            print(green("  [ PASS ] MemPalace 鎖定狀態正常"))
+    else:
+        print(green("  [ PASS ] 無任何鎖定檔案"))
+
+    print()
+
+    # 4. Check stale drawers in mempalace (sync check)
+    print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
+    sync_ok = True
+    try:
+        res = subprocess.run([TOOL_MEMPALACE, "sync"], capture_output=True, text=True)
+        gitignored = 0
+        missing = 0
+        for line in res.stdout.splitlines():
+            if "Gitignored:" in line:
+                parts = line.split(":")
+                if len(parts) > 1:
+                    num = "".join(filter(str.isdigit, parts[1]))
+                    if num:
+                        gitignored = int(num)
+            elif "Missing:" in line:
+                parts = line.split(":")
+                if len(parts) > 1:
+                    num = "".join(filter(str.isdigit, parts[1]))
+                    if num:
+                        missing = int(num)
+        
+        if gitignored > 0 or missing > 0:
+            sync_ok = False
+            print(red(f"  [ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
+            if fix:
+                print(yellow("    --> 正在自動執行 mempalace sync --apply . 清理記憶庫..."))
+                try:
+                    subprocess.run([TOOL_MEMPALACE, "sync", "--apply", "."], check=True)
+                    print(green("    [ FIXED ] 記憶庫清理完成！"))
+                    sync_ok = True
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 記憶庫清理失敗 ({e})"))
+            else:
+                all_pass = False
+        else:
+            print(green("  [ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
+    except FileNotFoundError:
+        print(yellow("  [ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
+    except Exception as e:
+        print(red(f"  [ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
+
+    print()
+
+    # 5. Check System CLIs
+    print(blue("5. 檢查系統相依 CLI 工具可用性..."))
+    cli_ok = True
+    for tool_name, pkg in (("mempalace", "mempalace"), ("graphify", "graphifyy"), ("claude-mem", "claude-mem")):
+        if shutil.which(tool_name):
+            print(green(f"  [ PASS ] 工具 {tool_name} 已安裝"))
+        else:
+            cli_ok = False
+            print(red(f"  [ FAIL ] 未找到 {tool_name} 指令"))
+            if fix:
+                print(yellow(f"    --> 正在嘗試自動安裝 {pkg}..."))
+                try:
+                    subprocess.run(["uv", "tool", "install", pkg, "--force"], check=True)
+                    print(green(f"    [ FIXED ] 已自動安裝 {pkg}！"))
+                    cli_ok = True
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
+            else:
+                all_pass = False
+    
+    print()
+
+    # 6. Check MCP verifies
+    print(blue("6. 檢查 IDE MCP 大腦配置與伺服器載入..."))
+    from .verifier import run_all_checks, PASS as VERIFY_PASS, FAIL as VERIFY_FAIL
+    mcp_results = run_all_checks(paths)
+    mcp_failures = 0
+    for r in mcp_results:
+        if r.status == VERIFY_FAIL:
+            mcp_failures += 1
+            print(red(f"  [ FAIL ] {r.name}: {r.detail}"))
+        else:
+            print(green(f"  [ PASS ] {r.name}{' ' + r.detail if r.detail else ''}"))
+            
+    if mcp_failures > 0:
+        print(red(f"  [ FAIL ] 共有 {mcp_failures} 項 MCP 配置錯誤"))
+        if fix:
+            print(yellow("    --> 正在重新註冊所有 MCP 服務..."))
+            try:
+                from .mcp import register_all
+                register_all(paths)
+                print(green("    [ FIXED ] 已成功重新配置所有 IDE 的 MCP 大腦！"))
+            except Exception as e:
+                print(red(f"    [ ERROR ] 重新註冊 MCP 服務失敗 ({e})"))
+        else:
+            all_pass = False
+    else:
+        print(green("  [ PASS ] MCP 大腦配置與伺服器載入完全正常"))
+
+    print()
+    print(blue("====== 🏁 診斷結束 ======"))
+    if all_pass:
+        print(green("🎉 完美！您的 AI 大腦環境一切正常，健康指數 100%！"))
+        return True
+    else:
+        if fix:
+            print(yellow("⚠️ 診斷中發現了問題，已嘗試修復。請再次執行 `ai-brain doctor` 驗證。"))
+        else:
+            print(red("⚠️ 發現部分配置問題！請執行 `ai-brain doctor --fix` 自動修正。"))
+        return False
+
+
 # --- Internal helpers -----------------------------------------------------------
+
+def _ensure_graphify_out_ignored() -> None:
+    gitignore = Path(".gitignore")
+    content = ""
+    if gitignore.is_file():
+        try:
+            content = gitignore.read_text(encoding="utf-8")
+        except Exception:
+            pass
+
+    lines = content.splitlines()
+    normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
+    
+    if "graphify-out" not in normalized:
+        print_yellow("--> 自動將 graphify-out/ 加入 .gitignore 避免記憶庫膨脹...")
+        new_lines = []
+        replaced = False
+        for line in lines:
+            stripped = line.strip().rstrip("/")
+            if stripped in ("graphify-out/cache", "graphify-out/cache/"):
+                new_lines.append("# Graphify output directory (regenerated on demand)")
+                new_lines.append("graphify-out/")
+                replaced = True
+            else:
+                new_lines.append(line)
+        
+        if not replaced:
+            if new_lines and new_lines[-1].strip():
+                new_lines.append("")
+            new_lines.append("# Graphify output directory (regenerated on demand)")
+            new_lines.append("graphify-out/")
+            
+        try:
+            gitignore.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        except Exception as e:
+            print(red(f"警告：更新 .gitignore 失敗 ({e})"))
+
 
 def _run_mempalace_init() -> bool:
     try:
         subprocess.run([TOOL_MEMPALACE, "init", "--yes", "--auto-mine", "--no-llm", "."], check=True)
+        try:
+            # Sync to apply prune on newly ignored files like graphify-out/
+            subprocess.run([TOOL_MEMPALACE, "sync", "--apply", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
         return True
     except FileNotFoundError:
         print(red("錯誤：未找到 mempalace 工具，請先執行: uv tool install mempalace --force"))
@@ -384,7 +702,12 @@ def _maybe_unlink_claude_md() -> None:
         content = claude_md.read_text(encoding="utf-8")
     except Exception:
         return
-    if "AI Agent 認知工作流與大腦記憶指引" in content or "AI Agent 大腦與記憶指引" in content:
+    if any(title in content for title in (
+        "AI Agent 認知工作流與大腦記憶指引",
+        "AI Agent 大腦與記憶指引",
+        "AI Agent Cognitive Workflow and Memory Guide",
+        "AI Agent Cognitive Workflow and Memory Guidelines"
+    )):
         try:
             claude_md.unlink()
         except Exception:

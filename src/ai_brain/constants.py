@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -94,22 +94,22 @@ GRAPHIFY_OUT_DIR = "graphify-out"
 LOCAL_GRAPHIFY_SKILL = ".claude/skills/graphify"
 
 # --- Hook markers & text snippets -----------------------------------------------
-COGNITIVE_PRINCIPLES_MARKER = "## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)"
+COGNITIVE_PRINCIPLES_MARKER = "## 🧠 AI Agent Self-Constraint & Active Thinking (Mandatory Cognitive Principles)"
 COGNITIVE_PRINCIPLES_BLOCK = """
-## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)
-1. **主動記憶檢索（不需用戶指定）**：在回答任何關於「系統設計」、「過去的問題/除錯記錄」、「環境配置」、「特定業務邏輯」的提問前，**你必須在第一步主動調用 `mempalace_search` 工具**，檢索相關歷史記憶。嚴禁完全依賴內建知識庫憑空猜測。
-2. **架構變更防線**：在修改任何代碼檔案或進行重構前，**你必須主動調用 `query_graph` 或查閱 `./graphify-out/` 索引**，以確保理解模組之間的上下游相依性。
-3. **短期記憶遵循**：遵循 `claude-mem` 注入的局部 Checkpoint 與開發習慣."""
+## 🧠 AI Agent Self-Constraint & Active Thinking (Mandatory Cognitive Principles)
+1. **Active Memory Retrieval (No User Instruction Required)**: Before answering any questions regarding "system design", "past issues/debugging history", "environment configuration", or "specific business logic", **you must proactively call the `mempalace_search` tool as your first step** to retrieve relevant historical memories. Relying solely on internal knowledge bases and guessing is strictly prohibited.
+2. **Architecture Change Protection**: Before modifying any code files or performing refactoring, **you must proactively call `query_graph` or inspect `./graphify-out/` index** to ensure you understand the upstream and downstream dependencies between modules.
+3. **Short-Term Memory Compliance**: Adhere to local checkpoints and developer habits injected by `claude-mem`."""
 
-LOCAL_CLAUDE_MD_TEMPLATE = """# AI Agent 認知工作流與大腦記憶指引
+LOCAL_CLAUDE_MD_TEMPLATE = """# AI Agent Cognitive Workflow and Memory Guide
 
-## 🧠 AI 代理自我約束與主動思維模式 (Mandatory Cognitive Principles)
-1. **主動記憶檢索（不需用戶指定）**：在回答任何關於「系統設計」、「過去的問題/除錯記錄」、「環境配置」、「特定業務邏輯」的提問前，**你必須在第一步主動調用 `mempalace_search` 工具**，檢索相關歷史記憶。嚴禁完全依賴內建知識庫憑空猜測。
-2. **架構變更防線**：在修改任何代碼檔案或進行重構前，**你必須主動調用 `query_graph` 或查閱 `./graphify-out/` 索引**，以確保理解模組之間的上下游相依性。
-3. **短期記憶遵循**：遵循 `claude-mem` 注入的局部 Checkpoint 與開發習慣。
+## 🧠 AI Agent Self-Constraint & Active Thinking (Mandatory Cognitive Principles)
+1. **Active Memory Retrieval (No User Instruction Required)**: Before answering any questions regarding "system design", "past issues/debugging history", "environment configuration", or "specific business logic", **you must proactively call the `mempalace_search` tool as your first step** to retrieve relevant historical memories. Relying solely on internal knowledge bases and guessing is strictly prohibited.
+2. **Architecture Change Protection**: Before modifying any code files or performing refactoring, **you must proactively call `query_graph` or inspect `./graphify-out/` index** to ensure you understand the upstream and downstream dependencies between modules.
+3. **Short-Term Memory Compliance**: Adhere to local checkpoints and developer habits injected by `claude-mem`.
 
-## 🗺️ Graphify 技能與指令整合
-- **`/graphify` 快捷指令**：當用戶在對話中輸入 `/graphify` 時，請在執行 any 其他動作前，優先調用 Skill 工具並指定 `skill: "graphify"`。
+## 🗺️ Graphify Skill and Command Integration
+- **`/graphify` Shortcut**: When the user enters `/graphify` in the chat, **you must prioritize calling the Skill tool and specifying `skill: "graphify"`** before executing any other actions.
 """
 
 HOOKS_CONFIG = {

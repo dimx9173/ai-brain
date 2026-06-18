@@ -215,5 +215,54 @@ class TestManageList(_RegisterSeveralMixin):
         self.assertEqual(before, after)
 
 
+class TestDoctor(_RegisterSeveralMixin):
+    def test_doctor_passes_when_everything_clean(self) -> None:
+        from pathlib import Path
+        Path(".gitignore").write_text("graphify-out/\n", encoding="utf-8")
+        
+        from unittest.mock import MagicMock, patch
+        paths = MagicMock()
+        from ai_brain.verifier import CheckResult, PASS
+        
+        with patch("ai_brain.verifier.run_all_checks") as mock_checks, \
+             patch("ai_brain.commands.subprocess.run") as mock_run:
+             
+            mock_checks.return_value = [
+                CheckResult("Mock Check", PASS)
+            ]
+            
+            mock_sync = MagicMock()
+            mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+            mock_run.return_value = mock_sync
+            
+            ok = commands.run_doctor(paths, fix=False)
+            self.assertTrue(ok)
+
+    def test_doctor_fails_and_fixes_gitignore(self) -> None:
+        from pathlib import Path
+        Path(".gitignore").write_text("", encoding="utf-8")
+        
+        from unittest.mock import MagicMock, patch
+        paths = MagicMock()
+        from ai_brain.verifier import CheckResult, PASS
+        
+        with patch("ai_brain.verifier.run_all_checks") as mock_checks, \
+             patch("ai_brain.commands.subprocess.run") as mock_run:
+             
+            mock_checks.return_value = [
+                CheckResult("Mock Check", PASS)
+            ]
+            mock_sync = MagicMock()
+            mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+            mock_run.return_value = mock_sync
+            
+            ok = commands.run_doctor(paths, fix=False)
+            self.assertFalse(ok)
+            
+            ok = commands.run_doctor(paths, fix=True)
+            self.assertTrue(ok)
+            self.assertIn("graphify-out/", Path(".gitignore").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

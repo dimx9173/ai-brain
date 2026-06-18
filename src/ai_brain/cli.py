@@ -43,6 +43,8 @@ def _show_help() -> None:
         ("exclude-all", "[全部停用] 一鍵停用所有專案的自動歸檔"),
         ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
         ("list", "[查詢狀態] 顯示當前專案的自動歸檔狀態（Active / Inactive）"),
+        ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定與垃圾清理"),
+        ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
     ]
     for name, desc in rows:
@@ -81,6 +83,10 @@ def _cmd_include(args, _paths) -> int:
     return 0 if commands.manage_include(args.pattern) else 1
 
 
+def _cmd_doctor(args, paths) -> int:
+    return 0 if commands.run_doctor(paths, fix=args.fix) else 1
+
+
 def _cmd_completions(args) -> int:
     """Dispatch to ai_brain.completions.main for the completions subcommand."""
     from . import completions as _completions
@@ -112,6 +118,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "exclude-all": lambda a, p: (commands.exclude_all(), 0)[1],
     "include-all": lambda a, p: (commands.include_all(), 0)[1],
     "list": lambda a, p: (commands.manage_list(), 0)[1],
+    "doctor": _cmd_doctor,
     "completions": lambda a, p: _cmd_completions(a),
 }
 
@@ -137,6 +144,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common("stop", "Archive today's conversations to long-term memory")
     _add_common("status", "Show current project brain status")
     _add_common("verify", "Run 9-point health check")
+    p = sub.add_parser("doctor", help="Run comprehensive diagnostics on AI brain", add_help=False)
+    p.add_argument("--fix", action="store_true", help="Automatically fix detected issues")
     _add_common("clean", "Remove local brain configuration")
     _add_common("uninstall", "Global removal of all configs and crons")
     _add_common("stop-cron", "Remove the daily auto-archive cron job")
@@ -208,6 +217,7 @@ class _Namespace_for:
         # We only populate these when relevant; other commands ignore them.
         self.action = rest[0] if rest else None
         self.shell = rest[1] if len(rest) > 1 else None
+        self.fix = "--fix" in rest
 
 
 if __name__ == "__main__":

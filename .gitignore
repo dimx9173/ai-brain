@@ -36,5 +36,5 @@ dev_docs/
 mempalace.yaml
 entities.json
 
-# Graphify cache (regenerated on demand)
-graphify-out/cache/
+# Graphify output directory (regenerated on demand)
+graphify-out/
