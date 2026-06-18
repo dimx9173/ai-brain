@@ -22,12 +22,64 @@
 `ai-brain` connects three distinct cognitive layers of memory to ensure that AI agents have full workspace awareness, code topography understanding, and historical context.
 
 ```mermaid
-graph TD
-    A[New Project] -->|ai-brain full-init| B(Initialize AI Brain Workspace)
-    B -->|git pull / checkout| C(🌅 Git Hooks Update Code Map)
-    C -->|End of day / Cron every 12h| D(🌇 Auto Memory Archive)
-    D -->|Cross-project debugging| E[🔍 query mempalace_search]
-    E --> C
+graph TB
+    %% Styling definitions
+    classDef default fill:#1e1e2e,stroke:#cdd6f4,stroke-width:1px,color:#cdd6f4;
+    classDef user fill:#313244,stroke:#f5c2e7,stroke-width:2px,color:#f5c2e7;
+    classDef l0 fill:#181825,stroke:#89b4fa,stroke-width:2px,color:#89b4fa;
+    classDef l1 fill:#181825,stroke:#a6e3a1,stroke-width:2px,color:#a6e3a1;
+    classDef l2 fill:#181825,stroke:#f9e2af,stroke-width:2px,color:#f9e2af;
+    classDef tool fill:#11111b,stroke:#f38ba8,stroke-dasharray: 5 5,color:#f38ba8;
+
+    subgraph UserSpace ["💻 Developer & IDE Workspace"]
+        IDE["Gemini / Antigravity IDE / Cursor / Claude Code"]:::user
+        Docs["Active File & Chat History"]:::user
+    end
+
+    subgraph L0 ["🧠 L0: Working Memory (Session State)"]
+        CM["claude-mem"]:::l0
+        Scratch["Local Scratchpad & Context"]:::l0
+        IDE -->|Reads/Writes Session| CM
+        Docs -->|Context Injection| Scratch
+    end
+
+    subgraph L1 ["🗺️ L1: Structural Memory (Codebase Topology)"]
+        Graphify["Graphify AST Extractor"]:::l1
+        GraphJson["graphify-out/graph.json"]:::l1
+        GitHooks["🌅 Git Hooks (post-checkout/merge)"]:::l1
+        
+        GitHooks -->|Triggers| Graphify
+        Graphify -->|Builds| GraphJson
+    end
+
+    subgraph L2 ["🏰 L2: Long-Term Memory (Persistent Knowledge)"]
+        MP["MemPalace SQLite Database"]:::l2
+        MP_mcp["mempalace-mcp (Stdio Server)"]:::l2
+        Cron["🌇 Cron Job (Daily 23:30 Archive)"]:::l2
+        
+        Cron -->|Auto Archive| MP
+        MP_mcp -->|Queries/Updates| MP
+    end
+
+    subgraph Orchestrator ["⚙️ ai-brain (Core Orchestrator)"]
+        CLI["ai-brain CLI"]:::tool
+        Wrapper["graphify-mcp-wrapper"]:::tool
+        
+        CLI -->|init / full-init| GitHooks
+        CLI -->|start| Graphify
+        CLI -->|stop| Cron
+        CLI -->|doctor| verifier["Verifier & Self-Healer"]:::tool
+        
+        Wrapper -->|Resolves workspace path| GraphJson
+    end
+
+    %% Cross-layer relations
+    IDE -->|query_graph| Wrapper
+    IDE -->|mempalace_search| MP_mcp
+    CM -->|Compress & Sweep| CLI
+    
+    %% Style links
+    linkStyle default stroke:#6c7086,stroke-width:1px;
 ```
 
 ---
