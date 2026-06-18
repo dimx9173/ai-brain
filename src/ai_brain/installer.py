@@ -137,11 +137,7 @@ def _update_from_registry() -> bool:
     repo_dir = _find_git_root(source_path.parent)
     if repo_dir:
         print("--> 偵測到 Git 倉庫，正在同步最新代碼...")
-        try:
-            subprocess.run(["git", "-C", str(repo_dir), "pull", "origin", "master"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        _sync_repo_to_origin(repo_dir)
 
     src_dir = source_path.parent.parent.resolve() / "src"
     if not _write_global_shim(src_dir):
@@ -158,4 +154,111 @@ def _find_git_root(start: Path) -> Path | None:
             return repo_dir
         repo_dir = repo_dir.parent
     return None
+
+
+def _run_git(repo_dir: Path, *args: str, timeout: int = 30) -> tuple[int, str, str]:
+    """Run a git command in *repo_dir*. Returns (rc, stdout, stderr).
+
+    Never raises — git failures are surfaced via return code so the caller
+    can print a friendly message. Used by ``_sync_repo_to_origin`` so a
+    transient git error (e.g. wrong branch name, network down) doesn't
+    silently leave the user on a stale checkout.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_dir), *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, "", f"git {' '.join(args)} timed out after {timeout}s"
+    except FileNotFoundError:
+        return 127, "", "git not found on PATH"
+    except Exception as e:  # pragma: no cover - defensive
+        return 1, "", f"failed to spawn git: {e}"
+    return result.returncode, (result.stdout or ""), (result.stderr or "")
+
+
+def _current_branch(repo_dir: Path) -> str | None:
+    """Return the current branch name, or None if detached / unknown.
+
+    Tries ``git rev-parse --abbrev-ref HEAD`` first; falls back to
+    ``symbolic-ref --short HEAD``. Returns None on failure (e.g. detached
+    HEAD, brand-new repo with no commits) so the caller can pick a sane
+    default like ``main``.
+    """
+    rc, out, _ = _run_git(repo_dir, "rev-parse", "--abbrev-ref", "HEAD")
+    if rc == 0:
+        name = out.strip()
+        # "HEAD" is what git returns on a detached HEAD; treat as unknown.
+        if name and name != "HEAD":
+            return name
+    return None
+
+
+def _has_uncommitted_changes(repo_dir: Path) -> bool:
+    """True if the working tree has tracked modifications or staged changes.
+
+    We deliberately do NOT consider untracked files — those won't block a
+    ``reset --hard`` and are usually config the user wants to keep.
+    """
+    rc, out, _ = _run_git(repo_dir, "status", "--porcelain")
+    if rc != 0:
+        # If status fails, err on the safe side and pretend there are changes
+        # so we don't blow them away with a hard reset.
+        return True
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        # Porcelain v1 format: "XY path" where X=index, Y=worktree.
+        # "??" = untracked — safe to ignore.
+        if line.startswith("??"):
+            continue
+        return True
+    return False
+
+
+def _sync_repo_to_origin(repo_dir: Path) -> None:
+    """Fast-forward *repo_dir*'s current branch to ``origin/<branch>``.
+
+    Replaces the previous ``git pull origin master`` call which had two
+    bugs: (1) hard-coded ``master`` while the actual default branch on
+    this repo is ``main``, and (2) swallowed stderr so failures left the
+    user on a stale checkout with no warning.
+
+    Strategy:
+      1. Detect the current branch name.
+      2. If the working tree has uncommitted changes, refuse to reset —
+         print a yellow warning and skip the sync (better than destroying
+Local edits).
+      3. Otherwise ``fetch`` then ``reset --hard origin/<branch>`` and
+         surface any error to the user.
+    """
+    branch = _current_branch(repo_dir) or "main"
+
+    if _has_uncommitted_changes(repo_dir):
+        yellow(
+            f"⚠️  偵測到 {repo_dir} 有未提交的變更，跳過 git 同步以免覆寫。"
+        )
+        yellow("   請先 commit / stash 後再執行 ai-brain update。")
+        return
+
+    rc, _, err = _run_git(repo_dir, "fetch", "origin", branch, timeout=60)
+    if rc != 0:
+        red(f"❌ git fetch origin {branch} 失敗：{err.strip() or f'exit {rc}'}")
+        return
+
+    rc, out, err = _run_git(repo_dir, "reset", "--hard", f"origin/{branch}")
+    if rc != 0:
+        red(
+            f"❌ git reset --hard origin/{branch} 失敗："
+            f"{(err or out).strip() or f'exit {rc}'}"
+        )
+        return
+
+    # Show the new HEAD for the user's peace of mind.
+    rc, head, _ = _run_git(repo_dir, "rev-parse", "--short", "HEAD")
+    short = head.strip() if rc == 0 else "?"
+    green(f"✅ 已同步至 origin/{branch} (HEAD = {short})")
 
