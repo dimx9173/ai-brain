@@ -1,16 +1,25 @@
 # 🧠 ai-brain
 
+<p align="center">
+  <img src="./docs/images/banner.png" alt="AI Brain Banner" width="600px" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+</p>
+
 > **AI Brain Orchestrator** — A unified CLI tool for AI agent memory management, codebase indexing, and multi-agent workspace synchronization.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](#)
-[![Shell](https://img.shields.io/badge/shell-bash-4EAA25.svg)](#)
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
+  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
+  <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
+</p>
 
 `ai-brain` simplifies multi-agent development by packaging complex setup and routines for MemPalace, Graphify, and claude-mem into a single, cohesive command-line interface. It ensures that any AI agent entering your project (Claude Code, Rufus, Cursor, Gemini, Antigravity IDE, etc.) instantly understands your codebase structure, developer habits, and shares a persistent long-term memory palace.
 
 ---
 
 ## 🗺️ System Overview
+
+`ai-brain` connects three distinct cognitive layers of memory to ensure that AI agents have full workspace awareness, code topography understanding, and historical context.
 
 ```mermaid
 graph TD
@@ -19,6 +28,26 @@ graph TD
     C -->|End of day / Cron every 12h| D(🌇 Auto Memory Archive)
     D -->|Cross-project debugging| E[🔍 query mempalace_search]
     E --> C
+```
+
+---
+
+## 🧠 Dynamic Workspace Detection (MCP Wrapper)
+
+For global MCP servers launched by IDEs (like Antigravity IDE) where the default working directory is set to `/`, `ai-brain` automatically registers and installs the custom `graphify-mcp-wrapper`. 
+
+```mermaid
+sequenceDiagram
+    participant IDE as Antigravity IDE
+    participant Wrapper as graphify-mcp-wrapper
+    participant Graphify as Graphify Serve
+    
+    IDE->>Wrapper: Spawn process (CWD = /)
+    Wrapper->>Wrapper: Scan sibling processes of parent PID
+    Wrapper->>Wrapper: Extract workspace ID from language_server arguments
+    Wrapper->>Wrapper: Match workspace ID in active projects registry
+    Wrapper->>Wrapper: Resolve path & chdir(workspace_root)
+    Wrapper->>Graphify: Launch Graphify server with correct CWD
 ```
 
 ---
@@ -51,7 +80,7 @@ cd ~/cwork/ai-brain
 ```
 
 > [!NOTE]
-> The installation copies the script to `~/.local/bin/ai-brain`. Please ensure `~/.local/bin` is in your `PATH` environment variable. If not, append it to your Shell config (e.g., `~/.zshenv`):
+> The installation copies the scripts (`ai-brain` and `graphify-mcp-wrapper`) to `~/.local/bin/`. Please ensure `~/.local/bin` is in your `PATH` environment variable. If not, append it to your Shell config (e.g., `~/.zshenv`):
 > ```bash
 > echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshenv
 > source ~/.zshenv
@@ -77,14 +106,14 @@ ai-brain full-init
 | :--- | :--- | :--- | :--- |
 | `init` | Initialize local wing configurations, Graphify rules, CLAUDE.md, and Git Hook bindings. | Run once per new project | ✅ Safe |
 | `full-init` | Perform `init` plus register the global daily auto-archive Cron Job at 23:30. | Run once per system setup | ✅ Safe |
-| `install` | Install/update the executable to `~/.local/bin/ai-brain` and verify PATH. | Run on setup/update | ✅ Safe |
+| `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |
 | `update` | Alias for `install` (supports auto Git-pull and copy-updating from the cloned source repo). | Run to update | ✅ Safe |
 | `start` | Generate or update the latest codebase architecture maps. | Runs automatically via Git Hooks | ✅ Safe |
 | `stop` | Safe scan, sweep, and archive of the day's local chat context to the long-term SQLite memory palace. | Run at end of day | ✅ Safe |
 | `status` | Print current project memory status (MemPalace, Graphify, CLAUDE.md, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
 | `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
-| `doctor` | Perform comprehensive workspace diagnostics (gitignore check, mempalace config, stale locks, CLI path, etc.). | Run for deep troubleshooting | 🔍 Read-only |
-| `doctor --fix` | Diagnoses and automatically heals any configuration issues. | Run to auto-fix systems | 🔧 Modifying |
+| `doctor` | Perform comprehensive workspace diagnostics (check gitignore, stale locks, CLI path access, etc.) | Run for deep troubleshooting | 🔍 Read-only |
+| `doctor --fix` | Diagnoses and automatically repairs any configuration issues (gitignore entries, mempalace rooms, active locks, missing MCP settings) | Run to auto-heal system | 🔧 Modifying |
 | `version` | Display the installed version of `ai-brain`. | Run to check version | 🔍 Read-only |
 | `clean` | Remove all local `ai-brain` configuration directories, map directories, and Git hooks. | Run to strip configuration | 🗑️ Destructive |
 | `uninstall` | Global removal of all local configurations, registered Cron Jobs, global executables, and MCP server listings. | Run to completely uninstall | 🗑️ Destructive |
@@ -111,9 +140,11 @@ ai-brain exclude-all       # Disable auto-archiving for all registered active pr
 ---
 
 ## 📖 SOP Guidelines
+
 For detailed step-by-step cognitive routines, workflows, database deadlock prevention rules, and agent guidelines, refer to the [AI Agent Orchestration SOP](docs/AI_Agent_Orchestration_SOP.md).
 
 ---
 
 ## 📄 License
+
 This project is open-sourced under the [MIT License](LICENSE).
