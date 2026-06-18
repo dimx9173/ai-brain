@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from ai_brain.constants import MCP_GRAPHIFY, MCP_MEMPALACE
