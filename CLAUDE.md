@@ -4,7 +4,7 @@
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
 1. **L0: Working Memory (Session & Developer Context)**
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`.
+   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
 
 2. **L1: Structural Memory (Codebase Topology)**
