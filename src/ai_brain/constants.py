@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -70,6 +70,10 @@ def GLOBAL_AI_BRAIN() -> Path:
 
 def GLOBAL_MEMPALACE_MCP() -> Path:
     return Path.home() / ".local" / "bin" / "mempalace-mcp"
+
+
+def GLOBAL_GRAPHIFY_MCP_WRAPPER() -> Path:
+    return Path.home() / ".local" / "bin" / "graphify-mcp-wrapper"
 
 
 # --- Tools supported by full-init -----------------------------------------------

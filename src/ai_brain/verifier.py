@@ -74,12 +74,18 @@ def check_mcp_config(
         if not args and "command" in info and isinstance(info["command"], list):
             args = info["command"][1:]
 
-        if cmd in ("python3", "python"):
-            if any("graphify.serve" in str(a) for a in args):
-                probe = subprocess.run([cmd, "-c", "import graphify.serve"], capture_output=True)
-                if probe.returncode != 0:
-                    return CheckResult(name, FAIL, "(python 環境未安裝 graphify)")
-        elif not shutil.which(cmd) and not (cmd.startswith("/") and os.access(cmd, os.X_OK)):
+        is_graphify_check = False
+        if cmd in ("python3", "python") and any("graphify.serve" in str(a) for a in args):
+            is_graphify_check = True
+        elif "graphify-mcp-wrapper" in str(cmd):
+            is_graphify_check = True
+
+        if is_graphify_check:
+            probe = subprocess.run(["python3", "-c", "import graphify.serve"], capture_output=True)
+            if probe.returncode != 0:
+                return CheckResult(name, FAIL, "(python 環境未安裝 graphify)")
+
+        if not shutil.which(cmd) and not (cmd.startswith("/") and os.access(cmd, os.X_OK)):
             return CheckResult(name, FAIL, f"({server} 執行檔 ({cmd}) 無效或不可執行)")
 
     return CheckResult(name, PASS)

@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from .config import modify_json_file
 from .constants import (
+    GLOBAL_GRAPHIFY_MCP_WRAPPER,
     GLOBAL_MEMPALACE_MCP,
     MCP_GRAPHIFY,
     MCP_MEMPALACE,
@@ -38,8 +39,8 @@ def _stdio_server_entry(server: str) -> dict[str, Any]:
         }
     if server == MCP_GRAPHIFY:
         return {
-            "command": "python3",
-            "args": ["-m", "graphify.serve"],
+            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "args": [],
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -56,8 +57,8 @@ def _kilo_local_entry(server: str) -> dict[str, Any]:
     if server == MCP_GRAPHIFY:
         return {
             "type": "local",
-            "command": "python3",
-            "args": ["-m", "graphify.serve"],
+            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "args": [],
             "enabled": True,
         }
     raise ValueError(f"Unknown MCP server: {server}")
@@ -73,7 +74,7 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
     if server == MCP_GRAPHIFY:
         return {
             "type": "local",
-            "command": ["python3", "-m", "graphify.serve"],
+            "command": [str(GLOBAL_GRAPHIFY_MCP_WRAPPER())],
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -101,8 +102,8 @@ def _claude_code_entry(server: str) -> dict[str, Any]:
     if server == MCP_GRAPHIFY:
         return {
             "type": "stdio",
-            "command": "python3",
-            "args": ["-m", "graphify.serve"],
+            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "args": [],
             "env": {},
         }
     raise ValueError(f"Unknown MCP server: {server}")

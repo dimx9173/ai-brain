@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .constants import (
     GLOBAL_AI_BRAIN,
+    GLOBAL_GRAPHIFY_MCP_WRAPPER,
     INSTALL_SOURCE_REGISTRY,
     VERSION,
 )
@@ -49,6 +50,32 @@ if __name__ == "__main__":
         return True
     except Exception as e:
         red(f"❌ 寫入全域 shim 失敗 ({e})")
+        return False
+
+
+def _write_graphify_wrapper_shim(src_dir: Path) -> bool:
+    """Write the customized global graphify wrapper shim pointing to src_dir."""
+    shim_content = f"""#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import sys
+from pathlib import Path
+
+# Add source directory to path
+sys.path.insert(0, {repr(str(src_dir))})
+
+from ai_brain.graphify_mcp_wrapper import main
+if __name__ == "__main__":
+    sys.exit(main())
+"""
+    try:
+        GLOBAL_GRAPHIFY_MCP_WRAPPER().parent.mkdir(parents=True, exist_ok=True)
+        if GLOBAL_GRAPHIFY_MCP_WRAPPER().exists():
+            GLOBAL_GRAPHIFY_MCP_WRAPPER().unlink()
+        GLOBAL_GRAPHIFY_MCP_WRAPPER().write_text(shim_content, encoding="utf-8")
+        GLOBAL_GRAPHIFY_MCP_WRAPPER().chmod(0o755)
+        return True
+    except Exception as e:
+        red(f"❌ 寫入全域 Graphify MCP wrapper 失敗 ({e})")
         return False
 
 
@@ -93,7 +120,7 @@ def _install_from_source(script_path: Path) -> bool:
     repo_root = src_dir.parent
     bin_ai_brain = repo_root / "bin" / "ai-brain"
 
-    if not _write_global_shim(src_dir):
+    if not _write_global_shim(src_dir) or not _write_graphify_wrapper_shim(src_dir):
         return False
 
     try:
@@ -102,7 +129,7 @@ def _install_from_source(script_path: Path) -> bool:
         red(f"❌ 記錄安裝來源失敗 ({e})")
         return False
 
-    green(f"✅ 成功將 ai-brain 複製/更新至 {GLOBAL_AI_BRAIN()}")
+    green(f"✅ 成功將 ai-brain 與 graphify-mcp-wrapper 複製/更新至 {GLOBAL_AI_BRAIN().parent}")
     blue(f"--> 已紀錄安裝來源：{bin_ai_brain}")
 
     path_env = os.environ.get("PATH", "")
@@ -140,7 +167,7 @@ def _update_from_registry() -> bool:
         _sync_repo_to_origin(repo_dir)
 
     src_dir = source_path.parent.parent.resolve() / "src"
-    if not _write_global_shim(src_dir):
+    if not _write_global_shim(src_dir) or not _write_graphify_wrapper_shim(src_dir):
         return False
     green("✅ 成功自源路徑同步並更新至最新版本！")
     return True

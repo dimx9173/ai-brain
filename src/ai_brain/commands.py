@@ -122,12 +122,13 @@ def uninstall_all(paths) -> bool:
     from . import cron
     cron.uninstall()
 
-    target = Path.home() / ".local" / "bin" / "ai-brain"
-    if target.exists():
-        try:
-            target.unlink()
-        except Exception as e:
-            print(red(f"❌ 移除失敗 ({e})"))
+    for name in ("ai-brain", "graphify-mcp-wrapper"):
+        target = Path.home() / ".local" / "bin" / name
+        if target.exists():
+            try:
+                target.unlink()
+            except Exception as e:
+                print(red(f"❌ 移除 {name} 失敗 ({e})"))
 
     from .mcp import remove_minimax_provider
     remove_minimax_provider(paths)
