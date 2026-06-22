@@ -265,6 +265,42 @@ class TestDoctor(_RegisterSeveralMixin):
             self.assertTrue(ok)
             self.assertIn("graphify-out/", Path(".gitignore").read_text(encoding="utf-8"))
 
+    def test_doctor_fails_and_fixes_git_hooks(self) -> None:
+        from pathlib import Path
+        # Initialize Git layout and clean gitignore
+        Path(".git").mkdir(exist_ok=True)
+        Path(".gitignore").write_text("graphify-out/\n", encoding="utf-8")
+        
+        from unittest.mock import MagicMock, patch
+        paths = MagicMock()
+        from ai_brain.verifier import CheckResult, PASS
+        
+        with patch("ai_brain.verifier.run_all_checks") as mock_checks, \
+             patch("ai_brain.commands.subprocess.run") as mock_run, \
+             patch("ai_brain.commands.shutil.which") as mock_which:
+             
+            mock_checks.return_value = [
+                CheckResult("Mock Check", PASS)
+            ]
+            mock_sync = MagicMock()
+            mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+            mock_run.return_value = mock_sync
+            mock_which.return_value = "/usr/local/bin/mock"
+            
+            # 1. Runs without fix: should fail since Git Hooks are missing
+            ok = commands.run_doctor(paths, fix=False)
+            self.assertFalse(ok)
+            
+            # 2. Runs with fix: should create Git Hooks and return True
+            ok = commands.run_doctor(paths, fix=True)
+            self.assertTrue(ok)
+            
+            # 3. Verify hooks were created and optimized
+            hooks_dir = Path(".git") / "hooks"
+            self.assertTrue((hooks_dir / "post-merge").is_file())
+            self.assertTrue((hooks_dir / "post-checkout").is_file())
+            self.assertIn("--fast", (hooks_dir / "post-merge").read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

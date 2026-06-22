@@ -22,6 +22,7 @@ from .constants import (
     GRAPHIFY_OUT_DIR,
     GRAPHIFY_TOOLS,
     HOOKS_CONFIG,
+    HOOK_BEGIN_MARKER,
     LAST_SWEEP_FILE,
     LOCAL_CLAUDE_MD_TEMPLATE,
     LOCAL_GRAPHIFY_SKILL,
@@ -555,6 +556,52 @@ def run_doctor(paths, fix: bool = False) -> bool:
             all_pass = False
     else:
         print(green("  [ PASS ] MCP 大腦配置與伺服器載入完全正常"))
+
+    print()
+
+    # 7. Check Git Hooks
+    print(blue("7. 檢查 Git Hooks 配置與速度優化版本..."))
+    hooks_ok = True
+    if not Path(".git").is_dir():
+        print(green("  [ PASS ] 非 Git 專案，跳過 Git Hooks 檢查"))
+    else:
+        hooks_dir = Path(".git") / "hooks"
+        for name in ("post-merge", "post-checkout"):
+            hook_file = hooks_dir / name
+            installed = False
+            up_to_date = False
+            
+            if hook_file.is_file():
+                try:
+                    content = hook_file.read_text(encoding="utf-8")
+                    begin_marker = HOOK_BEGIN_MARKER.format(name=name)
+                    if begin_marker in content:
+                        installed = True
+                        if "--fast" in content:
+                            up_to_date = True
+                except Exception:
+                    pass
+            
+            if not installed:
+                hooks_ok = False
+                print(red(f"  [ FAIL ] Git Hook '{name}' 未安裝"))
+            elif not up_to_date:
+                hooks_ok = False
+                print(yellow(f"  [ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未啟用速度優化 --fast)"))
+            else:
+                print(green(f"  [ PASS ] Git Hook '{name}' 已安裝且啟用速度優化"))
+                
+        if not hooks_ok:
+            if fix:
+                print(yellow("    --> 正在重新安裝/更新 Git Hooks..."))
+                if git_hooks.install():
+                    print(green("    [ FIXED ] 已成功更新 Git Hooks 至最新速度優化版本！"))
+                    hooks_ok = True
+                else:
+                    print(red("    [ ERROR ] 自動更新 Git Hooks 失敗，請手動執行 `ai-brain init` 重試。"))
+                    all_pass = False
+            else:
+                all_pass = False
 
     print()
     print(blue("====== 🏁 診斷結束 ======"))
