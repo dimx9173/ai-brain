@@ -332,35 +332,27 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
     all_pass = True
 
-    # 1. Check .gitignore
-    print(blue("1. 檢查 .gitignore 排除設定..."))
-    gitignore = Path(".gitignore")
+    # 1. Check gitignores
+    print(blue("1. 檢查 gitignore 排除設定..."))
+    ignores = _read_all_ignores()
     gi_ok = True
-    content = ""
-    if gitignore.is_file():
-        try:
-            content = gitignore.read_text(encoding="utf-8")
-        except Exception:
-            pass
-    lines = content.splitlines()
-    normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
     
-    if "graphify-out" not in normalized:
+    if "graphify-out" not in ignores:
         gi_ok = False
-        print(red("  [ FAIL ] .gitignore 中未忽略 graphify-out/ 目錄"))
+        print(red("  [ FAIL ] gitignore 中未忽略 graphify-out/ 目錄"))
         if fix:
             _ensure_graphify_out_ignored()
-            print(green("    [ FIXED ] 已自動將 graphify-out/ 加入 .gitignore"))
+            print(green("    [ FIXED ] 已自動將 graphify-out/ 加入全域 gitignore"))
             gi_ok = True
         else:
             all_pass = False
     else:
-        print(green("  [ PASS ] .gitignore 已正確排除 graphify-out/"))
+        print(green("  [ PASS ] gitignore 已正確排除 graphify-out/"))
 
     # Check other massive unignored folders
     for folder in ("node_modules", "venv", ".venv"):
-        if Path(folder).is_dir() and folder not in normalized:
-            print(yellow(f"  [ WARN ] 偵測到本機存在 {folder}/ 但未在 .gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
+        if Path(folder).is_dir() and folder not in ignores:
+            print(yellow(f"  [ WARN ] 偵測到本機存在 {folder}/ 但未在 gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
             if fix:
                 print_yellow(f"    --> 建議您手動將 {folder}/ 加入 .gitignore 排除名單。")
 
@@ -618,8 +610,58 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
 # --- Internal helpers -----------------------------------------------------------
 
+def _global_gitignore_path() -> Path:
+    import os
+    real_home = Path(os.path.expanduser("~")).resolve()
+    stubbed = Path.home().resolve() != real_home
+    
+    if not stubbed:
+        try:
+            res = subprocess.run(
+                ["git", "config", "--global", "core.excludesfile"],
+                capture_output=True,
+                text=True,
+            )
+            if res.returncode == 0:
+                path_str = res.stdout.strip()
+                if path_str:
+                    if path_str.startswith("~"):
+                        return Path.home() / path_str[1:].lstrip("/")
+                    p = Path(path_str).expanduser()
+                    try:
+                        if p.is_relative_to(real_home):
+                            return Path.home() / p.relative_to(real_home)
+                    except AttributeError:
+                        try:
+                            p.relative_to(real_home)
+                            return Path.home() / p.relative_to(real_home)
+                        except ValueError:
+                            pass
+                    return p
+        except Exception:
+            pass
+    return Path.home() / ".gitignore_global"
+
+
+def _read_all_ignores() -> set[str]:
+    """Read normalized patterns from both local .gitignore and global excludesfile."""
+    patterns = set()
+    paths_to_read = [Path(".gitignore"), _global_gitignore_path()]
+    for p in paths_to_read:
+        if p.is_file():
+            try:
+                content = p.read_text(encoding="utf-8")
+                for line in content.splitlines():
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("#"):
+                        patterns.add(stripped.rstrip("/"))
+            except Exception:
+                pass
+    return patterns
+
+
 def _ensure_graphify_out_ignored() -> None:
-    gitignore = Path(".gitignore")
+    gitignore = _global_gitignore_path()
     content = ""
     if gitignore.is_file():
         try:
@@ -631,7 +673,7 @@ def _ensure_graphify_out_ignored() -> None:
     normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
     
     if "graphify-out" not in normalized:
-        print_yellow("--> 自動將 graphify-out/ 加入 .gitignore 避免記憶庫膨脹...")
+        print_yellow(f"--> 自動將 graphify-out/ 加入全域 gitignore ({gitignore}) 避免記憶庫膨脹...")
         new_lines = []
         replaced = False
         for line in lines:
@@ -650,9 +692,12 @@ def _ensure_graphify_out_ignored() -> None:
             new_lines.append("graphify-out/")
             
         try:
+            gitignore.parent.mkdir(parents=True, exist_ok=True)
             gitignore.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            if gitignore == Path.home() / ".gitignore_global":
+                subprocess.run(["git", "config", "--global", "core.excludesfile", "~/.gitignore_global"])
         except Exception as e:
-            print(red(f"警告：更新 .gitignore 失敗 ({e})"))
+            print(red(f"警告：更新全域 gitignore 失敗 ({e})"))
 
 
 def _run_mempalace_init() -> bool:
