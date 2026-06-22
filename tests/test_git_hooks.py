@@ -107,7 +107,7 @@ class TestHookUninstallation(InTempDir):
 
 
 class TestHookTemplates(unittest.TestCase):
-    def test_post_checkout_runs_chain_in_background(self) -> None:
+    def test_post_checkout_runs_chain_in_background_with_lock(self) -> None:
         content = POST_CHECKOUT_TEMPLATE.format(
             begin=HOOK_BEGIN_MARKER.format(name="post-checkout"),
             end=HOOK_END_MARKER.format(name="post-checkout"),
@@ -116,6 +116,9 @@ class TestHookTemplates(unittest.TestCase):
         )
         self.assertIn(">/dev/null 2>&1 &", content)
         self.assertIn('if [ "$3" -eq 1 ]; then', content)
+        self.assertIn("ai-brain-checkout.lock", content)
+        self.assertIn('mkdir "$LOCK_DIR"', content)
+        self.assertIn("trap 'rm -rf", content)
 
 
 if __name__ == "__main__":
