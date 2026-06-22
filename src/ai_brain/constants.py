@@ -144,17 +144,32 @@ HOOKS_CONFIG = {
 }
 
 # --- Git hook templates ---------------------------------------------------------
+# Marker used to identify ai-brain managed sections inside user hooks.
+HOOK_BEGIN_MARKER = "# >>> ai-brain {name} hook begin"
+HOOK_END_MARKER = "# <<< ai-brain {name} hook end"
+HOOK_MARKER_BODY = "# (auto-managed by ai-brain; do not edit between markers)"
+
 POST_MERGE_TEMPLATE = """#!/bin/bash
+{begin}
+{marker_body}
 echo -e "\\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜 ======\\033[0m"
-%s
+{chain}
+{end}
 """
 
+# post-checkout runs on every branch switch; keep it non-blocking by running
+# the heavy graph rebuild in a subshell in the background.
 POST_CHECKOUT_TEMPLATE = """#!/bin/bash
+{begin}
+{marker_body}
 # 只在切換分支時觸發（引數 $3 為 1 代表切換分支，0 代表檢出單一檔案）
 if [ "$3" -eq 1 ]; then
-    echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：自動更新代碼架構圖譜 ======\\033[0m"
-    %s
+    (
+        echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：背景更新代碼架構圖譜 ======\\033[0m"
+        {chain}
+    ) >/dev/null 2>&1 &
 fi
+{end}
 """
 
 HOOK_CHAIN = """if command -v ai-brain &> /dev/null; then
