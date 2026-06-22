@@ -144,17 +144,48 @@ HOOKS_CONFIG = {
 }
 
 # --- Git hook templates ---------------------------------------------------------
+# Marker used to identify ai-brain managed sections inside user hooks.
+HOOK_BEGIN_MARKER = "# >>> ai-brain {name} hook begin"
+HOOK_END_MARKER = "# <<< ai-brain {name} hook end"
+HOOK_MARKER_BODY = "# (auto-managed by ai-brain; do not edit between markers)"
+
 POST_MERGE_TEMPLATE = """#!/bin/bash
+{begin}
+{marker_body}
 echo -e "\\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜 ======\\033[0m"
-%s
+{chain}
+{end}
 """
 
+# post-checkout runs on every branch switch; keep it non-blocking by running
+# the heavy graph rebuild in a subshell in the background.  A PID-based lock
+# prevents concurrent / back-to-back branch switches from stacking graphify runs.
 POST_CHECKOUT_TEMPLATE = """#!/bin/bash
+{begin}
+{marker_body}
 # 只在切換分支時觸發（引數 $3 為 1 代表切換分支，0 代表檢出單一檔案）
 if [ "$3" -eq 1 ]; then
-    echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：自動更新代碼架構圖譜 ======\\033[0m"
-    %s
+    (
+        LOCK_DIR=".git/ai-brain-checkout.lock"
+        if [ -d "$LOCK_DIR" ]; then
+            PID_FILE="$LOCK_DIR/pid"
+            if [ -f "$PID_FILE" ]; then
+                OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+                if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+                    exit 0
+                fi
+            fi
+            rm -rf "$LOCK_DIR"
+        fi
+        mkdir "$LOCK_DIR" 2>/dev/null || exit 0
+        echo $$ > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT
+
+        echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：背景更新代碼架構圖譜 ======\\033[0m"
+        {chain}
+    ) >/dev/null 2>&1 &
 fi
+{end}
 """
 
 HOOK_CHAIN = """if command -v ai-brain &> /dev/null; then
