@@ -82,3 +82,23 @@ def ensure_path_has_local_bin() -> None:
         if p not in path_env.split(os.path.pathsep):
             path_env = p + os.path.pathsep + path_env
     os.environ["PATH"] = path_env
+
+
+def find_graphify_python() -> str:
+    """Find the python interpreter that has graphify installed by reading its shebang."""
+    import os
+    import shutil
+    graphify_path = shutil.which("graphify")
+    if graphify_path:
+        try:
+            with open(graphify_path, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+            if first_line.startswith("#!"):
+                python_path = first_line[2:].strip()
+                python_path = python_path.split()[0]
+                if "python" in python_path and os.path.exists(python_path):
+                    return python_path
+        except Exception:
+            pass
+    return "python3"
+

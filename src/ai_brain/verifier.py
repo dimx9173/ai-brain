@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .constants import HOME, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
+from .platforms import find_graphify_python
 from .ui import green, red, yellow
 
 PASS = "OK"
@@ -81,9 +82,10 @@ def check_mcp_config(
             is_graphify_check = True
 
         if is_graphify_check:
-            probe = subprocess.run(["python3", "-c", "import graphify.serve"], capture_output=True)
+            py_cmd = find_graphify_python()
+            probe = subprocess.run([py_cmd, "-c", "import graphify.serve"], capture_output=True)
             if probe.returncode != 0:
-                return CheckResult(name, FAIL, "(python 環境未安裝 graphify)")
+                return CheckResult(name, FAIL, f"({py_cmd} 環境未安裝 graphify)")
 
         if not shutil.which(cmd) and not (cmd.startswith("/") and os.access(cmd, os.X_OK)):
             return CheckResult(name, FAIL, f"({server} 執行檔 ({cmd}) 無效或不可執行)")

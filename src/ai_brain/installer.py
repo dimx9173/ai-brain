@@ -23,6 +23,7 @@ from .constants import (
     INSTALL_SOURCE_REGISTRY,
     VERSION,
 )
+from .platforms import find_graphify_python
 from .ui import print_blue as blue, print_green as green, print_red as red, print_yellow as yellow
 from .upgraders import print_summary, upgrade_all
 
@@ -55,7 +56,8 @@ if __name__ == "__main__":
 
 def _write_graphify_wrapper_shim(src_dir: Path) -> bool:
     """Write the customized global graphify wrapper shim pointing to src_dir."""
-    shim_content = f"""#!/usr/bin/env python3
+    python_cmd = find_graphify_python()
+    shim_content = f"""#!{python_cmd}
 # -*- coding: utf-8 -*-
 import sys
 from pathlib import Path
