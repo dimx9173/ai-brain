@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -189,13 +189,13 @@ fi
 """
 
 HOOK_CHAIN = """if command -v ai-brain &> /dev/null; then
-    ai-brain start
+    ai-brain start --fast
 elif [ -f "./bin/ai-brain" ]; then
-    ./bin/ai-brain start
+    ./bin/ai-brain start --fast
 elif [ -f "./PC/Knowhow/ai-brain.sh" ]; then
-    ./PC/Knowhow/ai-brain.sh start
+    ./PC/Knowhow/ai-brain.sh start --fast
 elif [ -f "./ai-brain.sh" ]; then
-    ./ai-brain.sh start
+    ./ai-brain.sh start --fast
 else
-    command -v graphify &> /dev/null && graphify .
+    command -v graphify &> /dev/null && graphify update . --no-cluster
 fi"""

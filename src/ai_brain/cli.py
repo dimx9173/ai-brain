@@ -106,7 +106,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "version": lambda a, p: (_show_version(), 0)[1],
     "-v": lambda a, p: (_show_version(), 0)[1],
     "--version": lambda a, p: (_show_version(), 0)[1],
-    "start": lambda a, p: 0 if commands.start_day() else 1,
+    "start": lambda a, p: 0 if commands.start_day(fast=a.fast) else 1,
     "stop": lambda a, p: 0 if commands.stop_day() else 1,
     "status": lambda a, p: (commands.check_status(), 0)[1],
     "verify": _cmd_verify,
@@ -140,7 +140,9 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common("install", "Install/update the global ai-brain command")
     _add_common("update", "Alias for install (auto-pulls from git source)")
     _add_common("version", "Show installed version")
-    _add_common("start", "Refresh codebase architecture map")
+    p = sub.add_parser("start", help="Refresh codebase architecture map", add_help=False)
+    p.add_argument("--fast", action="store_true", help="Incremental update without clustering")
+    p.add_argument("--no-cluster", action="store_true", help="Incremental update without clustering (alias)")
     _add_common("stop", "Archive today's conversations to long-term memory")
     _add_common("status", "Show current project brain status")
     _add_common("verify", "Run 9-point health check")
@@ -218,6 +220,7 @@ class _Namespace_for:
         self.action = rest[0] if rest else None
         self.shell = rest[1] if len(rest) > 1 else None
         self.fix = "--fix" in rest
+        self.fast = "--fast" in rest or "--no-cluster" in rest
 
 
 if __name__ == "__main__":

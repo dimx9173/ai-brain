@@ -150,7 +150,7 @@ def uninstall_all(paths) -> bool:
 
 # --- start / stop / status ------------------------------------------------------
 
-def start_day() -> bool:
+def start_day(fast: bool = False) -> bool:
     """Morning routine: kick off a background sweep if stale, then refresh graph."""
     _ensure_graphify_out_ignored()
     if _should_run_background_sweep():
@@ -165,7 +165,7 @@ def start_day() -> bool:
             print(red(f"警告：背景歸檔啟動失敗 ({e})"))
 
     print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
-    if not _run_graphify_extract():
+    if not _run_graphify_extract(fast=fast):
         return False
     print(green("✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。"))
     return True
@@ -774,8 +774,11 @@ def _record_sweep_timestamp() -> None:
         pass
 
 
-def _run_graphify_extract() -> bool:
+def _run_graphify_extract(fast: bool = False) -> bool:
     candidates = [TOOL_GRAPHIFY, "./node_modules/.bin/graphify", "/graphify"]
+    graph_json = Path(GRAPHIFY_OUT_DIR) / "graph.json"
+    has_graph = graph_json.is_file()
+
     for cmd in candidates:
         is_local = cmd.startswith(".")
         if is_local:
@@ -784,7 +787,13 @@ def _run_graphify_extract() -> bool:
         elif not shutil.which(cmd):
             continue
         try:
-            subprocess.run([cmd, "."], check=True)
+            if fast:
+                args = [cmd, "update", ".", "--no-cluster"]
+            elif has_graph:
+                args = [cmd, "update", "."]
+            else:
+                args = [cmd, "."]
+            subprocess.run(args, check=True)
             return True
         except Exception:
             continue
