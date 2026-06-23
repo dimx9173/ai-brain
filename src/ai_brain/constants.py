@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.0.8"
+VERSION = "2.0.9"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -83,7 +83,7 @@ GRAPHIFY_TOOLS = ("antigravity", "kilo", "cursor", "claude", "opencode", "codex"
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.
 # (Belt-and-braces: `upgraders` carries binary ↔ package mapping, this list
 # is used by the install / uninstall messaging.)
-UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "graphifyy")
+UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "graphifyy[mcp]")
 
 # --- Time & thresholds ----------------------------------------------------------
 SWEEP_BACKGROUND_GAP_SECONDS = 12 * 60 * 60

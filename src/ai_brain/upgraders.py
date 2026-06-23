@@ -45,7 +45,7 @@ class UpgradableTool:
 CORE_TOOLS: tuple[UpgradableTool, ...] = (
     UpgradableTool("MemPalace", "mempalace", "mempalace"),
     UpgradableTool("claude-mem", "claude-mem", "claude-mem"),
-    UpgradableTool("Graphify", "graphify", "graphifyy"),
+    UpgradableTool("Graphify", "graphify", "graphifyy[mcp]"),
 )
 
 
@@ -76,7 +76,8 @@ def _version_from_metadata(packages: tuple[str, ...]) -> str | None:
     """
     # 1. Direct lookup against the candidate names.
     for pkg in packages:
-        for candidate in {pkg, pkg.lower().replace("-", "_")}:
+        base_pkg = pkg.split("[")[0]
+        for candidate in {base_pkg, base_pkg.lower().replace("-", "_")}:
             try:
                 return importlib_metadata.version(candidate)
             except importlib_metadata.PackageNotFoundError:
@@ -89,7 +90,8 @@ def _version_from_metadata(packages: tuple[str, ...]) -> str | None:
     # can't disambiguate without help, so we look for any installed dist
     # whose normalised name *starts with* the binary's normalised name.
     try:
-        target = packages[0].lower().replace("-", "_").replace("_", "")
+        base_pkg0 = packages[0].split("[")[0]
+        target = base_pkg0.lower().replace("-", "_").replace("_", "")
         for dist in importlib_metadata.distributions():
             normalised = dist.metadata["Name"].lower().replace("-", "").replace("_", "")
             if normalised.startswith(target) or target.startswith(normalised):
@@ -141,6 +143,7 @@ def _version_from_uv_list(binary: str, package: str) -> str | None:
         return None
     # Normalise — uv prints the distribution name, which may differ from
     # the binary name (e.g. graphifyy vs graphify).
+    base_pkg = package.split("[")[0]
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith("-"):
@@ -149,7 +152,7 @@ def _version_from_uv_list(binary: str, package: str) -> str | None:
         if len(parts) < 2:
             continue
         name, version = parts[0], parts[1]
-        if name in (package, package.lower(), binary, binary.lower()):
+        if name in (base_pkg, base_pkg.lower(), binary, binary.lower()):
             return version
     return None
 

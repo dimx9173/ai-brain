@@ -55,7 +55,7 @@ Before installing `ai-brain`, make sure you have installed the core dependency t
 ```bash
 uv tool install mempalace --force
 uv tool install claude-mem --force
-uv tool install graphifyy --force
+uv tool install "graphifyy[mcp]" --force
 ```
 
 ---

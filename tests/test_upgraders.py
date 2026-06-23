@@ -24,7 +24,7 @@ from ai_brain.upgraders import (
 class TestCoreToolsRegistry(unittest.TestCase):
     def test_core_tools_cover_the_three_documented_packages(self) -> None:
         packages = {t.package for t in CORE_TOOLS}
-        self.assertEqual(packages, {"mempalace", "claude-mem", "graphifyy"})
+        self.assertEqual(packages, {"mempalace", "claude-mem", "graphifyy[mcp]"})
 
     def test_binaries_are_path_safe(self) -> None:
         for tool in CORE_TOOLS:

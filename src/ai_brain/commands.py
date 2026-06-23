@@ -503,7 +503,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
     # 5. Check System CLIs
     print(blue("5. 檢查系統相依 CLI 工具可用性..."))
     cli_ok = True
-    for tool_name, pkg in (("mempalace", "mempalace"), ("graphify", "graphifyy"), ("claude-mem", "claude-mem")):
+    for tool_name, pkg in (("mempalace", "mempalace"), ("graphify", "graphifyy[mcp]"), ("claude-mem", "claude-mem")):
         if shutil.which(tool_name):
             print(green(f"  [ PASS ] 工具 {tool_name} 已安裝"))
         else:
@@ -726,7 +726,7 @@ def _run_graphify_install() -> bool:
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except FileNotFoundError:
-        print(red("錯誤：未找到 graphify 工具，請先執行: uv tool install graphifyy --force"))
+        print(red("錯誤：未找到 graphify 工具，請先執行: uv tool install \"graphifyy[mcp]\" --force"))
         return False
     except Exception as e:
         print(yellow(f"--> 安裝 Graphify 部分規則時發生警告 ({e})"))

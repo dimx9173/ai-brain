@@ -47,7 +47,7 @@ done
 | :------------ | :--------------------------------------------------------------- |
 | mempalace     | `uv tool install mempalace --force`                              |
 | claude-mem    | `uv tool install claude-mem --force`                             |
-| graphify      | `uv tool install graphifyy --force`                              |
+| graphify      | `uv tool install "graphifyy[mcp]" --force`                          |
 | uv 本身       | [uv 安裝指南](https://docs.astral.sh/uv/getting-started/installation/) |
 
 ### Step 4：Linux 環境注意 — PATH 配置
@@ -77,7 +77,7 @@ source ~/.zshenv
 ```bash
 uv tool install mempalace --force
 uv tool install claude-mem --force
-uv tool install graphifyy --force
+uv tool install "graphifyy[mcp]" --force
 ```
 
 ### 2️⃣ 建立全域 ai-brain 指令軟連結

@@ -7,7 +7,7 @@ Two flows:
   do a `git pull`, and regenerate the shim.
 
 Both flows finish by also upgrading the three core dependency CLIs
-(mempalace / claude-mem / graphifyy) and printing a single version table
+(mempalace / claude-mem / graphifyy[mcp]) and printing a single version table
 so the user can see the whole toolchain in one glance.
 """
 from __future__ import annotations
@@ -109,7 +109,7 @@ def _upgrade_and_summarise() -> None:
     one-liner that runs the in-repo package, so the canonical version is
     whatever is compiled into this file.
     """
-    blue("====== 🔄 一併更新核心 CLI 套件 (mempalace / claude-mem / graphifyy) ======")
+    blue("====== 🔄 一併更新核心 CLI 套件 (mempalace / claude-mem / graphifyy[mcp]) ======")
     outcomes = upgrade_all()
     print_summary(outcomes, self_version=VERSION)
 
