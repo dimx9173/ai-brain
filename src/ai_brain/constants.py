@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.0.7"
+VERSION = "2.0.8"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -77,7 +77,7 @@ def GLOBAL_GRAPHIFY_MCP_WRAPPER() -> Path:
 
 
 # --- Tools supported by full-init -----------------------------------------------
-GRAPHIFY_TOOLS = ("antigravity", "kilo", "cursor", "claude", "opencode")
+GRAPHIFY_TOOLS = ("antigravity", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw")
 
 # The `uv tool install` package names ai-brain orchestrates. Keep this in sync
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.

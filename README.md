@@ -8,7 +8,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.0.7-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.0.8-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
