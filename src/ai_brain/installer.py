@@ -168,7 +168,7 @@ def _update_from_registry() -> bool:
         print("--> 偵測到 Git 倉庫，正在同步最新代碼...")
         _sync_repo_to_origin(repo_dir)
 
-    src_dir = source_path.parent.parent.resolve() / "src"
+    src_dir = (repo_dir or source_path.parent.parent.resolve()) / "src"
     if not _write_global_shim(src_dir) or not _write_graphify_wrapper_shim(src_dir):
         return False
     green("✅ 成功自源路徑同步並更新至最新版本！")
