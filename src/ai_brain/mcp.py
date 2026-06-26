@@ -87,6 +87,11 @@ def _claude_desktop_entry(server: str) -> dict[str, Any]:
             "args": [],
             "env": {},
         }
+    if server == MCP_GRAPHIFY:
+        return {
+            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "args": [],
+        }
     raise ValueError(f"Claude Desktop does not register server: {server}")
 
 
@@ -134,7 +139,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
         RegistrationTarget("~/.claude.json", paths.claude_json, "mcpServers",
                            (MCP_MEMPALACE, MCP_GRAPHIFY), _claude_code_entry),
         RegistrationTarget("Claude Desktop", paths.claude_desktop, "mcpServers",
-                           (MCP_MEMPALACE,), _claude_desktop_entry),
+                           (MCP_MEMPALACE, MCP_GRAPHIFY), _claude_desktop_entry),
         RegistrationTarget("Kilo VS Code", paths.vscode_kilo, "mcpServers",
                            (MCP_MEMPALACE, MCP_GRAPHIFY), _kilo_local_entry),
         RegistrationTarget("Kilo CLI", paths.kilo_cli, "mcp",
@@ -214,7 +219,10 @@ def _register_in_file(target: RegistrationTarget) -> bool:
         servers = data.setdefault(target.server_key, {})
         for server in target.servers:
             if server in servers:
-                continue
+                current_entry = servers[server]
+                expected_entry = target.entry_builder(server)
+                if current_entry.get("command") == expected_entry.get("command"):
+                    continue
             servers[server] = target.entry_builder(server)
             print(f"Successfully registered {server} in {target.label}")
         return data

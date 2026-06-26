@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .constants import HOME, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
+from .constants import HOME, MCP_GRAPHIFY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
 from .platforms import find_graphify_python
 from .ui import green, red, yellow
 
@@ -74,6 +74,10 @@ def check_mcp_config(
         args = info.get("args", [])
         if not args and "command" in info and isinstance(info["command"], list):
             args = info["command"][1:]
+
+        if server == MCP_GRAPHIFY:
+            if "graphify-mcp-wrapper" not in str(cmd):
+                return CheckResult(name, FAIL, f"({server} 未配置為使用 graphify-mcp-wrapper)")
 
         is_graphify_check = False
         if cmd in ("python3", "python") and any("graphify.serve" in str(a) for a in args):
@@ -181,7 +185,7 @@ def run_all_checks(paths) -> List[CheckResult]:
     claude_json = HOME() / ".claude.json"
     if not claude_json.is_file() and Path(".claude.json").is_file():
         claude_json = Path(".claude.json")
-    results.append(check_mcp_config("Claude Code", claude_json, required_servers=(MCP_MEMPALACE,)))
+    results.append(check_mcp_config("Claude Code", claude_json))
 
     # 5. OpenClaw daemon
     results.append(check_openclaw_daemon())
@@ -204,8 +208,7 @@ def run_all_checks(paths) -> List[CheckResult]:
                                    "(此環境未安裝 Gemini CLI，跳過檢查)"))
 
     # 8. Claude Desktop
-    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop,
-                                   required_servers=(MCP_MEMPALACE,)))
+    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop))
 
     # 9. Kilo
     kilo_paths: List[Path] = []

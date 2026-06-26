@@ -54,7 +54,7 @@ class TestMcpConfigChecker(unittest.TestCase):
         _write(target, {
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
-                MCP_GRAPHIFY: {"command": "python3", "args": ["-m", "graphify.serve"]},
+                MCP_GRAPHIFY: {"command": "/Users/carlos/.local/bin/graphify-mcp-wrapper", "args": []},
             }
         })
         try:

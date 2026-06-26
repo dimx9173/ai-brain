@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-brain"
-version = "2.0.8"
+version = "2.0.11"
 description = "AI Brain Orchestrator — unified CLI for AI agent memory & code graph tools"
 readme = "README.md"
 license = { text = "MIT" }
