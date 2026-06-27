@@ -21,6 +21,8 @@ from .constants import (
     APP_NAME,
     CODEBASE_MEMORY_OUT_DIR,
     CODEBASE_MEMORY_TOOLS,
+    COGNITIVE_PRINCIPLES_BLOCK,
+    COGNITIVE_PRINCIPLES_MARKER,
     HOOKS_CONFIG,
     HOOK_BEGIN_MARKER,
     LAST_SWEEP_FILE,
@@ -597,7 +599,65 @@ def run_doctor(paths, fix: bool = False) -> bool:
                 all_pass = False
 
     print()
+
+    # 8. Check CLAUDE.md cognitive rules freshness
+    print(blue("8. 檢查 CLAUDE.md AI 工具使用規則版本..."))
+    rules_ok = True
+    freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
+    files_to_check = []
+    local_md = Path(PROJECT_CLAUDE_MD)
+    global_md = Path.home() / ".claude" / "CLAUDE.md"
+    if local_md.is_file():
+        files_to_check.append(("專案 CLAUDE.md", local_md))
+    if global_md.is_file():
+        files_to_check.append(("全域 ~/.claude/CLAUDE.md", global_md))
+
+    if not files_to_check:
+        print(green("  [ PASS ] 未偵測到 CLAUDE.md 檔案，略過"))
+    else:
+        for label, md_path in files_to_check:
+            try:
+                content = md_path.read_text(encoding="utf-8")
+            except Exception:
+                content = ""
+            if COGNITIVE_PRINCIPLES_MARKER in content and freshness_marker in content:
+                print(green(f"  [ PASS ] {label} 工具規則為最新版本"))
+            elif COGNITIVE_PRINCIPLES_MARKER in content:
+                rules_ok = False
+                print(yellow(f"  [ WARN ] {label} 工具規則版本過舊 (缺少 codebase-memory-mcp 優先順序說明)"))
+                if fix:
+                    # Replace the whole cognitive block with the updated template
+                    try:
+                        lines = content.splitlines()
+                        new_lines = []
+                        skip = False
+                        for line in lines:
+                            if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
+                                skip = True
+                                # Inject updated block
+                                for bl in COGNITIVE_PRINCIPLES_BLOCK.splitlines():
+                                    new_lines.append(bl)
+                                continue
+                            if skip:
+                                # Stop skipping at next top-level heading
+                                if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
+                                    skip = False
+                                    new_lines.append(line)
+                            else:
+                                new_lines.append(line)
+                        md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                        print(green(f"    [ FIXED ] 已更新 {label} 至最新工具規則版本"))
+                        rules_ok = True
+                    except Exception as e:
+                        print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                else:
+                    all_pass = False
+            else:
+                print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
+
+    print()
     print(blue("====== 🏁 診斷結束 ======"))
+
     if all_pass:
         print(green("🎉 完美！您的 AI 大腦環境一切正常，健康指數 100%！"))
         return True
