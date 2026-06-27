@@ -1015,8 +1015,10 @@ def _print_archive_status() -> None:
     print(f"  停用當前專案自動歸檔: {G}ai-brain exclude current{RST} 或 {G}ai-brain exclude .{RST}")
     print(f"  啟用指定專案自動歸檔: {G}ai-brain include [專案關鍵字|編號|all]{RST}")
     print(f"  停用指定專案自動歸檔: {G}ai-brain exclude [專案關鍵字|編號|all]{RST}")
-    print(f"  全部啟用: {G}ai-brain include all{RST}  (同 {G}include-all{RST})")
-    print(f"  全部停用: {G}ai-brain exclude all{RST}  (同 {G}exclude-all{RST})\n")
+    print(f"  全部啟用:             {G}ai-brain include all{RST}  (同 {G}include-all{RST})")
+    print(f"  全部停用:             {G}ai-brain exclude all{RST}  (同 {G}exclude-all{RST})")
+    print(f"  查看所有註冊專案:     {G}ai-brain list{RST}")
+    print(f"  註銷指定專案:         {G}ai-brain remove [專案關鍵字|編號|current|all]{RST}\n")
 
 
 def _resolve_target(pattern: str | None) -> str | None:
