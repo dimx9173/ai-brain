@@ -13,6 +13,7 @@ class TestPlatforms(unittest.TestCase):
         self.assertTrue(hasattr(paths, "claude_json"))
         self.assertTrue(hasattr(paths, "mcp_json"))
         self.assertTrue(hasattr(paths, "kilo_cli"))
+        self.assertTrue(hasattr(paths, "opencode_json"))
 
     def test_darwin_has_claude_desktop(self) -> None:
         orig_system = platform.system

@@ -114,6 +114,23 @@ def _claude_code_entry(server: str) -> dict[str, Any]:
     raise ValueError(f"Unknown MCP server: {server}")
 
 
+def _opencode_entry(server: str) -> dict[str, Any]:
+    """~/.config/opencode/opencode.json uses local type and array command."""
+    if server == MCP_MEMPALACE:
+        return {
+            "type": "local",
+            "command": [str(GLOBAL_MEMPALACE_MCP())],
+            "enabled": True,
+        }
+    if server == MCP_GRAPHIFY:
+        return {
+            "type": "local",
+            "command": [str(GLOBAL_GRAPHIFY_MCP_WRAPPER())],
+            "enabled": True,
+        }
+    raise ValueError(f"Unknown MCP server: {server}")
+
+
 # --- Target declarations --------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -134,6 +151,8 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
         RegistrationTarget("Gemini/Antigravity", paths.gemini_antigravity, "mcpServers",
                            (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
+        RegistrationTarget("OpenCode", paths.opencode_json, "mcp",
+                           (MCP_MEMPALACE, MCP_GRAPHIFY), _opencode_entry),
         RegistrationTarget("~/.mcp.json", paths.mcp_json, "mcpServers",
                            (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
         RegistrationTarget("~/.claude.json", paths.claude_json, "mcpServers",

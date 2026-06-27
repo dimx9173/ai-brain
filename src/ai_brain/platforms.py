@@ -25,6 +25,7 @@ class ToolPaths:
     claude_desktop: Path | None
     vscode_kilo: Path | None
     kilo_cli: Path
+    opencode_json: Path
 
 
 def get_paths() -> ToolPaths:
@@ -58,6 +59,7 @@ def get_paths() -> ToolPaths:
         claude_desktop=claude_desktop,
         vscode_kilo=vscode_kilo,
         kilo_cli=HOME() / ".config" / "kilo" / "kilo.json",
+        opencode_json=HOME() / ".config" / "opencode" / "opencode.json",
     )
 
 

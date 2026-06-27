@@ -190,8 +190,11 @@ def run_all_checks(paths) -> List[CheckResult]:
     # 5. OpenClaw daemon
     results.append(check_openclaw_daemon())
 
-    # 6. OpenCode ~/.mcp.json
-    results.append(check_mcp_config("OpenCode", paths.mcp_json))
+    # 6. OpenCode ~/.config/opencode/opencode.json
+    results.append(check_mcp_config("OpenCode", paths.opencode_json, server_key="mcp"))
+
+    # Generic MCP ~/.mcp.json
+    results.append(check_mcp_config("Generic MCP", paths.mcp_json))
 
     # 7. Gemini / Antigravity
     gemini_paths = [p for p in (paths.gemini_config, paths.gemini_antigravity) if p]
