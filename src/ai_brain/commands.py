@@ -451,7 +451,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
     sync_ok = True
     try:
-        res = subprocess.run([TOOL_MEMPALACE, "sync"], capture_output=True, text=True)
+        res = subprocess.run([TOOL_MEMPALACE, "sync", "."], capture_output=True, text=True)
         gitignored = 0
         missing = 0
         for line in res.stdout.splitlines():
