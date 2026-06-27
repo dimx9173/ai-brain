@@ -350,11 +350,12 @@ def run_doctor(paths, fix: bool = False) -> bool:
         print(green("  [ PASS ] gitignore 已正確排除 .codebase-memory/"))
 
     # Check other massive unignored folders
-    for folder in ("node_modules", "venv", ".venv"):
+    for folder in ("node_modules", "venv", ".venv", ".worktree", "graphify-out", "target", "build"):
         if Path(folder).is_dir() and folder not in ignores:
             print(yellow(f"  [ WARN ] 偵測到本機存在 {folder}/ 但未在 gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
             if fix:
-                print_yellow(f"    --> 建議您手動將 {folder}/ 加入 .gitignore 排除名單。")
+                _append_to_global_gitignore(folder, f"auto-excluded heavy/noisy directory")
+                print(green(f"    [ FIXED ] 已自動將 {folder}/ 加入全域 gitignore"))
 
     print()
 
@@ -660,7 +661,8 @@ def _read_all_ignores() -> set[str]:
     return patterns
 
 
-def _ensure_codebase_memory_ignored() -> None:
+def _append_to_global_gitignore(pattern: str, comment: str) -> None:
+    """Append a single gitignore pattern to the global gitignore file."""
     gitignore = _global_gitignore_path()
     content = ""
     if gitignore.is_file():
@@ -668,29 +670,14 @@ def _ensure_codebase_memory_ignored() -> None:
             content = gitignore.read_text(encoding="utf-8")
         except Exception:
             pass
-
     lines = content.splitlines()
     normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
-    
-    if ".codebase-memory" not in normalized:
-        print_yellow(f"--> 自動將 .codebase-memory/ 加入全域 gitignore ({gitignore}) 避免記憶庫膨脹...")
-        new_lines = []
-        replaced = False
-        for line in lines:
-            stripped = line.strip().rstrip("/")
-            if stripped in (".codebase-memory/cache", ".codebase-memory/cache/"):
-                new_lines.append("# codebase-memory-mcp cache and graphs")
-                new_lines.append(".codebase-memory/")
-                replaced = True
-            else:
-                new_lines.append(line)
-        
-        if not replaced:
-            if new_lines and new_lines[-1].strip():
-                new_lines.append("")
-            new_lines.append("# codebase-memory-mcp cache and graphs")
-            new_lines.append(".codebase-memory/")
-            
+    if pattern.rstrip("/") not in normalized:
+        new_lines = list(lines)
+        if new_lines and new_lines[-1].strip():
+            new_lines.append("")
+        new_lines.append(f"# {comment}")
+        new_lines.append(f"{pattern.rstrip('/')}/")
         try:
             gitignore.parent.mkdir(parents=True, exist_ok=True)
             gitignore.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
@@ -698,6 +685,11 @@ def _ensure_codebase_memory_ignored() -> None:
                 subprocess.run(["git", "config", "--global", "core.excludesfile", "~/.gitignore_global"])
         except Exception as e:
             print(red(f"警告：更新全域 gitignore 失敗 ({e})"))
+
+
+def _ensure_codebase_memory_ignored() -> None:
+    _append_to_global_gitignore(".codebase-memory", "codebase-memory-mcp cache and graphs")
+    _append_to_global_gitignore(".worktree", "git worktree checkouts")
 
 
 def _run_mempalace_init() -> bool:
