@@ -50,3 +50,23 @@ class TestRegistry(InTempDir):
         self.assertEqual(len(registry.list_archived()), 1)
         self.assertTrue(registry.clear_archive())
         self.assertEqual(len(registry.list_archived()), 0)
+
+    def test_deregister_project(self) -> None:
+        proj = registry.current_project_path()
+        registry.register_current()
+        registry.enable_archive(proj)
+        self.assertIn(proj, registry.list_active())
+        self.assertIn(proj, registry.list_archived())
+
+        self.assertTrue(registry.deregister_project(proj))
+        self.assertNotIn(proj, registry.list_active())
+        self.assertNotIn(proj, registry.list_archived())
+
+    def test_deregister_all_projects(self) -> None:
+        proj = registry.current_project_path()
+        registry.register_current()
+        registry.enable_archive(proj)
+
+        self.assertTrue(registry.deregister_all_projects())
+        self.assertEqual(len(registry.list_active()), 0)
+        self.assertEqual(len(registry.list_archived()), 0)
