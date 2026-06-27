@@ -161,7 +161,7 @@ class TestNoArgsShowsList(_RegisterSeveralMixin):
 
 
 class TestManageList(_RegisterSeveralMixin):
-    """`ai-brain list` shows the current project's auto-archive status."""
+    """`ai-brain list` shows the auto-archive status of all registered projects."""
 
     def _capture(self, fn, *args, **kwargs) -> str:
         import io
@@ -171,48 +171,59 @@ class TestManageList(_RegisterSeveralMixin):
             ok = fn(*args, **kwargs)
         return buf.getvalue(), ok
 
-    def test_list_inactive(self) -> None:
-        # _RegisterSeveralMixin set the cwd to a fresh tempdir; the
-        # current directory isn't in the active list we wrote, so we
-        # have to register it explicitly to exercise the active case.
-        registry.register_current()
+    def test_list_all_projects(self) -> None:
+        projects = ["/proj-a", "/proj-b"]
+        self._register(projects)
+        registry.enable_archive("/proj-a")
+        
         out, ok = self._capture(commands.manage_list)
         self.assertTrue(ok)
-        self.assertIn("當前專案自動歸檔狀態", out)
-        self.assertIn("預設不歸檔", out)
-        self.assertIn("若要啟用", out)
-        self.assertIn("ai-brain include current", out)
-
-    def test_list_active(self) -> None:
-        registry.register_current()
-        registry.enable_archive(registry.current_project_path())
-        out, ok = self._capture(commands.manage_list)
-        self.assertTrue(ok)
+        self.assertIn("全域自動記憶歸檔狀態清單", out)
+        self.assertIn("proj-a", out)
+        self.assertIn("proj-b", out)
         self.assertIn("已啟用自動歸檔", out)
-        self.assertIn("若要停用", out)
-        self.assertIn("ai-brain exclude current", out)
-
-    def test_list_unregistered_cwd_fails(self) -> None:
-        # Switch to a *different* temp dir that was never registered.
-        import os, tempfile
-        other = tempfile.mkdtemp(prefix="ai-brain-test-other-")
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(other)
-            out, ok = self._capture(commands.manage_list)
-            self.assertFalse(ok)
-            self.assertIn("未在 AI 大腦活躍清單中註冊", out)
-        finally:
-            os.chdir(old_cwd)
+        self.assertIn("預設不歸檔", out)
 
     def test_list_does_not_mutate_archive(self) -> None:
         # Showing the list is a read-only operation.
-        registry.register_current()
-        registry.enable_archive(registry.current_project_path())
+        self._register(["/proj-a"])
+        registry.enable_archive("/proj-a")
         before = set(registry.list_archived())
         self._capture(commands.manage_list)
         after = set(registry.list_archived())
         self.assertEqual(before, after)
+
+
+class TestManageRemove(_RegisterSeveralMixin):
+    """`ai-brain remove` removes a project from the active registry."""
+
+    def test_remove_by_1based_index(self) -> None:
+        projects = ["/proj-a", "/proj-b", "/proj-c"]
+        self._register(projects)
+        registry.enable_archive("/proj-b")
+
+        ok = commands.manage_remove("2") # index 2: proj-b
+        self.assertTrue(ok)
+        self.assertEqual(registry.list_active(), ["/proj-a", "/proj-c"])
+        self.assertEqual(registry.list_archived(), [])
+
+    def test_remove_by_keyword(self) -> None:
+        projects = ["/proj-a", "/proj-b"]
+        self._register(projects)
+
+        ok = commands.manage_remove("proj-a")
+        self.assertTrue(ok)
+        self.assertEqual(registry.list_active(), ["/proj-b"])
+
+    def test_remove_all(self) -> None:
+        projects = ["/proj-a", "/proj-b"]
+        self._register(projects)
+        registry.enable_archive("/proj-a")
+
+        ok = commands.manage_remove("all")
+        self.assertTrue(ok)
+        self.assertEqual(registry.list_active(), [])
+        self.assertEqual(registry.list_archived(), [])
 
 
 class TestDoctor(_RegisterSeveralMixin):

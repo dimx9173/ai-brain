@@ -42,7 +42,8 @@ def _show_help() -> None:
         ("include [key]", "[啟用歸檔] 啟用指定專案定時自動歸檔"),
         ("exclude-all", "[全部停用] 一鍵停用所有專案的自動歸檔"),
         ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
-        ("list", "[查詢狀態] 顯示當前專案的自動歸檔狀態（Active / Inactive）"),
+        ("list", "[查詢狀態] 顯示所有已註冊專案的自動歸檔狀態列表"),
+        ("remove [key]", "[註銷專案] 自大腦活躍專案清單中移除指定專案的註冊"),
         ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定與垃圾清理"),
         ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
@@ -83,6 +84,10 @@ def _cmd_include(args, _paths) -> int:
     return 0 if commands.manage_include(args.pattern) else 1
 
 
+def _cmd_remove(args, _paths) -> int:
+    return 0 if commands.manage_remove(args.pattern) else 1
+
+
 def _cmd_doctor(args, paths) -> int:
     return 0 if commands.run_doctor(paths, fix=args.fix) else 1
 
@@ -115,6 +120,8 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "stop-cron": lambda a, p: 0,  # cron-only command — handled in main() since we lazy-import
     "exclude": _cmd_exclude,
     "include": _cmd_include,
+    "remove": _cmd_remove,
+    "deregister": _cmd_remove,
     "exclude-all": lambda a, p: (commands.exclude_all(), 0)[1],
     "include-all": lambda a, p: (commands.include_all(), 0)[1],
     "list": lambda a, p: (commands.manage_list(), 0)[1],
@@ -155,6 +162,8 @@ def _build_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("exclude", "Disable auto-archive (pattern can be a keyword, 1-based index, or 'all')"),
         ("include", "Enable auto-archive (pattern can be a keyword, 1-based index, or 'all')"),
+        ("remove", "Remove project from registered active list (pattern can be a keyword, 1-based index, or 'all')"),
+        ("deregister", "Alias for remove"),
     ):
         p = _add_common(name, help_text)
         p.add_argument("pattern", nargs="?", default=None,
@@ -163,7 +172,7 @@ def _build_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("exclude-all", "Disable auto-archive for all projects"),
         ("include-all", "Enable auto-archive for all registered projects"),
-        ("list", "Show auto-archive status of the current project"),
+        ("list", "Show auto-archive status of all registered projects"),
     ):
         _add_common(name, help_text)
 

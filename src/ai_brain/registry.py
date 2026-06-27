@@ -66,18 +66,32 @@ def register_current() -> bool:
     return False
 
 
-def deregister_current() -> bool:
-    """Remove the current directory from the active + whitelist lists."""
-    proj_path = current_project_path()
+def deregister_project(proj_path: str) -> bool:
+    """Remove the specified directory from the active + whitelist lists."""
     removed = False
     for path in (REGISTRY_PATH(), AUTO_ARCHIVE_PATH()):
         lines = _read_lines(path)
         if proj_path in lines:
             lines.remove(proj_path)
             if _write_lines(path, lines) and path == REGISTRY_PATH():
-                yellow("--> 已將此專案自 AI 大腦活躍清單註銷。")
+                yellow(f"--> 已將專案 \"{Path(proj_path).name}\" 自 AI 大腦活躍清單註銷。")
                 removed = True
     return removed
+
+
+def deregister_current() -> bool:
+    """Remove the current directory from the active + whitelist lists."""
+    return deregister_project(current_project_path())
+
+
+def deregister_all_projects() -> bool:
+    """Clear all registered projects from active and whitelist lists."""
+    ok1 = _write_lines(REGISTRY_PATH(), [])
+    ok2 = _write_lines(AUTO_ARCHIVE_PATH(), [])
+    if ok1 and ok2:
+        green("--> 已成功清空 AI 大腦活躍專案註冊表！")
+        return True
+    return False
 
 
 def list_active() -> List[str]:
