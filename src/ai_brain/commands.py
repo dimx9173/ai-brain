@@ -600,87 +600,99 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
     print()
 
-    # 8. Check CLAUDE.md cognitive rules freshness
-    print(blue("8. 檢查 CLAUDE.md AI 工具使用規則版本..."))
+    # 8. Check CLAUDE.md cognitive rules freshness across ALL registered projects
+    print(blue("8. 檢查所有已註冊專案的 CLAUDE.md AI 工具使用規則版本..."))
     rules_ok = True
     freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
-    files_to_check = []
-    local_md = Path(PROJECT_CLAUDE_MD)
-    claude_local_md = Path(".claude") / "CLAUDE.md"
-    global_md = Path.home() / ".claude" / "CLAUDE.md"
-    if local_md.is_file():
-        files_to_check.append(("專案 CLAUDE.md", local_md))
-    if claude_local_md.is_file():
-        files_to_check.append(("專案 .claude/CLAUDE.md", claude_local_md))
-    if global_md.is_file():
-        files_to_check.append(("全域 ~/.claude/CLAUDE.md", global_md))
 
-    if not files_to_check:
-        print(green("  [ PASS ] 未偵測到 CLAUDE.md 檔案，略過"))
-    else:
-        for label, md_path in files_to_check:
-            try:
-                content = md_path.read_text(encoding="utf-8")
-            except Exception:
-                content = ""
-            if COGNITIVE_PRINCIPLES_MARKER in content and freshness_marker in content:
-                print(green(f"  [ PASS ] {label} 工具規則為最新版本"))
-            elif COGNITIVE_PRINCIPLES_MARKER in content:
-                rules_ok = False
-                print(yellow(f"  [ WARN ] {label} 工具規則版本過舊 (缺少 codebase-memory-mcp 優先順序說明)"))
-                if fix:
-                    # Replace the whole cognitive block with the updated template
-                    try:
-                        lines = content.splitlines()
-                        new_lines = []
-                        skip = False
-                        for line in lines:
-                            if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
-                                skip = True
-                                # Inject updated block
-                                for bl in COGNITIVE_PRINCIPLES_BLOCK.splitlines():
-                                    new_lines.append(bl)
-                                continue
-                            if skip:
-                                # Stop skipping at next top-level heading
-                                if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
-                                    skip = False
-                                    new_lines.append(line)
-                            else:
-                                new_lines.append(line)
-                        md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-                        print(green(f"    [ FIXED ] 已更新 {label} 至最新工具規則版本"))
-                        rules_ok = True
-                    except Exception as e:
-                        print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
-                else:
-                    all_pass = False
-            else:
-                # No ai-brain cognitive block — check for stale graphify content
-                if "graphify" in content.lower():
-                    rules_ok = False
-                    print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 引導內容"))
-                    if fix:
-                        try:
-                            # Remove graphify lines and append the latest cognitive block
-                            new_lines = [
-                                line for line in content.splitlines()
-                                if "graphify" not in line.lower()
-                            ]
-                            # Strip trailing blank lines then append fresh block
-                            while new_lines and not new_lines[-1].strip():
-                                new_lines.pop()
-                            new_lines.append("")
+    def _fix_claude_md(label: str, md_path: Path) -> bool:
+        """Return True if file is OK (or was fixed), False if needs user action."""
+        try:
+            content = md_path.read_text(encoding="utf-8")
+        except Exception:
+            return True  # unreadable — skip silently
+
+        if COGNITIVE_PRINCIPLES_MARKER in content and freshness_marker in content:
+            print(green(f"  [ PASS ] {label} 工具規則為最新版本"))
+            return True
+
+        if COGNITIVE_PRINCIPLES_MARKER in content:
+            # Stale block — update it
+            print(yellow(f"  [ WARN ] {label} 工具規則版本過舊"))
+            if fix:
+                try:
+                    lines = content.splitlines()
+                    new_lines: list[str] = []
+                    skip = False
+                    for line in lines:
+                        if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
+                            skip = True
                             new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
-                            md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-                            print(green(f"    [ FIXED ] 已清除 {label} 中的舊 graphify 引導並補上最新工具規則"))
-                            rules_ok = True
-                        except Exception as e:
-                            print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
-                    else:
+                            continue
+                        if skip:
+                            if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
+                                skip = False
+                                new_lines.append(line)
+                        else:
+                            new_lines.append(line)
+                    md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                    print(green(f"    [ FIXED ] 已更新 {label} 至最新工具規則版本"))
+                    return True
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                    return False
+            return False  # WARN counts as failure in check-only mode
+
+        # No cognitive block — check for stale graphify content
+        if "graphify" in content.lower():
+            print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 引導內容"))
+            if fix:
+                try:
+                    new_lines = [l for l in content.splitlines() if "graphify" not in l.lower()]
+                    while new_lines and not new_lines[-1].strip():
+                        new_lines.pop()
+                    new_lines.append("")
+                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
+                    md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                    print(green(f"    [ FIXED ] 已清除 {label} 中的舊 graphify 引導並補上最新工具規則"))
+                    return True
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                    return False
+            return False
+
+        print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
+        return True
+
+    # Build list of (label, path) pairs to check:
+    # - global ~/.claude/CLAUDE.md
+    # - for every registered project: CLAUDE.md and .claude/CLAUDE.md
+    all_registered = registry.list_active()
+    global_md = Path.home() / ".claude" / "CLAUDE.md"
+
+    if all_registered:
+        print(yellow(f"  --> 掃描 {len(all_registered)} 個已註冊專案 + 全域設定..."))
+    else:
+        print(yellow("  --> 無已註冊專案，僅掃描全域設定..."))
+
+    if global_md.is_file():
+        if not _fix_claude_md("全域 ~/.claude/CLAUDE.md", global_md):
+            rules_ok = False
+            if not fix:
+                all_pass = False
+
+    for proj in all_registered:
+        proj_path = Path(proj)
+        if not proj_path.is_dir():
+            continue
+        short = proj_path.name
+        for rel in ("CLAUDE.md", ".claude/CLAUDE.md"):
+            md_path = proj_path / rel
+            if md_path.is_file():
+                if not _fix_claude_md(f"[{short}] {rel}", md_path):
+                    rules_ok = False
+                    if not fix:
                         all_pass = False
-                else:
-                    print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
 
     print()
     print(blue("====== 🏁 診斷結束 ======"))
