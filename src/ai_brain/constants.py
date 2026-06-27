@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.1.13"
+VERSION = "2.1.14"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 

@@ -268,7 +268,7 @@ def manage_remove(pattern: str | None) -> bool:
         print(blue("====== ❌ 註銷 AI 大腦活躍專案 ======"))
         _print_archive_status()
         print(yellow("用法提示: "), end="")
-        print(f"請指定要移除的專案，例如: {green('ai-brain remove [編號|關鍵字|current|all]')}")
+        print(f"請指定要移除 the 專案，例如: {green('ai-brain remove [編號|關鍵字|current|all]')}")
         return True
 
     if pattern.lower() == "all":
@@ -285,11 +285,33 @@ def manage_list() -> bool:
     """Show the auto-archive status of all registered projects."""
     _print_archive_status()
     return True
-
-
-def run_doctor(paths, fix: bool = False) -> bool:
+def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     import os
+    
+    # 1. Resolve which projects to check
+    projects_to_check: list[Path] = []
+    if target:
+        resolved = _resolve_target(target)
+        if not resolved:
+            return False
+        projects_to_check.append(Path(resolved))
+    else:
+        for p in registry.list_active():
+            path_obj = Path(p)
+            if path_obj.is_dir():
+                projects_to_check.append(path_obj)
+        if not projects_to_check:
+            # If active registry is empty, default to checking current workspace directory
+            projects_to_check.append(Path.cwd().resolve())
+
+    # Build simple names helper
+    multiple = len(projects_to_check) > 1
+
     print(blue(f"====== {APP_EMOJI} 開始執行 AI 大腦全面健康診斷 ======"))
+    if target:
+        print(yellow(f"🎯 目標模式：檢查單一專案 \"{projects_to_check[0].name}\" ({projects_to_check[0]})"))
+    else:
+        print(yellow(f"🎯 全域模式：檢查所有註冊活躍專案 (共 {len(projects_to_check)} 個專案)"))
     if fix:
         print(yellow("💡 診斷修復模式已啟用，將會自動修正可修復之問題。"))
     print()
@@ -323,74 +345,75 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
     # 1. Check gitignores
     print(blue("1. 檢查 gitignore 排除設定..."))
-    ignores = _read_all_ignores()
-    gi_ok = True
-    
-    if ".codebase-memory" not in ignores:
-        gi_ok = False
-        print(red("  [ FAIL ] gitignore 中未忽略 .codebase-memory/ 目錄"))
-        if fix:
-            _ensure_codebase_memory_ignored()
-            print(green("    [ FIXED ] 已自動將 .codebase-memory/ 加入全域 gitignore"))
-            gi_ok = True
-        else:
-            all_pass = False
-    else:
-        print(green("  [ PASS ] gitignore 已正確排除 .codebase-memory/"))
-
-    # Check other massive unignored folders
-    for folder in ("node_modules", "venv", ".venv", ".worktree", "graphify-out", "target", "build"):
-        if Path(folder).is_dir() and folder not in ignores:
-            print(yellow(f"  [ WARN ] 偵測到本機存在 {folder}/ 但未在 gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
+    for proj in projects_to_check:
+        prefix = f"  [{proj.name}] " if multiple else "  "
+        ignores = _read_all_ignores(proj)
+        
+        if ".codebase-memory" not in ignores:
+            print(red(f"{prefix}[ FAIL ] gitignore 中未忽略 .codebase-memory/ 目錄"))
             if fix:
-                _append_to_global_gitignore(folder, f"auto-excluded heavy/noisy directory")
-                print(green(f"    [ FIXED ] 已自動將 {folder}/ 加入全域 gitignore"))
+                # We can write into global excludes or local gitignore.
+                # To be consistent with existing command, write into global gitignore.
+                _ensure_codebase_memory_ignored()
+                print(green(f"{prefix}  [ FIXED ] 已自動將 .codebase-memory/ 加入全域 gitignore"))
+            else:
+                all_pass = False
+        else:
+            print(green(f"{prefix}[ PASS ] gitignore 已正確排除 .codebase-memory/"))
+
+        # Check other massive unignored folders
+        for folder in ("node_modules", "venv", ".venv", ".worktree", "graphify-out", "target", "build"):
+            if (proj / folder).is_dir() and folder not in ignores:
+                print(yellow(f"{prefix}[ WARN ] 偵測到本機存在 {folder}/ 但未在 gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
+                if fix:
+                    _append_to_global_gitignore(folder, f"auto-excluded heavy/noisy directory")
+                    print(green(f"{prefix}  [ FIXED ] 已自動將 {folder}/ 加入全域 gitignore"))
 
     print()
 
     # 2. Check mempalace.yaml
     print(blue("2. 檢查 mempalace.yaml 房間配置..."))
-    my_yaml = Path("mempalace.yaml")
-    yaml_ok = True
-    if my_yaml.is_file():
-        try:
-            yaml_content = my_yaml.read_text(encoding="utf-8")
-        except Exception:
-            yaml_content = ""
-        
-        if "codebase_memory" in yaml_content or ".codebase-memory" in yaml_content:
-            yaml_ok = False
-            print(red("  [ FAIL ] mempalace.yaml 中仍包含已廢棄之 codebase_memory 房間"))
-            if fix:
-                try:
-                    lines = yaml_content.splitlines()
-                    new_lines = []
-                    skip_mode = False
-                    for line in lines:
-                        if line.strip().startswith("- name: codebase_memory") or line.strip().startswith("- name: .codebase-memory"):
-                            skip_mode = True
-                            continue
-                        if skip_mode:
-                            if line.startswith("- name:"):
-                                skip_mode = False
-                            else:
+    for proj in projects_to_check:
+        prefix = f"  [{proj.name}] " if multiple else "  "
+        my_yaml = proj / "mempalace.yaml"
+        if my_yaml.is_file():
+            try:
+                yaml_content = my_yaml.read_text(encoding="utf-8")
+            except Exception:
+                yaml_content = ""
+            
+            if "codebase_memory" in yaml_content or ".codebase-memory" in yaml_content:
+                print(red(f"{prefix}[ FAIL ] mempalace.yaml 中仍包含已廢棄之 codebase_memory 房間"))
+                if fix:
+                    try:
+                        lines = yaml_content.splitlines()
+                        new_lines = []
+                        skip_mode = False
+                        for line in lines:
+                            if line.strip().startswith("- name: codebase_memory") or line.strip().startswith("- name: .codebase-memory"):
+                                skip_mode = True
                                 continue
-                        new_lines.append(line)
-                    my_yaml.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-                    print(green("    [ FIXED ] 已自動自 mempalace.yaml 中移除 codebase_memory 房間"))
-                    yaml_ok = True
-                except Exception as e:
-                    print(red(f"    [ ERROR ] 無法修復 mempalace.yaml ({e})"))
+                            if skip_mode:
+                                if line.startswith("- name:"):
+                                    skip_mode = False
+                                else:
+                                    continue
+                            new_lines.append(line)
+                        my_yaml.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                        print(green(f"{prefix}  [ FIXED ] 已自動自 mempalace.yaml 中移除 codebase_memory 房間"))
+                    except Exception as e:
+                        print(red(f"{prefix}  [ ERROR ] 無法修復 mempalace.yaml ({e})"))
+                        all_pass = False
+                else:
+                    all_pass = False
             else:
-                all_pass = False
+                print(green(f"{prefix}[ PASS ] mempalace.yaml 配置正常"))
         else:
-            print(green("  [ PASS ] mempalace.yaml 配置正常"))
-    else:
-        print(green("  [ PASS ] mempalace.yaml 未初始化 (略過)"))
+            print(green(f"{prefix}[ PASS ] mempalace.yaml 未初始化 (略過)"))
 
     print()
 
-    # 3. Check locks
+    # 3. Check locks (Global Check - run once)
     print(blue("3. 檢查 MemPalace 鎖定鎖狀態..."))
     locks_dir = Path.home() / ".mempalace" / "locks"
     lock_ok = True
@@ -399,7 +422,6 @@ def run_doctor(paths, fix: bool = False) -> bool:
             active = is_file_locked(lock_file)
             
             if not active:
-                # Dormant lock file — harmless. Clean it up quietly in fix mode.
                 if fix:
                     try:
                         lock_file.unlink()
@@ -449,48 +471,48 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
     # 4. Check stale drawers in mempalace (sync check)
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
-    sync_ok = True
-    try:
-        res = subprocess.run([TOOL_MEMPALACE, "sync", "."], capture_output=True, text=True)
-        gitignored = 0
-        missing = 0
-        for line in res.stdout.splitlines():
-            if "Gitignored:" in line:
-                parts = line.split(":")
-                if len(parts) > 1:
-                    num = "".join(filter(str.isdigit, parts[1]))
-                    if num:
-                        gitignored = int(num)
-            elif "Missing:" in line:
-                parts = line.split(":")
-                if len(parts) > 1:
-                    num = "".join(filter(str.isdigit, parts[1]))
-                    if num:
-                        missing = int(num)
-        
-        if gitignored > 0 or missing > 0:
-            sync_ok = False
-            print(red(f"  [ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
-            if fix:
-                print(yellow("    --> 正在自動執行 mempalace sync --apply . 清理記憶庫..."))
-                try:
-                    subprocess.run([TOOL_MEMPALACE, "sync", "--apply", "."], check=True)
-                    print(green("    [ FIXED ] 記憶庫清理完成！"))
-                    sync_ok = True
-                except Exception as e:
-                    print(red(f"    [ ERROR ] 記憶庫清理失敗 ({e})"))
+    for proj in projects_to_check:
+        prefix = f"  [{proj.name}] " if multiple else "  "
+        try:
+            res = subprocess.run([TOOL_MEMPALACE, "sync", str(proj)], capture_output=True, text=True)
+            gitignored = 0
+            missing = 0
+            for line in res.stdout.splitlines():
+                if "Gitignored:" in line:
+                    parts = line.split(":")
+                    if len(parts) > 1:
+                        num = "".join(filter(str.isdigit, parts[1]))
+                        if num:
+                            gitignored = int(num)
+                elif "Missing:" in line:
+                    parts = line.split(":")
+                    if len(parts) > 1:
+                        num = "".join(filter(str.isdigit, parts[1]))
+                        if num:
+                            missing = int(num)
+            
+            if gitignored > 0 or missing > 0:
+                print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
+                if fix:
+                    print(yellow(f"{prefix}  --> 正在自動執行 mempalace sync --apply {proj} 清理記憶庫..."))
+                    try:
+                        subprocess.run([TOOL_MEMPALACE, "sync", "--apply", str(proj)], check=True)
+                        print(green(f"{prefix}  [ FIXED ] 記憶庫清理完成！"))
+                    except Exception as e:
+                        print(red(f"{prefix}  [ ERROR ] 記憶庫清理失敗 ({e})"))
+                        all_pass = False
+                else:
+                    all_pass = False
             else:
-                all_pass = False
-        else:
-            print(green("  [ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
-    except FileNotFoundError:
-        print(yellow("  [ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
-    except Exception as e:
-        print(red(f"  [ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
+                print(green(f"{prefix}[ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
+        except FileNotFoundError:
+            print(yellow(f"{prefix}[ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
+        except Exception as e:
+            print(red(f"{prefix}[ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
 
     print()
 
-    # 5. Check System CLIs
+    # 5. Check System CLIs (Global Check - run once)
     print(blue("5. 檢查系統相依 CLI 工具可用性..."))
     cli_ok = True
     for tool_name, pkg in (("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")):
@@ -512,7 +534,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
     
     print()
 
-    # 6. Check MCP verifies
+    # 6. Check MCP verifies (Global Check - run once)
     print(blue("6. 檢查 IDE MCP 大腦配置與伺服器載入..."))
     from .verifier import run_all_checks, PASS as VERIFY_PASS, FAIL as VERIFY_FAIL
     mcp_results = run_all_checks(paths)
@@ -534,6 +556,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
                 print(green("    [ FIXED ] 已成功重新配置所有 IDE 的 MCP 大腦！"))
             except Exception as e:
                 print(red(f"    [ ERROR ] 重新註冊 MCP 服務失敗 ({e})"))
+                all_pass = False
         else:
             all_pass = False
     else:
@@ -543,52 +566,53 @@ def run_doctor(paths, fix: bool = False) -> bool:
 
     # 7. Check Git Hooks
     print(blue("7. 檢查 Git Hooks 配置與速度優化版本..."))
-    hooks_ok = True
-    if not Path(".git").is_dir():
-        print(green("  [ PASS ] 非 Git 專案，跳過 Git Hooks 檢查"))
-    else:
-        hooks_dir = Path(".git") / "hooks"
-        for name in ("post-merge", "post-checkout"):
-            hook_file = hooks_dir / name
-            installed = False
-            up_to_date = False
-            
-            if hook_file.is_file():
-                try:
-                    content = hook_file.read_text(encoding="utf-8")
-                    begin_marker = HOOK_BEGIN_MARKER.format(name=name)
-                    if begin_marker in content:
-                        installed = True
-                        if "--fast" in content:
-                            up_to_date = True
-                except Exception:
-                    pass
-            
-            if not installed:
-                hooks_ok = False
-                print(red(f"  [ FAIL ] Git Hook '{name}' 未安裝"))
-            elif not up_to_date:
-                hooks_ok = False
-                print(yellow(f"  [ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未啟用速度優化 --fast)"))
-            else:
-                print(green(f"  [ PASS ] Git Hook '{name}' 已安裝且啟用速度優化"))
+    for proj in projects_to_check:
+        prefix = f"  [{proj.name}] " if multiple else "  "
+        if not (proj / ".git").is_dir():
+            print(green(f"{prefix}[ PASS ] 非 Git 專案，跳過 Git Hooks 檢查"))
+        else:
+            hooks_dir = proj / ".git" / "hooks"
+            hooks_ok = True
+            for name in ("post-merge", "post-checkout"):
+                hook_file = hooks_dir / name
+                installed = False
+                up_to_date = False
                 
-        if not hooks_ok:
-            if fix:
-                print(yellow("    --> 正在重新安裝/更新 Git Hooks..."))
-                if git_hooks.install():
-                    print(green("    [ FIXED ] 已成功更新 Git Hooks 至最新速度優化版本！"))
-                    hooks_ok = True
+                if hook_file.is_file():
+                    try:
+                        content = hook_file.read_text(encoding="utf-8")
+                        begin_marker = HOOK_BEGIN_MARKER.format(name=name)
+                        if begin_marker in content:
+                            installed = True
+                            if "--fast" in content:
+                                up_to_date = True
+                    except Exception:
+                        pass
+                
+                if not installed:
+                    hooks_ok = False
+                    print(red(f"{prefix}[ FAIL ] Git Hook '{name}' 未安裝"))
+                elif not up_to_date:
+                    hooks_ok = False
+                    print(yellow(f"{prefix}[ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未啟用速度優化 --fast)"))
                 else:
-                    print(red("    [ ERROR ] 自動更新 Git Hooks 失敗，請手動執行 `ai-brain init` 重試。"))
+                    print(green(f"{prefix}[ PASS ] Git Hook '{name}' 已安裝且啟用速度優化"))
+                    
+            if not hooks_ok:
+                if fix:
+                    print(yellow(f"{prefix}  --> 正在重新安裝/更新 Git Hooks..."))
+                    if git_hooks.install(proj):
+                        print(green(f"{prefix}  [ FIXED ] 已成功更新 Git Hooks 至最新速度優化版本！"))
+                    else:
+                        print(red(f"{prefix}  [ ERROR ] 自動更新 Git Hooks 失敗，請手動執行 `ai-brain init` 重試。"))
+                        all_pass = False
+                else:
                     all_pass = False
-            else:
-                all_pass = False
 
     print()
 
-    # 8. Check CLAUDE.md cognitive rules freshness across ALL registered projects
-    print(blue("8. 檢查所有已註冊專案的 CLAUDE.md AI 工具使用規則版本..."))
+    # 8. Check CLAUDE.md AI 工具使用規則版本
+    print(blue("8. 檢查 CLAUDE.md AI 工具使用規則版本..."))
     rules_ok = True
     freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
 
@@ -651,30 +675,18 @@ def run_doctor(paths, fix: bool = False) -> bool:
         print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
         return True
 
-    # Build list of (label, path) pairs to check:
-    # - global ~/.claude/CLAUDE.md
-    # - for every registered project: CLAUDE.md and .claude/CLAUDE.md
-    all_registered = registry.list_active()
+
     global_md = Path.home() / ".claude" / "CLAUDE.md"
-
-    if all_registered:
-        print(yellow(f"  --> 掃描 {len(all_registered)} 個已註冊專案 + 全域設定..."))
-    else:
-        print(yellow("  --> 無已註冊專案，僅掃描全域設定..."))
-
-    if global_md.is_file():
+    if not target and global_md.is_file():
         if not _fix_claude_md("全域 ~/.claude/CLAUDE.md", global_md):
             rules_ok = False
             if not fix:
                 all_pass = False
 
-    for proj in all_registered:
-        proj_path = Path(proj)
-        if not proj_path.is_dir():
-            continue
-        short = proj_path.name
+    for proj in projects_to_check:
+        short = proj.name
         for rel in ("CLAUDE.md", ".claude/CLAUDE.md"):
-            md_path = proj_path / rel
+            md_path = proj / rel
             if md_path.is_file():
                 if not _fix_claude_md(f"[{short}] {rel}", md_path):
                     rules_ok = False
@@ -730,10 +742,10 @@ def _global_gitignore_path() -> Path:
     return Path.home() / ".gitignore_global"
 
 
-def _read_all_ignores() -> set[str]:
+def _read_all_ignores(base_dir: Path = Path(".")) -> set[str]:
     """Read normalized patterns from both local .gitignore and global excludesfile."""
     patterns = set()
-    paths_to_read = [Path(".gitignore"), _global_gitignore_path()]
+    paths_to_read = [base_dir / ".gitignore", _global_gitignore_path()]
     for p in paths_to_read:
         if p.is_file():
             try:

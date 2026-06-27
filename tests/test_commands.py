@@ -6,6 +6,9 @@ We test the resolution layer (`_resolve_target`) by exercising the public
 from __future__ import annotations
 
 import unittest
+import unittest.mock
+
+from pathlib import Path
 
 from ai_brain import commands, registry
 from ai_brain._testing import InTempDir
@@ -318,6 +321,54 @@ class TestDoctor(_RegisterSeveralMixin):
             self.assertTrue((hooks_dir / "post-merge").is_file())
             self.assertTrue((hooks_dir / "post-checkout").is_file())
             self.assertIn("--fast", (hooks_dir / "post-merge").read_text(encoding="utf-8"))
+
+    @unittest.mock.patch("ai_brain.commands._read_all_ignores")
+    @unittest.mock.patch("ai_brain.verifier.run_all_checks")
+    @unittest.mock.patch("ai_brain.commands.subprocess.run")
+    def test_doctor_scans_multiple_projects_by_default(self, mock_run, mock_checks, mock_ignores) -> None:
+        from ai_brain.verifier import CheckResult, PASS
+        mock_checks.return_value = [CheckResult("Mock Check", PASS)]
+        mock_sync = unittest.mock.MagicMock()
+        mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+        mock_run.return_value = mock_sync
+        mock_ignores.return_value = {".codebase-memory"}
+
+        proj_a = Path(self.tmpdir) / "proj-a"
+        proj_b = Path(self.tmpdir) / "proj-b"
+        proj_a.mkdir()
+        proj_b.mkdir()
+        self._register([str(proj_a), str(proj_b)])
+
+        from unittest.mock import MagicMock
+        paths = MagicMock()
+
+        ok = commands.run_doctor(paths, target=None, fix=False)
+        self.assertTrue(ok)
+        self.assertEqual(mock_ignores.call_count, 2)
+
+    @unittest.mock.patch("ai_brain.commands._read_all_ignores")
+    @unittest.mock.patch("ai_brain.verifier.run_all_checks")
+    @unittest.mock.patch("ai_brain.commands.subprocess.run")
+    def test_doctor_scans_single_project_when_target_provided(self, mock_run, mock_checks, mock_ignores) -> None:
+        from ai_brain.verifier import CheckResult, PASS
+        mock_checks.return_value = [CheckResult("Mock Check", PASS)]
+        mock_sync = unittest.mock.MagicMock()
+        mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+        mock_run.return_value = mock_sync
+        mock_ignores.return_value = {".codebase-memory"}
+
+        proj_a = Path(self.tmpdir) / "proj-a"
+        proj_b = Path(self.tmpdir) / "proj-b"
+        proj_a.mkdir()
+        proj_b.mkdir()
+        self._register([str(proj_a), str(proj_b)])
+
+        from unittest.mock import MagicMock
+        paths = MagicMock()
+
+        ok = commands.run_doctor(paths, target="1", fix=False)
+        self.assertTrue(ok)
+        self.assertEqual(mock_ignores.call_count, 1)
 
 
 if __name__ == "__main__":

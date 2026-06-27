@@ -84,12 +84,13 @@ def _remove_managed_section(content: str, name: str) -> str | None:
     return "\n".join(cleaned_lines) + "\n"
 
 
-def install() -> bool:
+def install(base_dir: Path = Path(".")) -> bool:
     """Install or update hooks.  Never overwrite user-installed hooks."""
-    if not Path(".git").is_dir():
+    git_dir = base_dir / ".git"
+    if not git_dir.is_dir():
         return True
 
-    hooks_dir = _hooks_dir()
+    hooks_dir = git_dir / "hooks"
     try:
         hooks_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -116,9 +117,10 @@ def install() -> bool:
     return True
 
 
-def uninstall() -> bool:
+def uninstall(base_dir: Path = Path(".")) -> bool:
     """Remove our managed sections.  Delete the file only if it becomes empty."""
-    hooks_dir = _hooks_dir()
+    git_dir = base_dir / ".git"
+    hooks_dir = git_dir / "hooks"
     if not hooks_dir.is_dir():
         return True
 

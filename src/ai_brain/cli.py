@@ -89,7 +89,7 @@ def _cmd_remove(args, _paths) -> int:
 
 
 def _cmd_doctor(args, paths) -> int:
-    return 0 if commands.run_doctor(paths, fix=args.fix) else 1
+    return 0 if commands.run_doctor(paths, target=args.target, fix=args.fix) else 1
 
 
 def _cmd_completions(args) -> int:
@@ -154,6 +154,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common("status", "Show current project brain status")
     _add_common("verify", "Run 9-point health check")
     p = sub.add_parser("doctor", help="Run comprehensive diagnostics on AI brain", add_help=False)
+    p.add_argument("target", nargs="?", default=None,
+                   help="project keyword, 1-based index, '.', 'current', or omitted to check all registered projects")
     p.add_argument("--fix", action="store_true", help="Automatically fix detected issues")
     _add_common("clean", "Remove local brain configuration")
     _add_common("uninstall", "Global removal of all configs and crons")
@@ -223,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
 class _Namespace_for:
     def __init__(self, cmd: str, rest: list[str]) -> None:
         self.cmd = cmd
+        self.target = rest[0] if rest and not rest[0].startswith("-") else None
         self.pattern = rest[0] if rest else None
         # `completions` subcommand uses action + optional shell positional.
         # We only populate these when relevant; other commands ignore them.
