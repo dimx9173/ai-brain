@@ -2,14 +2,14 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.1.4-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.1.11-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
 
 > **AI Brain Orchestrator** — A unified CLI tool for AI agent memory management, codebase indexing, and multi-agent workspace synchronization.
 
-`ai-brain` simplifies multi-agent development by packaging complex setup and routines for MemPalace, codebase-memory-mcp, and claude-mem into a single, cohesive command-line interface. It ensures that any AI agent entering your project (Claude Code, Rufus, Cursor, Gemini, Antigravity IDE, etc.) instantly understands your codebase structure, developer habits, and shares a persistent long-term memory palace.
+`ai-brain` simplifies multi-agent development by packaging complex setup and routines for MemPalace, codebase-memory-mcp, and claude-mem into a single, cohesive command-line interface. It ensures that any AI agent entering your project (Claude Code, Rufus, Cursor, Gemini, Antigravity IDE, Codex, etc.) instantly understands your codebase structure, developer habits, and shares a persistent long-term memory palace.
 
 ---
 
@@ -83,8 +83,10 @@ ai-brain full-init
 | `stop` | Safe scan, sweep, and archive of the day's local chat context to the long-term SQLite memory palace. | Run at end of day | ✅ Safe |
 | `status` | Print current project memory status (MemPalace, Codebase-Memory, CLAUDE.md, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
 | `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
-| `doctor` | Perform comprehensive workspace diagnostics (check gitignore, stale locks, CLI path access, etc.) | Run for deep troubleshooting | 🔍 Read-only |
-| `doctor --fix` | Diagnoses and automatically repairs any configuration issues (gitignore entries, mempalace rooms, active locks, missing MCP settings) | Run to auto-heal system | 🔧 Modifying |
+| `doctor` | Perform comprehensive diagnostics (check gitignore, stale locks, CLI paths) across all projects. | Run for deep troubleshooting | 🔍 Read-only |
+| `doctor --fix` | Diagnoses and auto-fixes configuration errors, updating obsolete cognitive rules in CLAUDE.md files. | Run to auto-heal system | 🔧 Modifying |
+| `list` | Show auto-archive status of all registered active projects in the system. | Run to see project list | 🔍 Read-only |
+| `remove [key]` | Remove/deregister a project (by index or keyword) from the active registry list. | Run to clean active list | 🗑️ Destructive |
 | `version` | Display the installed version of `ai-brain`. | Run to check version | 🔍 Read-only |
 | `clean` | Remove all local `ai-brain` configuration directories, map directories, and Git hooks. | Run to strip configuration | 🗑️ Destructive |
 | `uninstall` | Global removal of all local configurations, registered Cron Jobs, global executables, and MCP server listings. | Run to completely uninstall | 🗑️ Destructive |
@@ -98,14 +100,17 @@ ai-brain exclude           # List all registered active projects and whitelistin
 ai-brain exclude current   # Disable auto-archiving for the current project
 ai-brain include-all       # Enable auto-archiving for all registered active projects
 ai-brain exclude-all       # Disable auto-archiving for all registered active projects
+ai-brain list              # List all registered projects with their auto-archive status
+ai-brain remove [key]      # Deregister a project from the system (accepts index, keyword, or all)
 ```
 
 ---
 
-## 🦾 Editor Integrations
+## 💡 Editor Integrations
 
 - **Claude Code / Rufus / OpenClaw**: Automatically registered on `full-init` via stdio command configuration.
 - **Gemini / Antigravity IDE / OpenCode**: Registered in `~/.gemini/config/mcp_config.json` and `~/.mcp.json` to launch `codebase-memory-mcp` as a stdio server.
+- **Codex Agent**: TOML configuration is automatically managed at `~/.codex/config.toml` to register stdio-based MCP servers.
 - **Cursor / VS Code / Claude Desktop**: Integrates with local `.git/hooks`, `CLAUDE.md`, and `.codebase-memory/` automatically, registering the MCP server for agent-wide context search.
 
 ---
