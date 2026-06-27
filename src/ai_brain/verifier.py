@@ -46,7 +46,7 @@ def check_mcp_config(
         return CheckResult(name, INFO, "(此環境未安裝，略過)")
 
     if not config_path.is_file():
-        return CheckResult(name, FAIL, f"(找不到 {config_path})")
+        return CheckResult(name, INFO, "(此環境未設定，略過)")
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:

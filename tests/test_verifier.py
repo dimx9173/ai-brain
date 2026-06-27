@@ -20,10 +20,10 @@ class TestMcpConfigChecker(unittest.TestCase):
         r = check_mcp_config("Test", None)
         self.assertEqual(r.status, INFO)
 
-    def test_returns_fail_when_file_missing(self) -> None:
+    def test_returns_info_when_file_missing(self) -> None:
         r = check_mcp_config("Test", Path("/nonexistent/cfg.json"))
-        self.assertEqual(r.status, FAIL)
-        self.assertIn("找不到", r.detail)
+        self.assertEqual(r.status, INFO)
+        self.assertIn("未設定", r.detail)
 
     def test_returns_fail_when_malformed_json(self) -> None:
         target = Path("/tmp/_ai_brain_test_bad.json")
