@@ -606,9 +606,12 @@ def run_doctor(paths, fix: bool = False) -> bool:
     freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
     files_to_check = []
     local_md = Path(PROJECT_CLAUDE_MD)
+    claude_local_md = Path(".claude") / "CLAUDE.md"
     global_md = Path.home() / ".claude" / "CLAUDE.md"
     if local_md.is_file():
         files_to_check.append(("專案 CLAUDE.md", local_md))
+    if claude_local_md.is_file():
+        files_to_check.append(("專案 .claude/CLAUDE.md", claude_local_md))
     if global_md.is_file():
         files_to_check.append(("全域 ~/.claude/CLAUDE.md", global_md))
 
@@ -653,7 +656,31 @@ def run_doctor(paths, fix: bool = False) -> bool:
                 else:
                     all_pass = False
             else:
-                print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
+                # No ai-brain cognitive block — check for stale graphify content
+                if "graphify" in content.lower():
+                    rules_ok = False
+                    print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 引導內容"))
+                    if fix:
+                        try:
+                            # Remove graphify lines and append the latest cognitive block
+                            new_lines = [
+                                line for line in content.splitlines()
+                                if "graphify" not in line.lower()
+                            ]
+                            # Strip trailing blank lines then append fresh block
+                            while new_lines and not new_lines[-1].strip():
+                                new_lines.pop()
+                            new_lines.append("")
+                            new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
+                            md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                            print(green(f"    [ FIXED ] 已清除 {label} 中的舊 graphify 引導並補上最新工具規則"))
+                            rules_ok = True
+                        except Exception as e:
+                            print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                    else:
+                        all_pass = False
+                else:
+                    print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
 
     print()
     print(blue("====== 🏁 診斷結束 ======"))
