@@ -6,7 +6,7 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
-from ai_brain.constants import MCP_GRAPHIFY, MCP_MEMPALACE
+from ai_brain.constants import MCP_CODEBASE_MEMORY, MCP_MEMPALACE
 from ai_brain.verifier import check_mcp_config, FAIL, INFO, PASS
 
 
@@ -41,7 +41,7 @@ class TestMcpConfigChecker(unittest.TestCase):
         try:
             r = check_mcp_config("Test", target)
             self.assertEqual(r.status, FAIL)
-            self.assertIn(MCP_GRAPHIFY, r.detail)
+            self.assertIn(MCP_CODEBASE_MEMORY, r.detail)
         finally:
             target.unlink(missing_ok=True)
 
@@ -54,7 +54,7 @@ class TestMcpConfigChecker(unittest.TestCase):
         _write(target, {
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
-                MCP_GRAPHIFY: {"command": "/Users/carlos/.local/bin/graphify-mcp-wrapper", "args": []},
+                MCP_CODEBASE_MEMORY: {"command": "/Users/carlos/.local/bin/codebase-memory-mcp", "args": []},
             }
         })
         try:

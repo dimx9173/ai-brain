@@ -13,20 +13,20 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.0.12"
+VERSION = "2.1.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
 # --- CLI tool identifiers -------------------------------------------------------
 TOOL_MEMPALACE = "mempalace"
 TOOL_MEMPALACE_MCP = "mempalace-mcp"
-TOOL_GRAPHIFY = "graphify"
+TOOL_CODEBASE_MEMORY = "codebase-memory-mcp"
 TOOL_CLAUDE_MEM = "claude-mem"
 
 # --- MCP server identifiers -----------------------------------------------------
 MCP_MEMPALACE = "mempalace"
-MCP_GRAPHIFY = "graphify"
-MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_GRAPHIFY)
+MCP_CODEBASE_MEMORY = "codebase-memory-mcp"
+MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_CODEBASE_MEMORY)
 
 # --- LLM providers --------------------------------------------------------------
 PROVIDER_MINIMAX = "minimax"
@@ -72,18 +72,18 @@ def GLOBAL_MEMPALACE_MCP() -> Path:
     return Path.home() / ".local" / "bin" / "mempalace-mcp"
 
 
-def GLOBAL_GRAPHIFY_MCP_WRAPPER() -> Path:
-    return Path.home() / ".local" / "bin" / "graphify-mcp-wrapper"
+def GLOBAL_CODEBASE_MEMORY_MCP() -> Path:
+    return Path.home() / ".local" / "bin" / "codebase-memory-mcp"
 
 
 # --- Tools supported by full-init -----------------------------------------------
-GRAPHIFY_TOOLS = ("antigravity", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw")
+CODEBASE_MEMORY_TOOLS = ("antigravity", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw")
 
 # The `uv tool install` package names ai-brain orchestrates. Keep this in sync
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.
 # (Belt-and-braces: `upgraders` carries binary ↔ package mapping, this list
 # is used by the install / uninstall messaging.)
-UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "graphifyy[mcp]")
+UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "codebase-memory-mcp")
 
 # --- Time & thresholds ----------------------------------------------------------
 SWEEP_BACKGROUND_GAP_SECONDS = 12 * 60 * 60
@@ -94,8 +94,8 @@ CRON_CMD = '$HOME/.local/bin/ai-brain stop > /dev/null 2>&1'
 PROJECT_CONFIG_FILE = ".claude/config.json"
 PROJECT_CLAUDE_MD = "CLAUDE.md"
 PROJECT_MEMPALACE_FILES = ("mempalace.yaml", "entities.json")
-GRAPHIFY_OUT_DIR = "graphify-out"
-LOCAL_GRAPHIFY_SKILL = ".claude/skills/graphify"
+CODEBASE_MEMORY_OUT_DIR = ".codebase-memory"
+LOCAL_CODEBASE_MEMORY_SKILL = ".claude/skills/codebase-memory"
 
 # --- Hook markers & text snippets -----------------------------------------------
 COGNITIVE_PRINCIPLES_MARKER = "## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)"
@@ -108,7 +108,7 @@ You must actively traverse and respect the three cognitive memory layers before 
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
 
 2. **L1: Structural Memory (Codebase Topology)**
-   - **Action**: Before modifying any source files or proposing refactors, proactively query the codebase map (via `query_graph`, `codegraph_*` tools, or checking `./graphify-out/`).
+   - **Action**: Before modifying any source files or proposing refactors, proactively query the codebase map (via `search_graph`, `trace_path`, `get_code_snippet`, or other `codebase-memory-mcp` tools).
    - **Purpose**: Map out upstream/downstream module dependencies and community structures to prevent architectural regressions.
 
 3. **L2: Long-Term Memory (Historical Memory Palace)**
@@ -125,15 +125,12 @@ You must actively traverse and respect the three cognitive memory layers before 
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
 
 2. **L1: Structural Memory (Codebase Topology)**
-   - **Action**: Before modifying any source files or proposing refactors, proactively query the codebase map (via `query_graph`, `codegraph_*` tools, or checking `./graphify-out/`).
+   - **Action**: Before modifying any source files or proposing refactors, proactively query the codebase map (via `search_graph`, `trace_path`, `get_code_snippet`, or other `codebase-memory-mcp` tools).
    - **Purpose**: Map out upstream/downstream module dependencies and community structures to prevent architectural regressions.
 
 3. **L2: Long-Term Memory (Historical Memory Palace)**
    - **Action**: Before answering queries about system design, past debugging history, environment setups, or business logic, proactively query the memory database (via `mempalace_search` or `mempalace_kg_query`).
    - **Purpose**: Leverage persistent historical context to avoid repeating past errors or reinventing existing patterns.
-
-## 🗺️ Graphify Skill and Command Integration
-- **`/graphify` Shortcut**: When the user enters `/graphify` in the chat, **you must prioritize calling the Skill tool and specifying `skill: "graphify"`** before executing any other actions.
 """
 
 HOOKS_CONFIG = {

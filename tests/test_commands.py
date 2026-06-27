@@ -220,7 +220,7 @@ class TestDoctor(_RegisterSeveralMixin):
         from pathlib import Path
         global_gi = commands._global_gitignore_path()
         global_gi.parent.mkdir(parents=True, exist_ok=True)
-        global_gi.write_text("graphify-out/\n", encoding="utf-8")
+        global_gi.write_text(".codebase-memory/\n", encoding="utf-8")
         
         from unittest.mock import MagicMock, patch
         paths = MagicMock()
@@ -268,7 +268,7 @@ class TestDoctor(_RegisterSeveralMixin):
             ok = commands.run_doctor(paths, fix=True)
             self.assertTrue(ok)
             global_gi = commands._global_gitignore_path()
-            self.assertIn("graphify-out/", global_gi.read_text(encoding="utf-8"))
+            self.assertIn(".codebase-memory/", global_gi.read_text(encoding="utf-8"))
 
     def test_doctor_fails_and_fixes_git_hooks(self) -> None:
         from pathlib import Path
@@ -276,7 +276,7 @@ class TestDoctor(_RegisterSeveralMixin):
         Path(".git").mkdir(exist_ok=True)
         global_gi = commands._global_gitignore_path()
         global_gi.parent.mkdir(parents=True, exist_ok=True)
-        global_gi.write_text("graphify-out/\n", encoding="utf-8")
+        global_gi.write_text(".codebase-memory/\n", encoding="utf-8")
         
         from unittest.mock import MagicMock, patch
         paths = MagicMock()

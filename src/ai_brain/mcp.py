@@ -13,12 +13,10 @@ from typing import Any, Callable
 
 from .config import modify_json_file
 from .constants import (
-    GLOBAL_GRAPHIFY_MCP_WRAPPER,
+    GLOBAL_CODEBASE_MEMORY_MCP,
     GLOBAL_MEMPALACE_MCP,
-    MCP_GRAPHIFY,
+    MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
-    MINIMAX_PROVIDER_CONFIG,
-    PROVIDER_MINIMAX,
     TOOL_MEMPALACE_MCP,
 )
 from .ui import print_blue as blue, print_green as green
@@ -37,9 +35,9 @@ def _stdio_server_entry(server: str) -> dict[str, Any]:
             "args": [],
             "env": {},
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
-            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
         }
     raise ValueError(f"Unknown MCP server: {server}")
@@ -54,10 +52,10 @@ def _kilo_local_entry(server: str) -> dict[str, Any]:
             "args": [],
             "enabled": True,
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
             "type": "local",
-            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
             "enabled": True,
         }
@@ -71,10 +69,10 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
             "type": "local",
             "command": [str(GLOBAL_MEMPALACE_MCP())],
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
             "type": "local",
-            "command": [str(GLOBAL_GRAPHIFY_MCP_WRAPPER())],
+            "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -87,9 +85,9 @@ def _claude_desktop_entry(server: str) -> dict[str, Any]:
             "args": [],
             "env": {},
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
-            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
         }
     raise ValueError(f"Claude Desktop does not register server: {server}")
@@ -104,10 +102,10 @@ def _claude_code_entry(server: str) -> dict[str, Any]:
             "args": [],
             "env": {},
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
             "type": "stdio",
-            "command": str(GLOBAL_GRAPHIFY_MCP_WRAPPER()),
+            "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
             "env": {},
         }
@@ -122,10 +120,10 @@ def _opencode_entry(server: str) -> dict[str, Any]:
             "command": [str(GLOBAL_MEMPALACE_MCP())],
             "enabled": True,
         }
-    if server == MCP_GRAPHIFY:
+    if server == MCP_CODEBASE_MEMORY:
         return {
             "type": "local",
-            "command": [str(GLOBAL_GRAPHIFY_MCP_WRAPPER())],
+            "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
             "enabled": True,
         }
     raise ValueError(f"Unknown MCP server: {server}")
@@ -148,21 +146,21 @@ def _all_targets(paths) -> list[RegistrationTarget]:
     """List every IDE target relevant to the current platform."""
     return [
         RegistrationTarget("Gemini", paths.gemini_config, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("Gemini/Antigravity", paths.gemini_antigravity, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("OpenCode", paths.opencode_json, "mcp",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _opencode_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _opencode_entry),
         RegistrationTarget("~/.mcp.json", paths.mcp_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _stdio_server_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("~/.claude.json", paths.claude_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _claude_code_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_code_entry),
         RegistrationTarget("Claude Desktop", paths.claude_desktop, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _claude_desktop_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_desktop_entry),
         RegistrationTarget("Kilo VS Code", paths.vscode_kilo, "mcpServers",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _kilo_local_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_local_entry),
         RegistrationTarget("Kilo CLI", paths.kilo_cli, "mcp",
-                           (MCP_MEMPALACE, MCP_GRAPHIFY), _kilo_cli_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_cli_entry),
     ]
 
 
@@ -193,42 +191,6 @@ def deregister_all(paths) -> int:
         _deregister_in_file(target)
         touched += 1
     return touched
-
-
-def configure_minimax_provider(paths) -> bool:
-    """Add the MiniMax LLM provider to ~/.graphify/providers.json."""
-    if not paths.graphify_providers:
-        return False
-
-    def _modifier(data: dict[str, Any]) -> dict[str, Any]:
-        if PROVIDER_MINIMAX not in data:
-            data[PROVIDER_MINIMAX] = MINIMAX_PROVIDER_CONFIG
-            print(f"Successfully configured MiniMax provider in {paths.graphify_providers}")
-        return data
-
-    blue(f"---> 自動設定 Graphify 自訂 LLM 後端 ({paths.graphify_providers})...")
-    ok = modify_json_file(paths.graphify_providers, _modifier)
-    if ok:
-        blue("    💡 MiniMax 後端使用說明:")
-        green('      1. 請先在環境中設定您的 API 金鑰: export MINIMAX_API_KEY="your-api-key"')
-        green("      2. 執行 Graphify 提取時指定 minimax 後端: "
-              "graphify extract . --backend minimax --model minimax-m2.5")
-    return ok
-
-
-def remove_minimax_provider(paths) -> bool:
-    """Drop the MiniMax entry from ~/.graphify/providers.json."""
-    if not paths.graphify_providers or not paths.graphify_providers.is_file():
-        return False
-
-    def _modifier(data: dict[str, Any]) -> dict[str, Any]:
-        if PROVIDER_MINIMAX in data:
-            del data[PROVIDER_MINIMAX]
-            print("Successfully removed MiniMax provider")
-        return data
-
-    blue("---> 自 ~/.graphify/providers.json 移除 MiniMax 自訂 LLM 後端...")
-    return modify_json_file(paths.graphify_providers, _modifier)
 
 
 # --- Internals ------------------------------------------------------------------

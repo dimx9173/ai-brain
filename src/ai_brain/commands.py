@@ -19,21 +19,21 @@ from . import registry
 from .constants import (
     APP_EMOJI,
     APP_NAME,
-    GRAPHIFY_OUT_DIR,
-    GRAPHIFY_TOOLS,
+    CODEBASE_MEMORY_OUT_DIR,
+    CODEBASE_MEMORY_TOOLS,
     HOOKS_CONFIG,
     HOOK_BEGIN_MARKER,
     LAST_SWEEP_FILE,
     LOCAL_CLAUDE_MD_TEMPLATE,
-    LOCAL_GRAPHIFY_SKILL,
+    LOCAL_CODEBASE_MEMORY_SKILL,
     PROJECT_CLAUDE_MD,
     PROJECT_CONFIG_FILE,
     PROJECT_MEMPALACE_FILES,
     SWEEP_BACKGROUND_GAP_SECONDS,
-    TOOL_GRAPHIFY,
+    TOOL_CODEBASE_MEMORY,
     TOOL_MEMPALACE,
 )
-from .mcp import configure_minimax_provider, deregister_all, register_all
+from .mcp import deregister_all, register_all
 from .ui import blue, green, red, yellow
 
 
@@ -42,12 +42,12 @@ from .ui import blue, green, red, yellow
 def init_brain() -> bool:
     print(blue(f"====== {APP_EMOJI} 開始初始化專案 AI 大腦配置 ======"))
 
-    _ensure_graphify_out_ignored()
+    _ensure_codebase_memory_ignored()
 
     if not _run_mempalace_init():
         return False
 
-    if not _run_graphify_install():
+    if not _run_codebase_memory_init():
         return False
 
     if not _write_project_hooks_config():
@@ -74,7 +74,6 @@ def full_init(paths) -> bool:
     cron.install()
 
     register_all(paths)
-    configure_minimax_provider(paths)
 
     from . import plugins
     plugins.install_opencode_plugins()
@@ -97,10 +96,8 @@ def clean_brain() -> bool:
             except Exception:
                 pass
 
-    _remove_path(Path(GRAPHIFY_OUT_DIR), is_dir=True, message="--> 移除 Graphify 輸出目錄...")
-    _remove_path(Path(LOCAL_GRAPHIFY_SKILL), is_dir=True, message="--> 移除 .claude 中的 Graphify 技能...")
-
-    _uninstall_graphify_tool_configs()
+    _remove_path(Path(CODEBASE_MEMORY_OUT_DIR), is_dir=True, message="--> 移除 Codebase-Memory 輸出目錄...")
+    _remove_path(Path(LOCAL_CODEBASE_MEMORY_SKILL), is_dir=True, message="--> 移除 .claude 中的 Codebase-Memory 技能...")
 
     _remove_path(Path(PROJECT_CONFIG_FILE), is_dir=False, message="--> 移除 .claude/config.json 記憶生命週期鉤子...")
     _remove_path(Path(".claude/settings.json"), is_dir=False, message="--> 移除 .claude/settings.json 中的 Hook 註冊...")
@@ -123,7 +120,7 @@ def uninstall_all(paths) -> bool:
     from . import cron
     cron.uninstall()
 
-    for name in ("ai-brain", "graphify-mcp-wrapper"):
+    for name in ("ai-brain",):
         target = Path.home() / ".local" / "bin" / name
         if target.exists():
             try:
@@ -131,8 +128,6 @@ def uninstall_all(paths) -> bool:
             except Exception as e:
                 print(red(f"❌ 移除 {name} 失敗 ({e})"))
 
-    from .mcp import remove_minimax_provider
-    remove_minimax_provider(paths)
     deregister_all(paths)
 
     from . import plugins
@@ -145,7 +140,7 @@ def uninstall_all(paths) -> bool:
     print("💡 提示: 若要完全移除相關 CLI 套件，您可以手動執行以下指令：")
     print("  uv tool uninstall mempalace")
     print("  uv tool uninstall claude-mem")
-    print("  uv tool uninstall graphifyy")
+    print("  uv tool uninstall codebase-memory-mcp")
     return True
 
 
@@ -153,7 +148,7 @@ def uninstall_all(paths) -> bool:
 
 def start_day(fast: bool = False) -> bool:
     """Morning routine: kick off a background sweep if stale, then refresh graph."""
-    _ensure_graphify_out_ignored()
+    _ensure_codebase_memory_ignored()
     if _should_run_background_sweep():
         print(yellow("--> 偵測到大於 12 小時未進行對話歸檔，正在背景自動沉澱昨日對話記憶..."))
         try:
@@ -166,7 +161,7 @@ def start_day(fast: bool = False) -> bool:
             print(red(f"警告：背景歸檔啟動失敗 ({e})"))
 
     print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
-    if not _run_graphify_extract(fast=fast):
+    if not _run_codebase_memory_index():
         return False
     print(green("✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。"))
     return True
@@ -183,7 +178,7 @@ def stop_day() -> bool:
 
 
 def check_status() -> bool:
-    _ensure_graphify_out_ignored()
+    _ensure_codebase_memory_ignored()
     print(blue("====== 📊 專案 AI 大腦狀態檢查 ======"))
     from .ui import GREEN, RED, YELLOW, NC
 
@@ -194,8 +189,13 @@ def check_status() -> bool:
     mempalace_ok = any(Path(p).exists() for p in (".mempalace", "mempalace.json", "mempalace.yaml"))
     status_line("MemPalace 狀態", mempalace_ok, missing_msg="未初始化")
 
-    graphify_ok = Path("graphify-out").is_dir()
-    status_line("Graphify 地圖", graphify_ok, color_ok=GREEN,
+    proj_name = str(Path.cwd().resolve()).replace("/", "-").replace("_", "-").lower().strip("-")
+    try:
+        res = subprocess.run(["codebase-memory-mcp", "cli", "list_projects"], capture_output=True, text=True)
+        codebase_memory_ok = proj_name in res.stdout.lower() or "active" in res.stdout.lower()
+    except Exception:
+        codebase_memory_ok = False
+    status_line("Codebase-Memory 地圖", codebase_memory_ok, color_ok=GREEN,
                 missing_msg="尚未生成地圖 (請執行 ai-brain start)")
 
     claude_md_ok = Path(PROJECT_CLAUDE_MD).is_file()
@@ -337,17 +337,17 @@ def run_doctor(paths, fix: bool = False) -> bool:
     ignores = _read_all_ignores()
     gi_ok = True
     
-    if "graphify-out" not in ignores:
+    if ".codebase-memory" not in ignores:
         gi_ok = False
-        print(red("  [ FAIL ] gitignore 中未忽略 graphify-out/ 目錄"))
+        print(red("  [ FAIL ] gitignore 中未忽略 .codebase-memory/ 目錄"))
         if fix:
-            _ensure_graphify_out_ignored()
-            print(green("    [ FIXED ] 已自動將 graphify-out/ 加入全域 gitignore"))
+            _ensure_codebase_memory_ignored()
+            print(green("    [ FIXED ] 已自動將 .codebase-memory/ 加入全域 gitignore"))
             gi_ok = True
         else:
             all_pass = False
     else:
-        print(green("  [ PASS ] gitignore 已正確排除 graphify-out/"))
+        print(green("  [ PASS ] gitignore 已正確排除 .codebase-memory/"))
 
     # Check other massive unignored folders
     for folder in ("node_modules", "venv", ".venv"):
@@ -368,16 +368,16 @@ def run_doctor(paths, fix: bool = False) -> bool:
         except Exception:
             yaml_content = ""
         
-        if "graphify_out" in yaml_content or "graphify-out" in yaml_content:
+        if "codebase_memory" in yaml_content or ".codebase-memory" in yaml_content:
             yaml_ok = False
-            print(red("  [ FAIL ] mempalace.yaml 中仍包含已廢棄之 graphify_out 房間"))
+            print(red("  [ FAIL ] mempalace.yaml 中仍包含已廢棄之 codebase_memory 房間"))
             if fix:
                 try:
                     lines = yaml_content.splitlines()
                     new_lines = []
                     skip_mode = False
                     for line in lines:
-                        if line.strip().startswith("- name: graphify_out") or line.strip().startswith("- name: graphify-out"):
+                        if line.strip().startswith("- name: codebase_memory") or line.strip().startswith("- name: .codebase-memory"):
                             skip_mode = True
                             continue
                         if skip_mode:
@@ -387,7 +387,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
                                 continue
                         new_lines.append(line)
                     my_yaml.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-                    print(green("    [ FIXED ] 已自動自 mempalace.yaml 中移除 graphify_out 房間"))
+                    print(green("    [ FIXED ] 已自動自 mempalace.yaml 中移除 codebase_memory 房間"))
                     yaml_ok = True
                 except Exception as e:
                     print(red(f"    [ ERROR ] 無法修復 mempalace.yaml ({e})"))
@@ -503,7 +503,7 @@ def run_doctor(paths, fix: bool = False) -> bool:
     # 5. Check System CLIs
     print(blue("5. 檢查系統相依 CLI 工具可用性..."))
     cli_ok = True
-    for tool_name, pkg in (("mempalace", "mempalace"), ("graphify", "graphifyy[mcp]"), ("claude-mem", "claude-mem")):
+    for tool_name, pkg in (("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")):
         if shutil.which(tool_name):
             print(green(f"  [ PASS ] 工具 {tool_name} 已安裝"))
         else:
@@ -660,7 +660,7 @@ def _read_all_ignores() -> set[str]:
     return patterns
 
 
-def _ensure_graphify_out_ignored() -> None:
+def _ensure_codebase_memory_ignored() -> None:
     gitignore = _global_gitignore_path()
     content = ""
     if gitignore.is_file():
@@ -672,15 +672,15 @@ def _ensure_graphify_out_ignored() -> None:
     lines = content.splitlines()
     normalized = [line.strip().rstrip("/") for line in lines if line.strip() and not line.strip().startswith("#")]
     
-    if "graphify-out" not in normalized:
-        print_yellow(f"--> 自動將 graphify-out/ 加入全域 gitignore ({gitignore}) 避免記憶庫膨脹...")
+    if ".codebase-memory" not in normalized:
+        print_yellow(f"--> 自動將 .codebase-memory/ 加入全域 gitignore ({gitignore}) 避免記憶庫膨脹...")
         new_lines = []
         replaced = False
         for line in lines:
             stripped = line.strip().rstrip("/")
-            if stripped in ("graphify-out/cache", "graphify-out/cache/"):
-                new_lines.append("# Graphify output directory (regenerated on demand)")
-                new_lines.append("graphify-out/")
+            if stripped in (".codebase-memory/cache", ".codebase-memory/cache/"):
+                new_lines.append("# codebase-memory-mcp cache and graphs")
+                new_lines.append(".codebase-memory/")
                 replaced = True
             else:
                 new_lines.append(line)
@@ -688,8 +688,8 @@ def _ensure_graphify_out_ignored() -> None:
         if not replaced:
             if new_lines and new_lines[-1].strip():
                 new_lines.append("")
-            new_lines.append("# Graphify output directory (regenerated on demand)")
-            new_lines.append("graphify-out/")
+            new_lines.append("# codebase-memory-mcp cache and graphs")
+            new_lines.append(".codebase-memory/")
             
         try:
             gitignore.parent.mkdir(parents=True, exist_ok=True)
@@ -704,7 +704,7 @@ def _run_mempalace_init() -> bool:
     try:
         subprocess.run([TOOL_MEMPALACE, "init", "--yes", "--auto-mine", "--no-llm", "."], check=True)
         try:
-            # Sync to apply prune on newly ignored files like graphify-out/
+            # Sync to apply prune on newly ignored files like .codebase-memory/
             subprocess.run([TOOL_MEMPALACE, "sync", "--apply", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
@@ -717,20 +717,18 @@ def _run_mempalace_init() -> bool:
         return False
 
 
-def _run_graphify_install() -> bool:
-    print_yellow("--> 安裝 Graphify 本地技能與各工具引導規則...")
+def _run_codebase_memory_init() -> bool:
+    print_yellow("--> 初始化 Codebase-Memory 圖譜索引...")
     try:
-        subprocess.run([TOOL_GRAPHIFY, "install", "--project"], check=True)
-        for tool in GRAPHIFY_TOOLS:
-            subprocess.run([TOOL_GRAPHIFY, tool, "install"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([TOOL_CODEBASE_MEMORY, "cli", "index_repository",
+                        json.dumps({"repo_path": str(Path.cwd().resolve())})], check=True)
         return True
     except FileNotFoundError:
-        print(red("錯誤：未找到 graphify 工具，請先執行: uv tool install \"graphifyy[mcp]\" --force"))
+        print(red("錯誤：未找到 codebase-memory-mcp 工具，請先執行: uv tool install codebase-memory-mcp --force"))
         return False
     except Exception as e:
-        print(yellow(f"--> 安裝 Graphify 部分規則時發生警告 ({e})"))
-        return True  # partial install is still considered success
+        print(yellow(f"--> 初始化 Codebase-Memory 圖譜時發生警告 ({e})"))
+        return True  # partial install/init is still considered success
 
 
 def _write_project_hooks_config() -> bool:
@@ -756,14 +754,7 @@ def _write_project_claude_md() -> bool:
         return False
 
 
-def _uninstall_graphify_tool_configs() -> None:
-    print("--> 移除各工具的 Graphify 本地配置...")
-    try:
-        for tool in GRAPHIFY_TOOLS:
-            subprocess.run([TOOL_GRAPHIFY, tool, "uninstall"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
+# graphify tool configs are no longer used.
 
 
 def _remove_path(path: Path, *, is_dir: bool, message: str) -> None:
@@ -866,31 +857,21 @@ def _record_sweep_timestamp() -> None:
         pass
 
 
-def _run_graphify_extract(fast: bool = False) -> bool:
-    candidates = [TOOL_GRAPHIFY, "./node_modules/.bin/graphify", "/graphify"]
-    graph_json = Path(GRAPHIFY_OUT_DIR) / "graph.json"
-    has_graph = graph_json.is_file()
-
-    for cmd in candidates:
-        is_local = cmd.startswith(".")
-        if is_local:
-            if not Path(cmd).is_file():
-                continue
-        elif not shutil.which(cmd):
-            continue
-        try:
-            if fast:
-                args = [cmd, "update", ".", "--no-cluster"]
-            elif has_graph:
-                args = [cmd, "update", "."]
-            else:
-                args = [cmd, "."]
-            subprocess.run(args, check=True)
-            return True
-        except Exception:
-            continue
-    print(red("⚠️ 未能自動執行 graphify，請確認是否有安裝全域 graphifyy 工具。"))
-    return False
+def _run_codebase_memory_index() -> bool:
+    try:
+        subprocess.run([
+            "codebase-memory-mcp",
+            "cli",
+            "index_repository",
+            json.dumps({"repo_path": str(Path.cwd().resolve())})
+        ], check=True)
+        return True
+    except FileNotFoundError:
+        print(red("錯誤：未找到 codebase-memory-mcp，請先執行: ai-brain install"))
+        return False
+    except Exception as e:
+        print(red(f"錯誤：更新代碼地圖圖譜失敗 ({e})"))
+        return False
 
 
 def _run_archive_sweep(*, silent: bool) -> None:

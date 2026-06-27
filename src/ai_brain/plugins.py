@@ -61,16 +61,8 @@ class OpenCodePlugin:
     source: Path              # absolute path to the file we ship
 
 
-# The graphify reminder is the only plugin we currently ship. Adding more
-# is just a matter of appending to this list.
-DEFAULT_OPENCODE_PLUGINS: tuple[OpenCodePlugin, ...] = (
-    OpenCodePlugin(
-        target_name="ai-brain-graphify.js",
-        # `<package>/plugins/graphify.js` — works because we always run
-        # from inside the package after `pip install` or via the shim.
-        source=Path(__file__).resolve().parent.parent.parent / ".opencode" / "plugins" / "graphify.js",
-    ),
-)
+# codebase-memory-mcp does not use custom OpenCode plugins.
+DEFAULT_OPENCODE_PLUGINS: tuple[OpenCodePlugin, ...] = ()
 
 
 # --- Per-IDE installers ---------------------------------------------------------
@@ -172,14 +164,13 @@ def install_kilo_skill_stub() -> bool:
     target = cmd_dir / "ai-brain.md"
     content = (
         "---\n"
-        "description: Reminders for using the ai-brain toolchain (mempalace + graphify)\n"
+        "description: Reminders for using the ai-brain toolchain (mempalace + codebase-memory-mcp)\n"
         "---\n\n"
         "When answering questions in this workspace:\n"
         "1. If the request is about past decisions, prior bugs, or environment config,\n"
         "   call the `mempalace` MCP tool (mempalace_search) before reading files.\n"
         "2. If the request is about code architecture or cross-file relationships,\n"
-        "   prefer `graphify query \"<question>\"` over grep / find.\n"
-        "3. For broad architecture review only, read `graphify-out/GRAPH_REPORT.md`.\n"
+        "   prefer codebase-memory-mcp MCP tools (search_graph, trace_path, etc.) over grep / find.\n"
     )
     try:
         cmd_dir.mkdir(parents=True, exist_ok=True)

@@ -45,7 +45,7 @@ class UpgradableTool:
 CORE_TOOLS: tuple[UpgradableTool, ...] = (
     UpgradableTool("MemPalace", "mempalace", "mempalace"),
     UpgradableTool("claude-mem", "claude-mem", "claude-mem"),
-    UpgradableTool("Graphify", "graphify", "graphifyy[mcp]"),
+    UpgradableTool("codebase-memory-mcp", "codebase-memory-mcp", "codebase-memory-mcp"),
 )
 
 
@@ -183,12 +183,12 @@ def get_version(binary: str, *, package: str | None = None) -> str:
             continue
         # Some tools print version on stderr (e.g. Python's --version).
         raw = (result.stdout or "") + (result.stderr or "")
-        first_line = raw.strip().splitlines()[0] if raw.strip() else ""
-        if not first_line:
+        if not raw.strip():
             continue
-        match = _VERSION_RE.search(first_line)
+        match = _VERSION_RE.search(raw)
         if match:
             return match.group(0)
+        first_line = raw.strip().splitlines()[0]
         # If the first line didn't look like a version (e.g. argparse usage
         # text), keep trying — don't return garbage as "the version".
         if any(t in first_line.lower() for t in ("usage:", "error:", "unknown")):

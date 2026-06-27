@@ -24,7 +24,7 @@ from ai_brain.upgraders import (
 class TestCoreToolsRegistry(unittest.TestCase):
     def test_core_tools_cover_the_three_documented_packages(self) -> None:
         packages = {t.package for t in CORE_TOOLS}
-        self.assertEqual(packages, {"mempalace", "claude-mem", "graphifyy[mcp]"})
+        self.assertEqual(packages, {"mempalace", "claude-mem", "codebase-memory-mcp"})
 
     def test_binaries_are_path_safe(self) -> None:
         for tool in CORE_TOOLS:
@@ -43,13 +43,13 @@ class TestCoreToolsRegistry(unittest.TestCase):
 class TestGetVersion(unittest.TestCase):
     def test_extracts_version_from_dash_dash_version(self) -> None:
         fake = subprocess.CompletedProcess(args=[], returncode=0,
-                                            stdout="graphify 1.2.3\n", stderr="")
-        with mock.patch("shutil.which", return_value="/usr/bin/graphify"), \
+                                            stdout="codebase-memory-mcp 1.2.3\n", stderr="")
+        with mock.patch("shutil.which", return_value="/usr/bin/codebase-memory-mcp"), \
              mock.patch("subprocess.run", return_value=fake) as run:
-            v = get_version("graphify")
+            v = get_version("codebase-memory-mcp")
         self.assertEqual(v, "1.2.3")
         # First call should have used --version
-        self.assertEqual(run.call_args.args[0], ["graphify", "--version"])
+        self.assertEqual(run.call_args.args[0], ["codebase-memory-mcp", "--version"])
 
     def test_falls_back_to_version_subcommand(self) -> None:
         empty = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")

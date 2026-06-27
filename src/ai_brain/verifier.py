@@ -16,8 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .constants import HOME, MCP_GRAPHIFY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
-from .platforms import find_graphify_python
+from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
 from .ui import green, red, yellow
 
 PASS = "OK"
@@ -75,21 +74,9 @@ def check_mcp_config(
         if not args and "command" in info and isinstance(info["command"], list):
             args = info["command"][1:]
 
-        if server == MCP_GRAPHIFY:
-            if "graphify-mcp-wrapper" not in str(cmd):
-                return CheckResult(name, FAIL, f"({server} 未配置為使用 graphify-mcp-wrapper)")
-
-        is_graphify_check = False
-        if cmd in ("python3", "python") and any("graphify.serve" in str(a) for a in args):
-            is_graphify_check = True
-        elif "graphify-mcp-wrapper" in str(cmd):
-            is_graphify_check = True
-
-        if is_graphify_check:
-            py_cmd = find_graphify_python()
-            probe = subprocess.run([py_cmd, "-c", "import graphify.serve"], capture_output=True)
-            if probe.returncode != 0:
-                return CheckResult(name, FAIL, f"({py_cmd} 環境未安裝 graphify)")
+        if server == MCP_CODEBASE_MEMORY:
+            if "codebase-memory-mcp" not in str(cmd):
+                return CheckResult(name, FAIL, f"({server} 未配置為使用 codebase-memory-mcp)")
 
         if not shutil.which(cmd) and not (cmd.startswith("/") and os.access(cmd, os.X_OK)):
             return CheckResult(name, FAIL, f"({server} 執行檔 ({cmd}) 無效或不可執行)")
@@ -178,9 +165,8 @@ def run_all_checks(paths) -> List[CheckResult]:
     # 2. claude-mem CLI
     results.append(check_cli_available("claude-mem", "claude-mem",
                                        info_message="(未安裝，僅 Claude Code 需要)"))
-    # 3. graphify CLI
-    results.append(check_cli_available("Graphify", "graphify",
-                                       fallback_paths=(Path("./node_modules/.bin/graphify"),)))
+    # 3. codebase-memory-mcp CLI
+    results.append(check_cli_available("codebase-memory-mcp", "codebase-memory-mcp"))
     # 4. Claude Code ~/.claude.json
     claude_json = HOME() / ".claude.json"
     if not claude_json.is_file() and Path(".claude.json").is_file():
