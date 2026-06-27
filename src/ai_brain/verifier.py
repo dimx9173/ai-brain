@@ -224,4 +224,7 @@ def run_all_checks(paths) -> List[CheckResult]:
         results.append(CheckResult("檢查 Kilo MCP 記憶載入與內容正確性", INFO,
                                    "(此環境未安裝 Kilo，跳過檢查)"))
 
+    # 10. Cursor
+    results.append(check_mcp_config("Cursor", paths.cursor_json))
+
     return results

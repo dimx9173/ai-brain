@@ -161,6 +161,8 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_local_entry),
         RegistrationTarget("Kilo CLI", paths.kilo_cli, "mcp",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_cli_entry),
+        RegistrationTarget("Cursor", paths.cursor_json, "mcpServers",
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
     ]
 
 
