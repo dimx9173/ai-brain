@@ -200,6 +200,9 @@ def deregister_all(paths) -> int:
 def _register_in_file(target: RegistrationTarget) -> bool:
     def _modifier(data: dict[str, Any]) -> dict[str, Any]:
         servers = data.setdefault(target.server_key, {})
+        if "graphify" in servers:
+            del servers["graphify"]
+            print(f"Successfully cleaned up obsolete server graphify from {target.label}")
         for server in target.servers:
             if server in servers:
                 current_entry = servers[server]
@@ -216,6 +219,8 @@ def _register_in_file(target: RegistrationTarget) -> bool:
 def _deregister_in_file(target: RegistrationTarget) -> bool:
     def _modifier(data: dict[str, Any]) -> dict[str, Any]:
         if target.server_key in data:
+            if "graphify" in data[target.server_key]:
+                del data[target.server_key]["graphify"]
             for server in target.servers:
                 if server in data[target.server_key]:
                     del data[target.server_key][server]
