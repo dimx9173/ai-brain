@@ -27,6 +27,7 @@ class ToolPaths:
     kilo_cli: Path
     opencode_json: Path
     cursor_json: Path
+    codex_toml: Path
 
 
 def get_paths() -> ToolPaths:
@@ -62,6 +63,7 @@ def get_paths() -> ToolPaths:
         kilo_cli=HOME() / ".config" / "kilo" / "kilo.json",
         opencode_json=HOME() / ".config" / "opencode" / "opencode.json",
         cursor_json=HOME() / ".cursor" / "mcp.json",
+        codex_toml=HOME() / ".codex" / "config.toml",
     )
 
 

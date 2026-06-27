@@ -62,3 +62,23 @@ class TestMcpConfigChecker(unittest.TestCase):
             self.assertEqual(r.status, PASS)
         finally:
             target.unlink(missing_ok=True)
+
+    @unittest.mock.patch("ai_brain.verifier.shutil.which")
+    def test_returns_pass_for_well_formed_toml_config(self, mock_which) -> None:
+        mock_which.return_value = "/usr/local/bin/mock"
+        target = Path("/tmp/_ai_brain_test_good.toml")
+        
+        from ai_brain.config import serialize_toml
+        payload = {
+            "mcp_servers": {
+                MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
+                MCP_CODEBASE_MEMORY: {"command": "/Users/carlos/.local/bin/codebase-memory-mcp", "args": []},
+            }
+        }
+        target.write_text(serialize_toml(payload), encoding="utf-8")
+        
+        try:
+            r = check_mcp_config("Test", target, server_key="mcp_servers")
+            self.assertEqual(r.status, PASS)
+        finally:
+            target.unlink(missing_ok=True)

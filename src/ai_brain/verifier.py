@@ -49,10 +49,15 @@ def check_mcp_config(
         return CheckResult(name, INFO, "(此環境未設定，略過)")
 
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        if config_path.suffix == ".toml":
+            from .config import parse_toml
+            data = parse_toml(config_path.read_text(encoding="utf-8"))
+        else:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
     except Exception as e:
-        return CheckResult(name, FAIL, f"(JSON 格式損壞 ({e}))")
+        fmt = "TOML" if config_path.suffix == ".toml" else "JSON"
+        return CheckResult(name, FAIL, f"({fmt} 格式損壞 ({e}))")
 
     mcp_servers = data.get(server_key, {})
     for server in required_servers:
@@ -226,5 +231,8 @@ def run_all_checks(paths) -> List[CheckResult]:
 
     # 10. Cursor
     results.append(check_mcp_config("Cursor", paths.cursor_json))
+
+    # 11. Codex
+    results.append(check_mcp_config("Codex", paths.codex_toml, server_key="mcp_servers"))
 
     return results

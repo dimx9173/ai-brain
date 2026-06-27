@@ -37,3 +37,71 @@ class TestConfigManager(InTempDir):
 
     def test_returns_false_when_path_is_none(self) -> None:
         self.assertFalse(modify_json_file(None, lambda d: d))
+
+
+class TestTomlConfigManager(InTempDir):
+    def test_parse_toml_basic(self) -> None:
+        from ai_brain.config import parse_toml
+        toml_str = """
+        model_provider = "custom"
+        disable_response_storage = true
+        [model_providers.custom]
+        name = "minimax_en"
+        requires_openai_auth = false
+        [mcp_servers.node_repl]
+        args = []
+        """
+        parsed = parse_toml(toml_str)
+        self.assertEqual(parsed.get("model_provider"), "custom")
+        self.assertEqual(parsed.get("disable_response_storage"), True)
+        self.assertEqual(parsed.get("model_providers", {}).get("custom", {}).get("name"), "minimax_en")
+        self.assertEqual(parsed.get("model_providers", {}).get("custom", {}).get("requires_openai_auth"), False)
+        self.assertEqual(parsed.get("mcp_servers", {}).get("node_repl", {}).get("args"), [])
+
+    def test_serialize_toml_basic(self) -> None:
+        from ai_brain.config import serialize_toml
+        data = {
+            "model_provider": "custom",
+            "disable_response_storage": True,
+            "model_providers": {
+                "custom": {
+                    "name": "minimax_en",
+                }
+            },
+            "mcp_servers": {
+                "node_repl": {
+                    "args": []
+                }
+            }
+        }
+        serialized = serialize_toml(data)
+        self.assertIn('model_provider = "custom"', serialized)
+        self.assertIn('disable_response_storage = true', serialized)
+        self.assertIn('[model_providers.custom]', serialized)
+        self.assertIn('name = "minimax_en"', serialized)
+        self.assertIn('[mcp_servers.node_repl]', serialized)
+        self.assertIn('args = []', serialized)
+
+    def test_modify_toml_file(self) -> None:
+        from ai_brain.config import modify_toml_file, parse_toml
+        target = Path(self.tmpdir) / "cfg.toml"
+        
+        # Test creation
+        def modifier1(d: dict) -> dict:
+            d["key"] = "value"
+            return d
+        
+        result = modify_toml_file(target, modifier1)
+        self.assertTrue(result)
+        parsed = parse_toml(target.read_text())
+        self.assertEqual(parsed, {"key": "value"})
+
+        # Test merge
+        def modifier2(d: dict) -> dict:
+            d["another"] = 42
+            return d
+        
+        result = modify_toml_file(target, modifier2)
+        self.assertTrue(result)
+        parsed = parse_toml(target.read_text())
+        self.assertEqual(parsed, {"key": "value", "another": 42})
