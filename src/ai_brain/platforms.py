@@ -21,7 +21,6 @@ class ToolPaths:
     gemini_antigravity: Path
     mcp_json: Path
     claude_json: Path
-    graphify_providers: Path
     claude_desktop: Path | None
     vscode_kilo: Path | None
     kilo_cli: Path
@@ -58,7 +57,6 @@ def get_paths() -> ToolPaths:
         gemini_antigravity=HOME() / ".gemini" / "antigravity" / "mcp_config.json",
         mcp_json=HOME() / ".mcp.json",
         claude_json=HOME() / ".claude.json",
-        graphify_providers=HOME() / ".graphify" / "providers.json",
         claude_desktop=claude_desktop,
         vscode_kilo=vscode_kilo,
         kilo_cli=HOME() / ".config" / "kilo" / "kilo.json",
@@ -91,5 +89,3 @@ def ensure_path_has_local_bin() -> None:
             path_env = p + os.path.pathsep + path_env
     os.environ["PATH"] = path_env
 
-
-# find_graphify_python is no longer used.

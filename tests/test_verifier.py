@@ -350,7 +350,6 @@ class _FakeToolPaths:
         self.gemini_antigravity = base / ".gemini" / "antigravity" / "mcp_config.json"
         self.mcp_json = base / ".mcp.json"
         self.claude_json = base / ".claude.json"
-        self.graphify_providers = base / ".graphify" / "providers.json"
         self.claude_desktop = base / "Claude" / "config.json"
         self.vscode_kilo = None
         self.kilo_cli = base / ".config" / "kilo" / "kilo.json"

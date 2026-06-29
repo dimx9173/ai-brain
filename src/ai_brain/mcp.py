@@ -209,7 +209,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
 # --- Public API -----------------------------------------------------------------
 
 def register_all(paths) -> int:
-    """Register mempalace + graphify across every relevant IDE config.
+    """Register mempalace + codebase-memory-mcp across every relevant IDE config.
 
     Returns the number of files we successfully touched.
     """
@@ -224,12 +224,12 @@ def register_all(paths) -> int:
 
 
 def deregister_all(paths) -> int:
-    """Remove mempalace + graphify from every relevant IDE config."""
+    """Remove mempalace + codebase-memory-mcp from every relevant IDE config."""
     touched = 0
     for target in _all_targets(paths):
         if not target.path or not target.path.is_file():
             continue
-        blue(f"---> 自 {target.label} 註銷 MemPalace / Graphify MCP 伺服器...")
+        blue(f"---> 自 {target.label} 註銷 MemPalace / Codebase-Memory MCP 伺服器...")
         _deregister_in_file(target)
         touched += 1
     return touched

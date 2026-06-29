@@ -51,6 +51,12 @@ class TestReadCrontab(InTempDir):
         result = cron._read_crontab()
         self.assertEqual(result, [])
 
+    @patch("ai_brain.cron.subprocess.run", side_effect=cron.subprocess.TimeoutExpired("crontab", 10))
+    @patch("ai_brain.cron.shutil.which", return_value="/usr/bin/crontab")
+    def test_read_crontab_returns_empty_on_timeout(self, mock_which, mock_run):
+        result = cron._read_crontab()
+        self.assertEqual(result, [])
+
 
 # --- _write_crontab ------------------------------------------------------------
 
@@ -59,13 +65,14 @@ class TestWriteCrontab(InTempDir):
     def test_write_crontab_success(self, mock_popen):
         p = MagicMock()
         p.communicate.return_value = (None, None)
+        p.returncode = 0
         mock_popen.return_value = p
         result = cron._write_crontab(["line1", "line2"])
         self.assertTrue(result)
         mock_popen.assert_called_once_with(
             ["crontab", "-"], stdin=cron.subprocess.PIPE, text=True
         )
-        p.communicate.assert_called_once_with(input="line1\nline2\n")
+        p.communicate.assert_called_once_with(input="line1\nline2\n", timeout=10)
 
     @patch("ai_brain.cron.subprocess.Popen", side_effect=OSError("boom"))
     def test_write_crontab_exception_returns_false(self, mock_popen):
@@ -79,10 +86,33 @@ class TestWriteCrontab(InTempDir):
     def test_write_crontab_empty_list(self, mock_popen):
         p = MagicMock()
         p.communicate.return_value = (None, None)
+        p.returncode = 0
         mock_popen.return_value = p
         result = cron._write_crontab([])
         self.assertTrue(result)
-        p.communicate.assert_called_once_with(input="\n")
+        p.communicate.assert_called_once_with(input="\n", timeout=10)
+
+    @patch("ai_brain.cron.subprocess.Popen")
+    def test_write_crontab_returns_false_on_timeout(self, mock_popen):
+        import subprocess as _sp
+        p = MagicMock()
+        p.communicate.side_effect = _sp.TimeoutExpired("crontab", 10)
+        mock_popen.return_value = p
+        buf = StringIO()
+        with redirect_stdout(buf):
+            result = cron._write_crontab(["line1"])
+        self.assertFalse(result)
+        p.kill.assert_called_once()
+        self.assertIn("逾時", buf.getvalue())
+
+    @patch("ai_brain.cron.subprocess.Popen")
+    def test_write_crontab_returns_false_on_nonzero_returncode(self, mock_popen):
+        p = MagicMock()
+        p.communicate.return_value = (None, None)
+        p.returncode = 1
+        mock_popen.return_value = p
+        result = cron._write_crontab(["line1"])
+        self.assertFalse(result)
 
 
 # --- install() -----------------------------------------------------------------

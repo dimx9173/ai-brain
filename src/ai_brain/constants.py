@@ -19,9 +19,7 @@ APP_EMOJI = "🧠"
 
 # --- CLI tool identifiers -------------------------------------------------------
 TOOL_MEMPALACE = "mempalace"
-TOOL_MEMPALACE_MCP = "mempalace-mcp"
 TOOL_CODEBASE_MEMORY = "codebase-memory-mcp"
-TOOL_CLAUDE_MEM = "claude-mem"
 
 # --- MCP server identifiers -----------------------------------------------------
 MCP_MEMPALACE = "mempalace"

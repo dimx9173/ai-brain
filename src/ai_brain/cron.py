@@ -21,12 +21,14 @@ CRON_LINE = f"{CRON_SCHEDULE} {CRON_CMD}"
 
 
 def _read_crontab() -> List[str]:
-    """Return current crontab lines, or [] if no crontab / tool missing."""
+    """Return current crontab lines, or [] if no crontab / tool missing / timeout."""
     if not shutil.which("crontab"):
         return []
     try:
-        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-    except FileNotFoundError:
+        result = subprocess.run(
+            ["crontab", "-l"], capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return []
     if result.returncode != 0:
         return []
@@ -37,8 +39,12 @@ def _write_crontab(lines: List[str]) -> bool:
     """Pipe *lines* into `crontab -`."""
     try:
         p = subprocess.Popen(["crontab", "-"], stdin=subprocess.PIPE, text=True)
-        p.communicate(input="\n".join(lines) + "\n")
-        return True
+        p.communicate(input="\n".join(lines) + "\n", timeout=10)
+        return p.returncode == 0
+    except subprocess.TimeoutExpired:
+        p.kill()
+        red("❌ 寫入 crontab 逾時（>10 秒）")
+        return False
     except Exception as e:
         red(f"❌ 寫入 crontab 失敗 ({e})")
         return False

@@ -1,6 +1,7 @@
 """Unit tests for the project registry + auto-archive whitelist."""
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 from unittest.mock import patch
@@ -84,7 +85,7 @@ class TestRegistryErrorPaths(InTempDir):
 
     def test_write_lines_returns_false_on_open_error(self) -> None:
         target = Path(self.tmpdir) / "new_reg.txt"
-        with patch("tempfile.mkstemp", side_effect=PermissionError("denied")):
+        with patch("ai_brain.registry.os.open", side_effect=PermissionError("denied")):
             result = registry._write_lines(target, ["data"])
         self.assertFalse(result)
 
@@ -156,3 +157,89 @@ class TestRegisterCurrentConcurrent(InTempDir):
         leftovers = list((target.parent).glob(".*.tmp"))
         self.assertEqual(leftovers, [])
         self.assertEqual(registry._read_lines(target), ["/a", "/b"])
+
+
+class TestRegistryConcurrency(InTempDir):
+    """Verify that register_current and deregister_project serialize."""
+
+    def test_concurrent_register_and_deregister(self) -> None:
+        """Run 10 threads that each register_current, and 5 threads that each
+        deregister_project. After all threads complete, no duplicate entries
+        should appear in the registry."""
+        tmp = Path(self.tmpdir).resolve()
+        for i in range(5):
+            (tmp / f"proj_{i}").mkdir()
+            os.chdir(str(tmp / f"proj_{i}"))
+            registry.register_current()
+
+        errors: list[Exception] = []
+        barrier = threading.Barrier(15)
+
+        def do_register(idx: int) -> None:
+            try:
+                barrier.wait(timeout=5)
+                (tmp / f"proj_new_{idx}").mkdir(exist_ok=True)
+                os.chdir(str(tmp / f"proj_new_{idx}"))
+                registry.register_current()
+            except Exception as e:
+                errors.append(e)
+
+        def do_deregister(idx: int) -> None:
+            try:
+                barrier.wait(timeout=5)
+                os.chdir(str(tmp / f"proj_{idx}"))
+                registry.deregister_project(str(tmp / f"proj_{idx}"))
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=do_register, args=(i,)) for i in range(10)]
+        threads += [threading.Thread(target=do_deregister, args=(i,)) for i in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(errors, [])
+        entries = registry._read_lines(registry.REGISTRY_PATH())
+        self.assertEqual(len(entries), len(set(entries)))
+
+    def test_deregister_does_not_lose_registered_projects(self) -> None:
+        """A concurrent register should survive a concurrent deregister that
+        replaces the file. After register("projC") + deregister("projB")
+        concurrently, projA and projC must both be present."""
+        tmp = Path(self.tmpdir).resolve()
+        (tmp / "projA").mkdir()
+        (tmp / "projB").mkdir()
+        os.chdir(str(tmp / "projA"))
+        registry.register_current()
+        os.chdir(str(tmp / "projB"))
+        registry.register_current()
+
+        (tmp / "projC").mkdir()
+        errors: list[Exception] = []
+
+        def register_c() -> None:
+            try:
+                os.chdir(str(tmp / "projC"))
+                registry.register_current()
+            except Exception as e:
+                errors.append(e)
+
+        def deregister_b() -> None:
+            try:
+                registry.deregister_project(str(tmp / "projB"))
+            except Exception as e:
+                errors.append(e)
+
+        t1 = threading.Thread(target=register_c)
+        t2 = threading.Thread(target=deregister_b)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        self.assertEqual(errors, [])
+        entries = registry._read_lines(registry.REGISTRY_PATH())
+        self.assertIn(str(tmp / "projA"), entries)
+        self.assertIn(str(tmp / "projC"), entries)
+        self.assertNotIn(str(tmp / "projB"), entries)

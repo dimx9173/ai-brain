@@ -4,20 +4,19 @@ Two plain text files under ~/.claude/ hold the active project list and the
 auto-archive whitelist. Both are line-delimited absolute paths; we use
 `set` semantics to keep dedup simple.
 
-All full-file writes go through :func:`_write_lines` which delegates to
-the atomic write helper in ``config._atomic_write_text`` (tempfile in the
-same directory + ``os.replace``).  :func:`register_current` additionally
-uses ``fcntl.flock`` to serialize the read-check-append sequence so that
-two concurrent ``ai-brain init`` calls never duplicate the same entry.
+All full-file writes go through :func:`_write_lines` which acquires an
+exclusive ``fcntl.flock`` on the registry file before truncating and
+rewriting it.  :func:`register_current` uses the same ``fcntl.flock`` to
+serialize the read-check-append sequence so that two concurrent
+``ai-brain init`` calls never duplicate the same entry.
 """
 from __future__ import annotations
 
 import fcntl
 import os
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Callable, Iterable, List, Optional
 
-from .config import _atomic_write_text
 from .constants import AUTO_ARCHIVE_PATH, REGISTRY_PATH
 from .ui import print_green as green
 from .ui import print_red as red
@@ -35,11 +34,38 @@ def _read_lines(path: Path) -> List[str]:
         return []
 
 
+def _write_content(path: Path, content: str) -> None:
+    """Open, flock, truncate, write, fsync, unlock, close. Raises on failure."""
+    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            os.ftruncate(fd, 0)
+            os.lseek(fd, 0, os.SEEK_SET)
+            # Use os.fdopen to get a proper text-mode writer; pass closefd=False
+            # so closing the file object doesn't close our fd (finally below handles it).
+            with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as f:
+                f.write(content)
+                f.flush()
+                os.fsync(fd)
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
 def _write_lines(path: Path, lines: Iterable[str]) -> bool:
+    """Replace the registry file content with serialization via flock."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         content = "".join(line + "\n" for line in lines)
-        _atomic_write_text(path, content)
+        _write_content(path, content)
         return True
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")
@@ -56,6 +82,41 @@ def _append_line(path: Path, line: str) -> bool:
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")
         return False
+
+
+def _lock_read_modify_write(
+    path: Path, modify_fn: Callable[[List[str]], List[str] | None]
+) -> tuple[bool, List[str] | None]:
+    """Open path, flock, read, call modify_fn(lines). If it returns non-None,
+    write the result. Returns (success, modified_lines_or_None)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(exist_ok=True)
+    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            lines = _read_lines(path)
+            new_lines = modify_fn(lines)
+            if new_lines is None:
+                return True, None
+            content = "".join(line + "\n" for line in new_lines)
+            os.ftruncate(fd, 0)
+            os.lseek(fd, 0, os.SEEK_SET)
+            with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as f:
+                f.write(content)
+                f.flush()
+                os.fsync(fd)
+            return True, new_lines
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
 
 # --- Public API -----------------------------------------------------------------
@@ -95,12 +156,22 @@ def deregister_project(proj_path: str) -> bool:
     """Remove the specified directory from the active + whitelist lists."""
     removed = False
     for path in (REGISTRY_PATH(), AUTO_ARCHIVE_PATH()):
-        lines = _read_lines(path)
-        if proj_path in lines:
-            lines.remove(proj_path)
-            if _write_lines(path, lines) and path == REGISTRY_PATH():
-                yellow(f"--> 已將專案 \"{Path(proj_path).name}\" 自 AI 大腦活躍清單註銷。")
-                removed = True
+
+        def _remove(lines: List[str]) -> List[str] | None:
+            if proj_path not in lines:
+                return None
+            new = list(lines)
+            new.remove(proj_path)
+            return new
+
+        try:
+            ok, new_lines = _lock_read_modify_write(path, _remove)
+        except Exception as e:
+            red(f"錯誤：無法寫入 {path} ({e})")
+            continue
+        if ok and new_lines is not None and path == REGISTRY_PATH():
+            yellow(f"--> 已將專案 \"{Path(proj_path).name}\" 自 AI 大腦活躍清單註銷。")
+            removed = True
     return removed
 
 

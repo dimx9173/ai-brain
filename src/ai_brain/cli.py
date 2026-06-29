@@ -27,7 +27,7 @@ def _show_help() -> None:
     print("  ai-brain [指令]\n")
     print(yellow("可用指令:"))
     rows = [
-        ("init", "[一次性] 初始化專案 AI 大腦配置（MemPalace、Graphify、記憶鉤子與引導指南）"),
+        ("init", "[一次性] 初始化專案 AI 大腦配置（MemPalace、codebase-memory-mcp、記憶鉤子與引導指南）"),
         ("full-init", "[一次性] 初始化配置，並一併在系統中註冊深夜 23:30 自動記憶歸檔 Cron Job"),
         ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
         ("version", "[顯示版本] 顯示目前安裝的 ai-brain 工具版本"),

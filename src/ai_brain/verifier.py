@@ -1,7 +1,7 @@
 """Generic MCP server verification.
 
 The original `verify_brain` had 5 near-identical "check JSON file → look for
-mempalace/graphify → run `shutil.which` on command" blocks. This module
+mempalace/codebase-memory-mcp → run `shutil.which` on command" blocks. This module
 replaces them with one generic checker, a list of targets, and a small
 set of *optional* checks for tools like openclaw/opencode/gemini that
 we probe with `command -v` first.
