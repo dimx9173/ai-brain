@@ -905,6 +905,87 @@ class TestDoctorExtra(_CmdBase):
         self.assertNotIn("codebase_memory", yaml_content)
         self.assertIn("other", yaml_content)
 
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.verifier.run_all_checks")
+    @patch("ai_brain.commands.subprocess.run")
+    @patch("ai_brain.commands.shutil.which", return_value="/mock")
+    def test_doctor_removes_project_graphify_plugin_files(self, mock_which, mock_run,
+                                                          mock_checks, mock_hooks):
+        self._minimal_git_repo()
+        (Path(self.tmpdir) / ".opencode" / "plugins").mkdir(parents=True)
+        plugin = Path(self.tmpdir) / ".opencode" / "plugins" / "graphify.js"
+        plugin.write_text("// graphify", encoding="utf-8")
+        mock_run.return_value = self._mk_subprocess_result(stdout="Gitignored: 0\nMissing: 0")
+        mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
+
+        out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
+        self.assertTrue(ok)
+        self.assertFalse(plugin.exists())
+        self.assertIn("已移除", out)
+
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.verifier.run_all_checks")
+    @patch("ai_brain.commands.subprocess.run")
+    @patch("ai_brain.commands.shutil.which", return_value="/mock")
+    def test_doctor_strips_graphify_from_project_opencode_json(self, mock_which, mock_run,
+                                                               mock_checks, mock_hooks):
+        self._minimal_git_repo()
+        opencode_cfg = Path(self.tmpdir) / ".opencode" / "opencode.json"
+        opencode_cfg.parent.mkdir(parents=True)
+        opencode_cfg.write_text(
+            json.dumps({"$schema": "https://app.kilo.ai/config.json",
+                         "plugin": [".opencode/plugins/graphify.js", "other"]}),
+            encoding="utf-8",
+        )
+        mock_run.return_value = self._mk_subprocess_result(stdout="Gitignored: 0\nMissing: 0")
+        mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
+
+        out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
+        self.assertTrue(ok)
+        rebuilt = json.loads(opencode_cfg.read_text(encoding="utf-8"))
+        self.assertNotIn(".opencode/plugins/graphify.js", rebuilt.get("plugin", []))
+        self.assertIn("other", rebuilt["plugin"])
+
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.verifier.run_all_checks")
+    @patch("ai_brain.commands.subprocess.run")
+    @patch("ai_brain.commands.shutil.which", return_value="/mock")
+    def test_doctor_removes_non_empty_graphify_out(self, mock_which, mock_run,
+                                                   mock_checks, mock_hooks):
+        self._minimal_git_repo()
+        gdir = Path(self.tmpdir) / "graphify-out"
+        gdir.mkdir()
+        (gdir / "graph.json").write_text('{"nodes":[]}', encoding="utf-8")
+        mock_run.return_value = self._mk_subprocess_result(stdout="Gitignored: 0\nMissing: 0")
+        mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
+
+        out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
+        self.assertTrue(ok)
+        self.assertFalse(gdir.exists())
+        self.assertIn("graphify-out", out)
+
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.verifier.run_all_checks")
+    @patch("ai_brain.commands.subprocess.run")
+    @patch("ai_brain.commands.shutil.which", return_value="/mock")
+    def test_doctor_removes_global_graphify_plugin_file(self, mock_which, mock_run,
+                                                        mock_checks, mock_hooks):
+        self._minimal_git_repo()
+        global_plugin_dir = Path.home() / ".config" / "opencode" / "plugins"
+        global_plugin_dir.mkdir(parents=True, exist_ok=True)
+        global_plugin = global_plugin_dir / "ai-brain-graphify.js"
+        global_plugin.write_text("// global graphify plugin", encoding="utf-8")
+        mock_run.return_value = self._mk_subprocess_result(stdout="Gitignored: 0\nMissing: 0")
+        mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
+
+        try:
+            out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
+            self.assertTrue(ok)
+            self.assertFalse(global_plugin.exists())
+        finally:
+            if global_plugin.exists():
+                global_plugin.unlink()
+
 
 # ============================================================================ #
 # ============================================================================ #

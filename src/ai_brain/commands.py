@@ -755,18 +755,67 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         ".claude/skills/graphify",
         ".kilo/command/graphify.md",
     )
+    _PROJECT_GRAPHIFY_PLUGINS = (
+        ".opencode/plugins/graphify.js",
+        ".opencode/plugins/ai-brain-graphify.js",
+        ".opencode/plugins/ai-brain-graphify.ts",
+        ".kilo/plugins/graphify.js",
+        ".kilo/plugins/ai-brain-graphify.js",
+    )
+    _PROJECT_OPENCODE_CONFIGS = (
+        "opencode.json",
+        ".opencode/opencode.json",
+    )
+    graphify_problems = 0
+
+    def _has_graphify_plugins(data: dict) -> bool:
+        plugins = data.get("plugin")
+        if not isinstance(plugins, list):
+            return False
+        return any(isinstance(p, str) and "graphify" in p.lower() for p in plugins)
+
+    def _strip_graphify_plugins(data: dict) -> None:
+        plugins = data.get("plugin")
+        if not isinstance(plugins, list):
+            return
+        cleaned = [p for p in plugins if not (isinstance(p, str) and "graphify" in p.lower())]
+        if cleaned:
+            data["plugin"] = cleaned
+        else:
+            data.pop("plugin", None)
 
     for proj in projects_to_check:
         prefix = f"  [{proj.name}] " if multiple else "  "
+        proj_had_problem = False
 
         graphify_dir = proj / "graphify-out"
         if graphify_dir.is_dir():
             is_empty = not any(graphify_dir.iterdir())
+            proj_had_problem = True
             if is_empty:
                 print(red(f"{prefix}[ FAIL ] 偵測到空的 graphify-out/ 目錄殘留"))
-                if fix:
+            else:
+                print(red(f"{prefix}[ FAIL ] 偵測到含資料的 graphify-out/ 目錄殘留"))
+            if fix:
+                try:
                     shutil.rmtree(graphify_dir, ignore_errors=True)
-                    print(green(f"{prefix}  [ FIXED ] 已移除空的 graphify-out/ 目錄"))
+                    print(green(f"{prefix}  [ FIXED ] 已移除 graphify-out/ 目錄"))
+                except Exception as e:
+                    print(red(f"{prefix}  [ ERROR ] 移除 graphify-out/ 失敗 ({e})"))
+                    all_pass = False
+
+        for dotfile in sorted(proj.glob(".graphify_*")):
+            if not dotfile.is_file():
+                continue
+            proj_had_problem = True
+            print(red(f"{prefix}[ FAIL ] 偵測到舊有 graphify 暫存檔: {dotfile.name}"))
+            if fix:
+                try:
+                    dotfile.unlink()
+                    print(green(f"{prefix}  [ FIXED ] 已移除 {dotfile.name}"))
+                except Exception as e:
+                    print(red(f"{prefix}  [ ERROR ] 移除 {dotfile.name} 失敗 ({e})"))
+                    all_pass = False
 
         for rel_path in _GRAPHIFY_PATHS_TO_CHECK:
             artifact = proj / rel_path
@@ -783,6 +832,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         pass
 
                 if is_graphify_artifact:
+                    proj_had_problem = True
                     print(red(f"{prefix}[ FAIL ] 偵測到舊有 graphify 配置: {rel_path}"))
                     if fix:
                         try:
@@ -795,12 +845,85 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                             print(red(f"{prefix}  [ ERROR ] 移除 {rel_path} 失敗 ({e})"))
                             all_pass = False
 
-    if not any(
-        (proj / "graphify-out").is_dir() or any(
-            (proj / p).exists() for p in _GRAPHIFY_PATHS_TO_CHECK
-        )
-        for proj in projects_to_check
-    ):
+        for rel_path in _PROJECT_GRAPHIFY_PLUGINS:
+            plugin_file = proj / rel_path
+            if plugin_file.is_file():
+                proj_had_problem = True
+                print(red(f"{prefix}[ FAIL ] 偵測到舊有 graphify plugin 檔案: {rel_path}"))
+                if fix:
+                    try:
+                        plugin_file.unlink()
+                        print(green(f"{prefix}  [ FIXED ] 已移除 {rel_path}"))
+                    except Exception as e:
+                        print(red(f"{prefix}  [ ERROR ] 移除 {rel_path} 失敗 ({e})"))
+                        all_pass = False
+
+        for rel in _PROJECT_OPENCODE_CONFIGS:
+            cfg = proj / rel
+            if not cfg.is_file():
+                continue
+            try:
+                data = json.loads(cfg.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if not _has_graphify_plugins(data):
+                continue
+            proj_had_problem = True
+            print(red(f"{prefix}[ FAIL ] {rel} plugin 陣列引用過時 graphify"))
+            if fix:
+                try:
+                    _strip_graphify_plugins(data)
+                    cfg.write_text(
+                        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
+                    print(green(f"{prefix}  [ FIXED ] 已清除 {rel} 中的 graphify 引用"))
+                except Exception as e:
+                    print(red(f"{prefix}  [ ERROR ] 修正 {rel} 失敗 ({e})"))
+                    all_pass = False
+
+        if proj_had_problem:
+            graphify_problems += 1
+
+    global_graphify_problems = 0
+    global_oc_cfg = Path.home() / ".config" / "opencode" / "opencode.json"
+    global_plugin_paths = sorted(
+        p for p in (Path.home() / ".config" / "opencode" / "plugins").glob("*.js")
+        if "graphify" in p.name.lower()
+    ) if (Path.home() / ".config" / "opencode" / "plugins").is_dir() else []
+
+    if global_oc_cfg.is_file():
+        try:
+            gdata = json.loads(global_oc_cfg.read_text(encoding="utf-8"))
+        except Exception:
+            gdata = None
+        if gdata and _has_graphify_plugins(gdata):
+            global_graphify_problems += 1
+            print(red(f"  [ FAIL ] 全域 opencode.json plugin 陣列引用過時 graphify"))
+            if fix:
+                try:
+                    _strip_graphify_plugins(gdata)
+                    global_oc_cfg.write_text(
+                        json.dumps(gdata, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
+                    print(green("    [ FIXED ] 已清除全域 opencode.json 中的 graphify 引用"))
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 修正全域 opencode.json 失敗 ({e})"))
+                    all_pass = False
+
+    for pf in global_plugin_paths:
+        graphify_problems += 1
+        print(red(f"  [ FAIL ] 偵測到全域舊有 graphify plugin 檔: {pf.name}"))
+        if fix:
+            try:
+                pf.unlink()
+                print(green(f"    [ FIXED ] 已移除 {pf.name}"))
+            except Exception as e:
+                print(red(f"    [ ERROR ] 移除 {pf.name} 失敗 ({e})"))
+                all_pass = False
+
+    if graphify_problems == 0 and global_graphify_problems == 0:
         print(green("  [ PASS ] 無 graphify 遺留物"))
 
     print()
