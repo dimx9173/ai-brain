@@ -14,9 +14,9 @@ from typing import Any, Callable
 from .config import modify_json_file
 from .constants import (
     GLOBAL_CODEBASE_MEMORY_MCP,
-    GLOBAL_MEMPALACE_MCP,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
+    MEMPALACE_MCP_COMMAND,
     TOOL_MEMPALACE_MCP,
 )
 from .ui import print_blue as blue
@@ -47,8 +47,8 @@ def _kilo_local_entry(server: str) -> dict[str, Any]:
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
-            "command": str(GLOBAL_MEMPALACE_MCP()),
-            "args": [],
+            "command": MEMPALACE_MCP_COMMAND()[0],
+            "args": MEMPALACE_MCP_COMMAND()[1:],
             "enabled": True,
         }
     if server == MCP_CODEBASE_MEMORY:
@@ -66,7 +66,7 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
-            "command": [str(GLOBAL_MEMPALACE_MCP())],
+            "command": MEMPALACE_MCP_COMMAND(),
         }
     if server == MCP_CODEBASE_MEMORY:
         return {
@@ -79,9 +79,10 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
 def _claude_desktop_entry(server: str) -> dict[str, Any]:
     """Claude Desktop app on macOS uses absolute path (no `type` field)."""
     if server == MCP_MEMPALACE:
+        cmd = MEMPALACE_MCP_COMMAND()
         return {
-            "command": str(GLOBAL_MEMPALACE_MCP()),
-            "args": [],
+            "command": cmd[0],
+            "args": cmd[1:],
             "env": {},
         }
     if server == MCP_CODEBASE_MEMORY:
@@ -116,7 +117,7 @@ def _opencode_entry(server: str) -> dict[str, Any]:
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
-            "command": [str(GLOBAL_MEMPALACE_MCP())],
+            "command": MEMPALACE_MCP_COMMAND(),
             "enabled": True,
         }
     if server == MCP_CODEBASE_MEMORY:
@@ -150,7 +151,7 @@ def _openclaw_entry(server: str) -> dict[str, Any]:
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
-            "command": [str(GLOBAL_MEMPALACE_MCP())],
+            "command": MEMPALACE_MCP_COMMAND(),
             "enabled": True,
         }
     if server == MCP_CODEBASE_MEMORY:

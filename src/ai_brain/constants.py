@@ -72,6 +72,43 @@ def GLOBAL_MEMPALACE_MCP() -> Path:
     return Path.home() / ".local" / "bin" / "mempalace-mcp"
 
 
+# --- MemPalace MCP command auto-detection ---------------------------------------
+# Prefer pip-installed version (`python3 -m mempalace.mcp_server`) over the
+# `uv tool install` binary shim. The uv shim (v3.5.0) hangs on large 3.2GB
+# chroma DBs under certain spawn modes (e.g. opencode/kilo `type: "local"`).
+# The pip version (typically 3.3.4) responds in <2s.
+# Cached per-process: `ai-brain` CLI calls this a few times per invocation,
+# and the pip-availability answer won't change mid-run.
+_MEMPALACE_MCP_COMMAND: list[str] | None = None
+
+
+def MEMPALACE_MCP_COMMAND() -> list[str]:
+    """Prefer pip-installed ``python3 -m mempalace.mcp_server`` (fast); fall
+    back to the uv binary at ``~/.local/bin/mempalace-mcp``. Cached per-process.
+    """
+    global _MEMPALACE_MCP_COMMAND
+    if _MEMPALACE_MCP_COMMAND is not None:
+        return _MEMPALACE_MCP_COMMAND
+
+    import shutil
+    import subprocess
+
+    python3 = shutil.which("python3")
+    if python3:
+        try:
+            result = subprocess.run(
+                [python3, "-c", "import mempalace.mcp_server"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                _MEMPALACE_MCP_COMMAND = [python3, "-m", "mempalace.mcp_server"]
+                return _MEMPALACE_MCP_COMMAND
+        except Exception:
+            pass
+
+    _MEMPALACE_MCP_COMMAND = [str(GLOBAL_MEMPALACE_MCP())]
+    return _MEMPALACE_MCP_COMMAND
 def GLOBAL_CODEBASE_MEMORY_MCP() -> Path:
     return Path.home() / ".local" / "bin" / "codebase-memory-mcp"
 

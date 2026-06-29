@@ -8,7 +8,11 @@ from typing import Any
 from unittest import mock
 
 from ai_brain._testing import InTempDir
-from ai_brain.constants import MCP_CODEBASE_MEMORY, MCP_MEMPALACE, GLOBAL_MEMPALACE_MCP
+from ai_brain.constants import (
+    MEMPALACE_MCP_COMMAND,
+    MCP_CODEBASE_MEMORY,
+    MCP_MEMPALACE,
+)
 from ai_brain.mcp import (
     RegistrationTarget,
     _all_targets,
@@ -89,9 +93,10 @@ class TestStdioServerEntry(InTempDir):
 class TestKiloLocalEntry(InTempDir):
     def test_mempalace(self):
         entry = _kilo_local_entry(MCP_MEMPALACE)
+        expected = MEMPALACE_MCP_COMMAND()
         self.assertEqual(entry["type"], "local")
-        self.assertIn("mempalace-mcp", entry["command"])
-        self.assertEqual(entry["args"], [])
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
         self.assertTrue(entry["enabled"])
 
     def test_codebase_memory(self):
@@ -110,7 +115,7 @@ class TestKiloCliEntry(InTempDir):
         entry = _kilo_cli_entry(MCP_MEMPALACE)
         self.assertEqual(entry["type"], "local")
         self.assertIsInstance(entry["command"], list)
-        self.assertIn("mempalace-mcp", entry["command"][0])
+        self.assertEqual(entry["command"], MEMPALACE_MCP_COMMAND())
 
     def test_codebase_memory(self):
         entry = _kilo_cli_entry(MCP_CODEBASE_MEMORY)
@@ -124,9 +129,10 @@ class TestKiloCliEntry(InTempDir):
 class TestClaudeDesktopEntry(InTempDir):
     def test_mempalace(self):
         entry = _claude_desktop_entry(MCP_MEMPALACE)
+        expected = MEMPALACE_MCP_COMMAND()
         self.assertNotIn("type", entry)
-        self.assertIn("mempalace-mcp", entry["command"])
-        self.assertEqual(entry["args"], [])
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
         self.assertEqual(entry["env"], {})
 
     def test_codebase_memory(self):
@@ -193,10 +199,11 @@ class TestCodexEntry(InTempDir):
 class TestOpenClawEntry(InTempDir):
     def test_mempalace(self):
         entry = _openclaw_entry(MCP_MEMPALACE)
+        expected = MEMPALACE_MCP_COMMAND()
         self.assertEqual(entry["type"], "local")
         self.assertIsInstance(entry["command"], list)
         self.assertTrue(entry["enabled"])
-        self.assertEqual(str(GLOBAL_MEMPALACE_MCP()), entry["command"][0])
+        self.assertEqual(entry["command"], expected)
 
     def test_codebase_memory(self):
         from ai_brain.constants import GLOBAL_CODEBASE_MEMORY_MCP
