@@ -76,8 +76,9 @@ def _minimal_paths() -> ToolPaths:
 class TestStdioServerEntry(InTempDir):
     def test_mempalace(self):
         entry = _stdio_server_entry(MCP_MEMPALACE)
-        self.assertEqual(entry["command"], "mempalace-mcp")
-        self.assertEqual(entry["args"], [])
+        expected = MEMPALACE_MCP_COMMAND()
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
         self.assertEqual(entry["env"], {})
 
     def test_codebase_memory(self):
@@ -147,9 +148,10 @@ class TestClaudeDesktopEntry(InTempDir):
 class TestClaudeCodeEntry(InTempDir):
     def test_mempalace(self):
         entry = _claude_code_entry(MCP_MEMPALACE)
+        expected = MEMPALACE_MCP_COMMAND()
         self.assertEqual(entry["type"], "stdio")
-        self.assertEqual(entry["command"], "mempalace-mcp")
-        self.assertEqual(entry["args"], [])
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
         self.assertEqual(entry["env"], {})
 
     def test_codebase_memory(self):
@@ -182,9 +184,10 @@ class TestOpencodeEntry(InTempDir):
 class TestCodexEntry(InTempDir):
     def test_mempalace(self):
         entry = _codex_entry(MCP_MEMPALACE)
+        expected = MEMPALACE_MCP_COMMAND()
         self.assertEqual(entry["type"], "stdio")
-        self.assertEqual(entry["command"], "mempalace-mcp")
-        self.assertEqual(entry["args"], [])
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
 
     def test_codebase_memory(self):
         entry = _codex_entry(MCP_CODEBASE_MEMORY)
@@ -320,7 +323,9 @@ class TestRegisterInFileTOML(InTempDir):
         )
         _register_in_file(rt)
         content = target.read_text(encoding="utf-8")
-        self.assertIn("mempalace-mcp", content)
+        # Check that the old command was replaced with the new structure
+        self.assertNotIn("old-mempalace", content)
+        self.assertIn("mempalace.mcp_server", content)
 
 
 # ---------------------------------------------------------------------------

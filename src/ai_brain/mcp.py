@@ -17,7 +17,6 @@ from .constants import (
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
     MEMPALACE_MCP_COMMAND,
-    TOOL_MEMPALACE_MCP,
 )
 from .ui import print_blue as blue
 
@@ -29,9 +28,10 @@ from .ui import print_blue as blue
 def _stdio_server_entry(server: str) -> dict[str, Any]:
     """Default stdio entry: command + args + env."""
     if server == MCP_MEMPALACE:
+        cmd = MEMPALACE_MCP_COMMAND()
         return {
-            "command": TOOL_MEMPALACE_MCP,
-            "args": [],
+            "command": cmd[0],
+            "args": cmd[1:],
             "env": {},
         }
     if server == MCP_CODEBASE_MEMORY:
@@ -96,10 +96,11 @@ def _claude_desktop_entry(server: str) -> dict[str, Any]:
 def _claude_code_entry(server: str) -> dict[str, Any]:
     """~/.claude.json uses the modern stdio shape with a `type` field."""
     if server == MCP_MEMPALACE:
+        cmd = MEMPALACE_MCP_COMMAND()
         return {
             "type": "stdio",
-            "command": TOOL_MEMPALACE_MCP,
-            "args": [],
+            "command": cmd[0],
+            "args": cmd[1:],
             "env": {},
         }
     if server == MCP_CODEBASE_MEMORY:
@@ -132,10 +133,11 @@ def _opencode_entry(server: str) -> dict[str, Any]:
 def _codex_entry(server: str) -> dict[str, Any]:
     """Codex config.toml uses stdio type with string command."""
     if server == MCP_MEMPALACE:
+        cmd = MEMPALACE_MCP_COMMAND()
         return {
             "type": "stdio",
-            "command": TOOL_MEMPALACE_MCP,
-            "args": [],
+            "command": cmd[0],
+            "args": cmd[1:],
         }
     if server == MCP_CODEBASE_MEMORY:
         return {

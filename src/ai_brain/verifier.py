@@ -128,7 +128,7 @@ def check_openclaw_daemon() -> CheckResult:
     if not (shutil.which(oc_cmd) or (oc_cmd.startswith("/") and os.access(oc_cmd, os.X_OK))):
         return CheckResult(name, INFO, "(此環境未安裝 OpenClaw CLI，跳過檢查)")
     try:
-        result = subprocess.run([oc_cmd, "daemon", "status"], capture_output=True, text=True)
+        result = subprocess.run([oc_cmd, "daemon", "status"], capture_output=True, text=True, timeout=5)
         if "running" in result.stdout:
             return CheckResult(name, PASS, "(已啟動)")
         return CheckResult(name, WARN, "(OpenClaw 已安裝但未啟動)")

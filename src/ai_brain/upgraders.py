@@ -220,6 +220,10 @@ def upgrade(tool: UpgradableTool) -> tuple[bool, str]:
     """
     if not shutil.which("uv"):
         return False, "uv not on PATH — install it from https://docs.astral.sh/uv/"
+    # Invalidate the cached `uv tool list` output — after --force reinstall
+    # the in-process cache would otherwise serve stale versions.
+    global _UV_TOOL_LIST_CACHE
+    _UV_TOOL_LIST_CACHE = None
     try:
         result = subprocess.run(
             ["uv", "tool", "install", tool.package, "--force", "--reinstall"],

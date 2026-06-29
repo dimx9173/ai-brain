@@ -1,20 +1,16 @@
 """Global plugin installation for OpenCode & Kilo.
 
-`ai-brain` ships its own helper plugins (e.g. `graphify.js`) that remind the
-agent to consult the knowledge graph before grepping. We *could* register
-them at the project level (`.opencode/opencode.json`), but that path is
-relative to the project root and other developers' machines won't have the
-same absolute path — leading to the `Cannot find module ... .opencode/.opencode/...`
-error we hit on 2026-06-16.
+`ai-brain` ships its own helper plugins that can be registered globally
+rather than at the project level. The project-relative path caused
+`Cannot find module .opencode/.opencode/...` errors (see 2026-06-16 fix).
 
-The fix is to copy the plugin to a *global* per-user directory that doesn't
-depend on the project path, then register it from there. The user-level
+The fix copies plugins to a global per-user directory that doesn't
+depend on the project path, then registers them from there. The user-level
 configs are:
 
 - OpenCode: `~/.config/opencode/plugins/<name>.{ts,js}` referenced from
   `~/.config/opencode/opencode.json`'s `"plugin"` array.
-- Kilo: `~/.config/kilo/command/<name>.md` (skill). The current `graphify.md`
-  is already there, so this is mostly a no-op for Kilo today; left as a
+- Kilo: `~/.config/kilo/command/<name>.md` (skill). Left as a
   hook for future plugins.
 
 We never *overwrite* a user-edited plugin — if the destination file already
@@ -144,7 +140,6 @@ def _register_in_opencode_config(plugin_name: str) -> bool:
 
 def install_opencode_plugins(plugins: Iterable[OpenCodePlugin] = DEFAULT_OPENCODE_PLUGINS) -> int:
     """Copy + register every OpenCode plugin we ship. Returns count installed."""
-    blue("---> 註冊 OpenCode 全域 plugin (graphify 提示器)...")
     installed = 0
     for plugin in plugins:
         dest = _copy_plugin(plugin)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-brain"
-version = "2.2.0"
+version = "2.2.2"
 description = "AI Brain Orchestrator — unified CLI for AI agent memory & code graph tools"
 readme = "README.md"
 license = { text = "MIT" }
@@ -66,11 +66,7 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 fail_under = 60
-omit = [
-    # Legacy wrapper — graphify MCP replaced by codebase-memory-mcp.
-    # Kept for backward compatibility; not exercised in tests.
-    "src/ai_brain/graphify_mcp_wrapper.py",
-]
+omit = []
 
 [tool.ruff]
 target-version = "py38"
