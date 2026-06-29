@@ -206,34 +206,32 @@ HOOK_MARKER_BODY = "# (auto-managed by ai-brain; do not edit between markers)"
 POST_MERGE_TEMPLATE = """#!/bin/bash
 {begin}
 {marker_body}
+# Serialize concurrent `git pull` invocations: flock auto-releases on exit.
+exec 9>.git/ai-brain-post-merge.lock
+if ! flock -n 9; then
+    echo "[ai-brain] skipping: another post-merge hook instance running"
+    exit 0
+fi
 echo -e "\\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜 ======\\033[0m"
 {chain}
 {end}
 """
 
 # post-checkout runs on every branch switch; keep it non-blocking by running
-# the heavy graph rebuild in a subshell in the background.  A PID-based lock
-# prevents concurrent / back-to-back branch switches from stacking graphify runs.
+# the heavy graph rebuild in a subshell in the background.  flock(1) provides
+# an atomic, TOCTOU-free lock — no PID files, no mkdir races, no trap cleanup.
 POST_CHECKOUT_TEMPLATE = """#!/bin/bash
 {begin}
 {marker_body}
 # 只在切換分支時觸發（引數 $3 為 1 代表切換分支，0 代表檢出單一檔案）
 if [ "$3" -eq 1 ]; then
     (
-        LOCK_DIR=".git/ai-brain-checkout.lock"
-        if [ -d "$LOCK_DIR" ]; then
-            PID_FILE="$LOCK_DIR/pid"
-            if [ -f "$PID_FILE" ]; then
-                OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
-                if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-                    exit 0
-                fi
-            fi
-            rm -rf "$LOCK_DIR"
+        LOCK_FILE=".git/ai-brain-checkout.lock"
+        exec 8>"$LOCK_FILE"
+        if ! flock -n 8; then
+            echo "[ai-brain] skipping: another post-checkout running"
+            exit 0
         fi
-        mkdir "$LOCK_DIR" 2>/dev/null || exit 0
-        echo $$ > "$LOCK_DIR/pid"
-        trap 'rm -rf "$LOCK_DIR"' EXIT
 
         echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：背景更新代碼架構圖譜 ======\\033[0m"
         {chain}

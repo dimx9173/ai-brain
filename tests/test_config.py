@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
+import threading
 from pathlib import Path
+from unittest.mock import patch
 
-from ai_brain.config import modify_json_file
+from ai_brain.config import _atomic_write_text, modify_json_file
 from ai_brain._testing import InTempDir
 
 
@@ -105,3 +109,56 @@ class TestTomlConfigManager(InTempDir):
         self.assertTrue(result)
         parsed = parse_toml(target.read_text())
         self.assertEqual(parsed, {"key": "value", "another": 42})
+
+
+class TestAtomicWriteText(InTempDir):
+    def test_no_leftover_tmp_after_write(self) -> None:
+        target = Path(self.tmpdir) / "cfg.json"
+        _atomic_write_text(target, '{"hello": "world"}')
+        leftovers = list(Path(self.tmpdir).glob(".*.tmp"))
+        self.assertEqual(leftovers, [])
+        self.assertEqual(target.read_text(), '{"hello": "world"}')
+
+    def test_preserves_file_permissions(self) -> None:
+        target = Path(self.tmpdir) / "cfg.json"
+        target.write_text("{}")
+        os.chmod(str(target), 0o644)
+        original_mode = stat.S_IMODE(os.stat(str(target)).st_mode)
+
+        _atomic_write_text(target, '{"updated": true}')
+
+        new_mode = stat.S_IMODE(os.stat(str(target)).st_mode)
+        self.assertEqual(new_mode, original_mode)
+
+    def test_cleans_up_tmp_on_failure(self) -> None:
+        target = Path(self.tmpdir) / "cfg.json"
+
+        with patch("os.replace", side_effect=PermissionError("denied during replace")):
+            with self.assertRaises(PermissionError):
+                _atomic_write_text(target, "content")
+
+        leftovers = list(Path(self.tmpdir).glob(".*.tmp"))
+        self.assertEqual(leftovers, [])
+
+    def test_concurrent_writes_produce_valid_json(self) -> None:
+        target = Path(self.tmpdir) / "concurrent.json"
+        target.write_text("{}")
+        errors = []
+        iterations = 50
+
+        def writer(i: int) -> None:
+            try:
+                for _ in range(iterations):
+                    modify_json_file(target, lambda d, i=i: {**d, f"t{i}": i})
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=writer, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(errors, [])
+        final = json.loads(target.read_text())
+        self.assertIsInstance(final, dict)

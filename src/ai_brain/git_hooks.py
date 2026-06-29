@@ -9,11 +9,19 @@ background subshell so branch switches stay fast.
 When a hook already exists (e.g. a user-installed hook), we append an
 ai-brain managed section between markers instead of overwriting the whole
 file.  `uninstall()` removes only those managed sections.
+
+All hook file writes use atomic replacement (tempfile + ``os.replace``)
+via :func:`config._atomic_write_text`, so a concurrent ``ai-brain init``
+from another terminal can never leave a hook half-written or destroy the
+user's original content.
 """
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
+from .config import _atomic_write_text
 from .constants import (
     HOOK_BEGIN_MARKER,
     HOOK_CHAIN,
@@ -23,12 +31,38 @@ from .constants import (
     POST_MERGE_TEMPLATE,
 )
 from .ui import print_red as red
+from .ui import print_yellow
 
 HOOK_NAMES = ("post-merge", "post-checkout")
 
 
 def _hooks_dir() -> Path:
     return Path(".git") / "hooks"
+
+
+def _detect_hooks_path_clash(proj: Path) -> str | None:
+    """Return custom core.hooksPath if it points away from .git/hooks, else None."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(proj), "config", "--get", "core.hooksPath"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    raw = r.stdout.strip()
+    if not raw:
+        return None
+    resolved = (
+        (proj / raw).resolve() if not os.path.isabs(raw) else Path(raw).resolve()
+    )
+    dotgit_hooks = (proj / ".git" / "hooks").resolve()
+    if resolved == dotgit_hooks:
+        return None
+    return raw
 
 
 def _render_hook(name: str, template: str) -> str:
@@ -90,6 +124,14 @@ def install(base_dir: Path = Path(".")) -> bool:
     if not git_dir.is_dir():
         return True
 
+    clash = _detect_hooks_path_clash(base_dir)
+    if clash is not None:
+        print_yellow(
+            f"[WARN] core.hooksPath is set to '{clash}' — Git will NOT run "
+            f"hooks in .git/hooks/. Either unset it or reconfigure husky/lefthook."
+        )
+        return False
+
     hooks_dir = git_dir / "hooks"
     try:
         hooks_dir.mkdir(parents=True, exist_ok=True)
@@ -109,7 +151,7 @@ def install(base_dir: Path = Path(".")) -> bool:
                 new_content = _inject_managed_section(existing, name, template)
             else:
                 new_content = _render_hook(name, template)
-            path.write_text(new_content, encoding="utf-8")
+            _atomic_write_text(path, new_content)
             path.chmod(0o755)
         except Exception as e:
             red(f"警告：寫入 {path.name} 失敗 ({e})")
@@ -141,7 +183,7 @@ def uninstall(base_dir: Path = Path(".")) -> bool:
                 pass
         elif cleaned != content:
             try:
-                hook.write_text(cleaned + "\n", encoding="utf-8")
+                _atomic_write_text(hook, cleaned + "\n")
                 hook.chmod(0o755)
             except Exception:
                 pass

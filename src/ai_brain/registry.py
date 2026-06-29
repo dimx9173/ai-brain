@@ -3,12 +3,21 @@
 Two plain text files under ~/.claude/ hold the active project list and the
 auto-archive whitelist. Both are line-delimited absolute paths; we use
 `set` semantics to keep dedup simple.
+
+All full-file writes go through :func:`_write_lines` which delegates to
+the atomic write helper in ``config._atomic_write_text`` (tempfile in the
+same directory + ``os.replace``).  :func:`register_current` additionally
+uses ``fcntl.flock`` to serialize the read-check-append sequence so that
+two concurrent ``ai-brain init`` calls never duplicate the same entry.
 """
 from __future__ import annotations
 
+import fcntl
+import os
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from .config import _atomic_write_text
 from .constants import AUTO_ARCHIVE_PATH, REGISTRY_PATH
 from .ui import print_green as green
 from .ui import print_red as red
@@ -29,9 +38,8 @@ def _read_lines(path: Path) -> List[str]:
 def _write_lines(path: Path, lines: Iterable[str]) -> bool:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            for line in lines:
-                f.write(line + "\n")
+        content = "".join(line + "\n" for line in lines)
+        _atomic_write_text(path, content)
         return True
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")
@@ -57,14 +65,30 @@ def current_project_path() -> str:
 
 
 def register_current() -> bool:
-    """Add the current directory to the active project list (idempotent)."""
+    """Add the current directory to the active project list (idempotent).
+
+    An exclusive ``fcntl.flock`` is held for the entire
+    read → check → append sequence so that two processes calling this
+    concurrently cannot both decide "not yet registered" and write a
+    duplicate entry.
+    """
     proj_path = current_project_path()
-    if proj_path in _read_lines(REGISTRY_PATH()):
+    reg_path = REGISTRY_PATH()
+    reg_path.parent.mkdir(parents=True, exist_ok=True)
+    reg_path.touch(exist_ok=True)
+
+    lock_fd = os.open(str(reg_path), os.O_RDONLY)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        if proj_path in _read_lines(reg_path):
+            return False
+        if _append_line(reg_path, proj_path):
+            green("--> 已將此專案註冊至 AI 大腦活躍清單中！")
+            return True
         return False
-    if _append_line(REGISTRY_PATH(), proj_path):
-        green("--> 已將此專案註冊至 AI 大腦活躍清單中！")
-        return True
-    return False
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
 
 
 def deregister_project(proj_path: str) -> bool:

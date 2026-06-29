@@ -1,17 +1,63 @@
-"""JSON config file read/merge/write utility.
+"""JSON / TOML config file read/merge/write utility.
 
-Most AI tooling stores settings as JSON; ai-brain touches ~7 such files. They
-all share the same needs: read → mutate → atomic write, with the option to
-silently recover from a malformed file (the cost of a corrupted IDE config is
-higher than the cost of resetting it).
+Most AI tooling stores settings as JSON or TOML; ai-brain touches ~7 such
+files.  They all share the same needs: read → mutate → atomic write, with
+the option to silently recover from a malformed file (the cost of a
+corrupted IDE config is higher than the cost of resetting it).
+
+All writes go through :func:`_atomic_write_text`, which writes to a
+temporary file in the same directory and then uses ``os.replace`` to
+swap it into place.  On POSIX (macOS / Linux) ``os.replace`` is atomic
+when source and destination live on the same filesystem, so readers
+never see a half-written file -- even if the writer crashes or is
+killed mid-write.
 """
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
 from .ui import print_red as red
+
+
+def _atomic_write_text(path: Path | str, content: str, *, encoding: str = "utf-8") -> None:
+    """Write *content* to *path* atomically via tempfile + ``os.replace``.
+
+    1. Creates a temp file in the **same directory** as *path* (so the
+       subsequent ``os.replace`` is guaranteed atomic -- both files are on
+       the same filesystem). Uses ``tempfile.mkstemp`` for a unique name so
+       concurrent writers don't collide on a fixed ``.tmp`` suffix.
+    2. Writes *content* to the temp file.
+    3. Copies the file-mode bits from the existing *path* (if any) so the
+       replacement keeps the original permission bits.
+    4. Calls ``os.replace`` to atomically swap the temp file into place.
+    5. On any failure the temp file is cleaned up and the exception propagates.
+    """
+    path = Path(path)
+    parent = path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+
+    fd, tmp_str = tempfile.mkstemp(
+        dir=str(parent),
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as f:
+            f.write(content)
+        if path.exists():
+            shutil.copymode(str(path), tmp_str)
+        os.replace(tmp_str, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp_str)
+        except OSError:
+            pass
+        raise
 
 
 def modify_json_file(
@@ -43,8 +89,8 @@ def modify_json_file(
     data = modifier_fn(data)
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        content = json.dumps(data, indent=2, ensure_ascii=False)
+        _atomic_write_text(path, content)
         return True
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")
@@ -185,7 +231,7 @@ def modify_toml_file(
 
     try:
         new_content = serialize_toml(data)
-        path.write_text(new_content, encoding="utf-8")
+        _atomic_write_text(path, new_content)
         return True
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")

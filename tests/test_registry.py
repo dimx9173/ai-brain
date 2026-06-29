@@ -1,6 +1,7 @@
 """Unit tests for the project registry + auto-archive whitelist."""
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -83,7 +84,7 @@ class TestRegistryErrorPaths(InTempDir):
 
     def test_write_lines_returns_false_on_open_error(self) -> None:
         target = Path(self.tmpdir) / "new_reg.txt"
-        with patch("builtins.open", side_effect=PermissionError("denied")):
+        with patch("tempfile.mkstemp", side_effect=PermissionError("denied")):
             result = registry._write_lines(target, ["data"])
         self.assertFalse(result)
 
@@ -123,3 +124,35 @@ class TestRegistryErrorPaths(InTempDir):
         registry.register_current()
         with patch("ai_brain.registry._write_lines", return_value=False):
             self.assertFalse(registry.archive_all_active())
+
+
+class TestRegisterCurrentConcurrent(InTempDir):
+    def test_concurrent_register_no_duplicates(self) -> None:
+        errors = []
+        barrier = threading.Barrier(10)
+
+        def register_once() -> None:
+            try:
+                barrier.wait(timeout=5)
+                registry.register_current()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=register_once) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(errors, [])
+        active = registry.list_active()
+        proj = registry.current_project_path()
+        count = active.count(proj)
+        self.assertEqual(count, 1, f"Expected 1 entry but found {count}: {active}")
+
+    def test_write_lines_is_atomic_no_leftover_tmp(self) -> None:
+        target = Path(self.tmpdir) / "nested" / "reg.txt"
+        registry._write_lines(target, ["/a", "/b"])
+        leftovers = list((target.parent).glob(".*.tmp"))
+        self.assertEqual(leftovers, [])
+        self.assertEqual(registry._read_lines(target), ["/a", "/b"])
