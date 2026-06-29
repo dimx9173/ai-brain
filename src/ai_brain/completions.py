@@ -24,14 +24,12 @@ Run `python3 -m ai_brain.completions show bash` to print a single script.
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import List
 
 # Reuse the single source of truth for subcommand names.
 from .cli import COMMANDS
-
 
 # --------------------------------------------------------------------------- #
 # Static tokens accepted as the `pattern` positional for include/exclude.

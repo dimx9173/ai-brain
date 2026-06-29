@@ -34,7 +34,7 @@ def modify_json_file(
     data: dict[str, Any] = {}
     if path.exists():
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
             red(f"警告：讀取 {path} 時發生 JSON 格式錯誤 ({e})，將會重置該檔案。")
@@ -75,7 +75,7 @@ def parse_toml(content: str) -> dict[str, Any]:
                     current_part += char
             if current_part:
                 parts.append(current_part.strip().strip('"'))
-            
+
             curr = data
             for part in parts:
                 curr = curr.setdefault(part, {})
@@ -137,7 +137,7 @@ def serialize_toml(data: dict[str, Any]) -> str:
     for k, v in sorted(data.items()):
         if not isinstance(v, dict):
             lines.append(f"{_escape_key(k)} = {_serialize_value(v)}")
-    
+
     def _write_tables(prefix: str, table: dict[str, Any]):
         for k, v in sorted(table.items()):
             if isinstance(v, dict):

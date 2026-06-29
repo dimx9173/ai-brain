@@ -28,8 +28,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from .ui import print_blue as blue, print_green as green, print_yellow as yellow
-
+from .ui import print_blue as blue
+from .ui import print_green as green
+from .ui import print_yellow as yellow
 
 # --- Locations -----------------------------------------------------------------
 

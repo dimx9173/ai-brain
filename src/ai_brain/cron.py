@@ -11,7 +11,10 @@ import subprocess
 from typing import List
 
 from .constants import CRON_CMD, CRON_SCHEDULE
-from .ui import print_blue as blue, print_green as green, print_red as red, print_yellow as yellow
+from .ui import print_blue as blue
+from .ui import print_green as green
+from .ui import print_red as red
+from .ui import print_yellow as yellow
 
 CRON_MARKER = "ai-brain stop"
 CRON_LINE = f"{CRON_SCHEDULE} {CRON_CMD}"

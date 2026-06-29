@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
+from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_REQUIRED_SERVERS
 from .ui import green, red, yellow
 
 PASS = "OK"
@@ -53,7 +53,7 @@ def check_mcp_config(
             from .config import parse_toml
             data = parse_toml(config_path.read_text(encoding="utf-8"))
         else:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 data = json.load(f)
     except Exception as e:
         fmt = "TOML" if config_path.suffix == ".toml" else "JSON"
@@ -215,7 +215,7 @@ def run_all_checks(paths) -> List[CheckResult]:
         for p in kilo_paths:
             # Kilo config has the same content but may nest under `mcp` instead of `mcpServers`.
             try:
-                with open(p, "r", encoding="utf-8") as f:
+                with open(p, encoding="utf-8") as f:
                     raw = json.load(f)
                 server_key = "mcpServers" if "mcpServers" in raw else "mcp"
             except Exception:
@@ -234,5 +234,21 @@ def run_all_checks(paths) -> List[CheckResult]:
 
     # 11. Codex
     results.append(check_mcp_config("Codex", paths.codex_toml, server_key="mcp_servers"))
+
+    # 12. OpenClaw MCP config (only check if openclaw CLI exists)
+    _oc_cmd = "openclaw"
+    _oc_found = shutil.which(_oc_cmd)
+    if not _oc_found:
+        _nvm_dir = HOME() / ".nvm" / "versions" / "node"
+        if _nvm_dir.is_dir():
+            for _root, _dirs, _files in os.walk(_nvm_dir):
+                if "openclaw" in _files:
+                    _oc_found = _root
+                    break
+    if _oc_found:
+        results.append(check_mcp_config("OpenClaw", paths.openclaw_config))
+    else:
+        results.append(CheckResult("檢查 OpenClaw MCP 記憶載入與內容正確性", INFO,
+                                   "(此環境未安裝 OpenClaw CLI，跳過檢查)"))
 
     return results

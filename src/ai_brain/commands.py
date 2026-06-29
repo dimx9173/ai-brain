@@ -14,17 +14,14 @@ import sys
 import time
 from pathlib import Path
 
-from . import git_hooks
-from . import registry
+from . import git_hooks, registry
 from .constants import (
     APP_EMOJI,
-    APP_NAME,
     CODEBASE_MEMORY_OUT_DIR,
-    CODEBASE_MEMORY_TOOLS,
     COGNITIVE_PRINCIPLES_BLOCK,
     COGNITIVE_PRINCIPLES_MARKER,
-    HOOKS_CONFIG,
     HOOK_BEGIN_MARKER,
+    HOOKS_CONFIG,
     LAST_SWEEP_FILE,
     LOCAL_CLAUDE_MD_TEMPLATE,
     LOCAL_CODEBASE_MEMORY_SKILL,
@@ -37,7 +34,6 @@ from .constants import (
 )
 from .mcp import deregister_all, register_all
 from .ui import blue, green, red, yellow
-
 
 # --- init / clean / full-init ---------------------------------------------------
 
@@ -182,7 +178,7 @@ def stop_day() -> bool:
 def check_status() -> bool:
     _ensure_codebase_memory_ignored()
     print(blue("====== 📊 專案 AI 大腦狀態檢查 ======"))
-    from .ui import GREEN, RED, YELLOW, NC
+    from .ui import GREEN, NC, RED
 
     def status_line(label: str, ok: bool, color_ok: str = GREEN, missing_msg: str = "未初始化") -> None:
         marker = f"{color_ok}已配置 (Active){NC}" if ok else f"{RED}{missing_msg}{NC}"
@@ -287,7 +283,7 @@ def manage_list() -> bool:
     return True
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     import os
-    
+
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
     if target:
@@ -321,11 +317,11 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         has_fcntl = True
     except ImportError:
         has_fcntl = False
-        
+
     def is_file_locked(filepath: Path) -> bool:
         if has_fcntl:
             try:
-                with open(filepath, "r") as f:
+                with open(filepath) as f:
                     try:
                         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         fcntl.flock(f, fcntl.LOCK_UN)
@@ -338,7 +334,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             try:
                 with open(filepath, "r+") as f:
                     return False
-            except IOError:
+            except OSError:
                 return True
 
     all_pass = True
@@ -348,7 +344,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     for proj in projects_to_check:
         prefix = f"  [{proj.name}] " if multiple else "  "
         ignores = _read_all_ignores(proj)
-        
+
         if ".codebase-memory" not in ignores:
             print(red(f"{prefix}[ FAIL ] gitignore 中未忽略 .codebase-memory/ 目錄"))
             if fix:
@@ -366,7 +362,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             if (proj / folder).is_dir() and folder not in ignores:
                 print(yellow(f"{prefix}[ WARN ] 偵測到本機存在 {folder}/ 但未在 gitignore 中排除。這可能會導致 MemPalace 索引耗時。"))
                 if fix:
-                    _append_to_global_gitignore(folder, f"auto-excluded heavy/noisy directory")
+                    _append_to_global_gitignore(folder, "auto-excluded heavy/noisy directory")
                     print(green(f"{prefix}  [ FIXED ] 已自動將 {folder}/ 加入全域 gitignore"))
 
     print()
@@ -381,7 +377,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                 yaml_content = my_yaml.read_text(encoding="utf-8")
             except Exception:
                 yaml_content = ""
-            
+
             if "codebase_memory" in yaml_content or ".codebase-memory" in yaml_content:
                 print(red(f"{prefix}[ FAIL ] mempalace.yaml 中仍包含已廢棄之 codebase_memory 房間"))
                 if fix:
@@ -420,7 +416,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     if locks_dir.is_dir():
         for lock_file in locks_dir.glob("*.lock"):
             active = is_file_locked(lock_file)
-            
+
             if not active:
                 if fix:
                     try:
@@ -428,7 +424,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     except Exception:
                         pass
                 continue
-                
+
             pid = None
             cmd = ""
             content = ""
@@ -436,14 +432,14 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                 content = lock_file.read_text(encoding="utf-8").strip()
             except Exception:
                 pass
-                
+
             if content:
                 parts = content.split(maxsplit=1)
                 if parts and parts[0].isdigit():
                     pid = int(parts[0])
                     if len(parts) > 1:
                         cmd = parts[1]
-            
+
             if pid:
                 try:
                     os.kill(pid, 0)
@@ -490,7 +486,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         num = "".join(filter(str.isdigit, parts[1]))
                         if num:
                             missing = int(num)
-            
+
             if gitignored > 0 or missing > 0:
                 print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
                 if fix:
@@ -531,12 +527,13 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
             else:
                 all_pass = False
-    
+
     print()
 
     # 6. Check MCP verifies (Global Check - run once)
     print(blue("6. 檢查 IDE MCP 大腦配置與伺服器載入..."))
-    from .verifier import run_all_checks, PASS as VERIFY_PASS, FAIL as VERIFY_FAIL
+    from .verifier import FAIL as VERIFY_FAIL
+    from .verifier import run_all_checks
     mcp_results = run_all_checks(paths)
     mcp_failures = 0
     for r in mcp_results:
@@ -545,10 +542,28 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             print(red(f"  [ FAIL ] {r.name}: {r.detail}"))
         else:
             print(green(f"  [ PASS ] {r.name}{' ' + r.detail if r.detail else ''}"))
-            
+
     if mcp_failures > 0:
         print(red(f"  [ FAIL ] 共有 {mcp_failures} 項 MCP 配置錯誤"))
         if fix:
+            try:
+                import shutil as _shutil
+                _oc_cmd = "openclaw"
+                _oc_found = _shutil.which(_oc_cmd)
+                if not _oc_found:
+                    _nvm_dir = Path.home() / ".nvm" / "versions" / "node"
+                    if _nvm_dir.is_dir():
+                        for _root, _dirs, _files in os.walk(_nvm_dir):
+                            if "openclaw" in _files:
+                                _oc_found = _root
+                                break
+                if _oc_found:
+                    _oc_dir = paths.openclaw_config.parent
+                    if not _oc_dir.is_dir():
+                        _oc_dir.mkdir(parents=True, exist_ok=True)
+                        print(yellow(f"    --> 偵測到 OpenClaw 已安裝，建立配置目錄: {_oc_dir}"))
+            except Exception:
+                pass
             print(yellow("    --> 正在重新註冊所有 MCP 服務..."))
             try:
                 from .mcp import register_all
@@ -577,7 +592,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                 hook_file = hooks_dir / name
                 installed = False
                 up_to_date = False
-                
+
                 if hook_file.is_file():
                     try:
                         content = hook_file.read_text(encoding="utf-8")
@@ -588,7 +603,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                                 up_to_date = True
                     except Exception:
                         pass
-                
+
                 if not installed:
                     hooks_ok = False
                     print(red(f"{prefix}[ FAIL ] Git Hook '{name}' 未安裝"))
@@ -597,7 +612,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(yellow(f"{prefix}[ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未啟用速度優化 --fast)"))
                 else:
                     print(green(f"{prefix}[ PASS ] Git Hook '{name}' 已安裝且啟用速度優化"))
-                    
+
             if not hooks_ok:
                 if fix:
                     print(yellow(f"{prefix}  --> 正在重新安裝/更新 Git Hooks..."))
@@ -616,18 +631,54 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     rules_ok = True
     freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
 
+    def _strip_graphify_lines(content: str) -> tuple[str, bool]:
+        """Remove lines referencing graphify. Returns (new_content, was_changed)."""
+        new_lines = []
+        skip_block = False
+        changed = False
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("## ") and "graphify" in stripped.lower():
+                skip_block = True
+                changed = True
+                continue
+            if skip_block and (stripped.startswith("## ") or stripped.startswith("# ")):
+                skip_block = False
+            if skip_block:
+                changed = True
+                continue
+            if "graphify" in line.lower() and not any(t in line for t in ("codebase-memory-mcp", "graph tools")):
+                changed = True
+                continue
+            new_lines.append(line)
+        while new_lines and not new_lines[-1].strip():
+            new_lines.pop()
+        return "\n".join(new_lines) + "\n" if new_lines else "", changed
+
     def _fix_claude_md(label: str, md_path: Path) -> bool:
         """Return True if file is OK (or was fixed), False if needs user action."""
         try:
             content = md_path.read_text(encoding="utf-8")
         except Exception:
-            return True  # unreadable — skip silently
+            return True
 
-        if COGNITIVE_PRINCIPLES_MARKER in content and freshness_marker in content:
+        has_marker = COGNITIVE_PRINCIPLES_MARKER in content
+        has_freshness = freshness_marker in content
+
+        if has_marker and has_freshness:
+            stripped, had_graphify = _strip_graphify_lines(content)
+            if had_graphify:
+                print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 殘留內容（認知規則已是最新）"))
+                if fix:
+                    md_path.write_text(stripped, encoding="utf-8")
+                    print(green(f"    [ FIXED ] 已清除 {label} 中的 graphify 殘留"))
+                    content = stripped
+                else:
+                    return False
             print(green(f"  [ PASS ] {label} 工具規則為最新版本"))
             return True
 
-        if COGNITIVE_PRINCIPLES_MARKER in content:
+        if has_marker:
             # Stale block — update it
             print(yellow(f"  [ WARN ] {label} 工具規則版本過舊"))
             if fix:
@@ -646,7 +697,9 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                                 new_lines.append(line)
                         else:
                             new_lines.append(line)
-                    md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+                    updated = "\n".join(new_lines) + "\n"
+                    updated, _ = _strip_graphify_lines(updated)
+                    md_path.write_text(updated, encoding="utf-8")
                     print(green(f"    [ FIXED ] 已更新 {label} 至最新工具規則版本"))
                     return True
                 except Exception as e:
@@ -694,6 +747,63 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         all_pass = False
 
     print()
+
+    # 9. Scan for legacy graphify artifacts
+    print(blue("9. 掃描舊有 graphify 遺留物..."))
+    _GRAPHIFY_PATHS_TO_CHECK = (
+        ".cursor/rules/graphify.mdc",
+        ".claude/skills/graphify",
+        ".kilo/command/graphify.md",
+    )
+
+    for proj in projects_to_check:
+        prefix = f"  [{proj.name}] " if multiple else "  "
+
+        graphify_dir = proj / "graphify-out"
+        if graphify_dir.is_dir():
+            is_empty = not any(graphify_dir.iterdir())
+            if is_empty:
+                print(red(f"{prefix}[ FAIL ] 偵測到空的 graphify-out/ 目錄殘留"))
+                if fix:
+                    shutil.rmtree(graphify_dir, ignore_errors=True)
+                    print(green(f"{prefix}  [ FIXED ] 已移除空的 graphify-out/ 目錄"))
+
+        for rel_path in _GRAPHIFY_PATHS_TO_CHECK:
+            artifact = proj / rel_path
+            if artifact.is_file() or artifact.is_dir():
+                is_graphify_artifact = artifact.is_dir()
+                if not is_graphify_artifact:
+                    try:
+                        txt = artifact.read_text(encoding="utf-8", errors="ignore")
+                        is_graphify_artifact = (
+                            "graphify" in txt.lower()
+                            and "codebase-memory-mcp" not in txt.lower()
+                        )
+                    except Exception:
+                        pass
+
+                if is_graphify_artifact:
+                    print(red(f"{prefix}[ FAIL ] 偵測到舊有 graphify 配置: {rel_path}"))
+                    if fix:
+                        try:
+                            if artifact.is_dir():
+                                shutil.rmtree(artifact)
+                            else:
+                                artifact.unlink()
+                            print(green(f"{prefix}  [ FIXED ] 已移除 {rel_path}"))
+                        except Exception as e:
+                            print(red(f"{prefix}  [ ERROR ] 移除 {rel_path} 失敗 ({e})"))
+                            all_pass = False
+
+    if not any(
+        (proj / "graphify-out").is_dir() or any(
+            (proj / p).exists() for p in _GRAPHIFY_PATHS_TO_CHECK
+        )
+        for proj in projects_to_check
+    ):
+        print(green("  [ PASS ] 無 graphify 遺留物"))
+
+    print()
     print(blue("====== 🏁 診斷結束 ======"))
 
     if all_pass:
@@ -713,7 +823,7 @@ def _global_gitignore_path() -> Path:
     import os
     real_home = Path(os.path.expanduser("~")).resolve()
     stubbed = Path.home().resolve() != real_home
-    
+
     if not stubbed:
         try:
             res = subprocess.run(
@@ -1012,7 +1122,7 @@ def find_claude_folder_by_path(proj_path: str) -> Path | None:
 def _print_archive_status() -> None:
     print(blue("====== 🗂️ 全域自動記憶歸檔狀態清單 ======"))
     print("目前註冊的專案與其自動歸檔狀態：\n")
-    from .ui import GREEN, RED, NC
+    from .ui import GREEN, NC, RED
     enabled = set(registry.list_archived())
     for i, proj_path in enumerate(registry.list_active(), 1):
         base = Path(proj_path).name
@@ -1022,7 +1132,8 @@ def _print_archive_status() -> None:
             print(f"  [{i}] {RED}[ 預設不歸檔 (Inactive) ]{NC} {base} ({proj_path})")
     print()
     print(yellow("用法提示:"))
-    from .ui import GREEN as G, NC as RST
+    from .ui import GREEN as G
+    from .ui import NC as RST
     print(f"  啟用當前專案自動歸檔: {G}ai-brain include{RST}")
     print(f"  停用當前專案自動歸檔: {G}ai-brain exclude current{RST} 或 {G}ai-brain exclude .{RST}")
     print(f"  啟用指定專案自動歸檔: {G}ai-brain include [專案關鍵字|編號|all]{RST}")

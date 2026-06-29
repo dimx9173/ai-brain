@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from .constants import AUTO_ARCHIVE_PATH, REGISTRY_PATH
-from .ui import print_green as green, print_red as red, print_yellow as yellow
-
+from .ui import print_green as green
+from .ui import print_red as red
+from .ui import print_yellow as yellow
 
 # --- File helpers ---------------------------------------------------------------
 
@@ -19,7 +20,7 @@ def _read_lines(path: Path) -> List[str]:
     if not path.is_file():
         return []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
     except Exception:
         return []

@@ -283,7 +283,8 @@ def print_summary(outcomes: list[UpgradeOutcome], self_version: str) -> None:
     Imported lazily by installer.update() so we don't have a circular import
     with `ui`. Pure stdout — no exceptions raised.
     """
-    from .ui import print_blue as blue, print_green as green, print_red as red
+    from .ui import print_blue as blue
+    from .ui import print_green as green
 
     print()
     blue("====== 📦 安裝完成！以下是所有套件目前版本 ======")

@@ -19,8 +19,7 @@ from .constants import (
     MCP_MEMPALACE,
     TOOL_MEMPALACE_MCP,
 )
-from .ui import print_blue as blue, print_green as green
-
+from .ui import print_blue as blue
 
 # --- Server descriptors ---------------------------------------------------------
 # Each descriptor produces the IDE-specific entry for an MCP server. Keeping the
@@ -146,6 +145,23 @@ def _codex_entry(server: str) -> dict[str, Any]:
     raise ValueError(f"Unknown MCP server: {server}")
 
 
+def _openclaw_entry(server: str) -> dict[str, Any]:
+    """OpenClaw uses mcpServers key with local type and array command."""
+    if server == MCP_MEMPALACE:
+        return {
+            "type": "local",
+            "command": [str(GLOBAL_MEMPALACE_MCP())],
+            "enabled": True,
+        }
+    if server == MCP_CODEBASE_MEMORY:
+        return {
+            "type": "local",
+            "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
+            "enabled": True,
+        }
+    raise ValueError(f"Unknown MCP server: {server}")
+
+
 # --- Target declarations --------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -182,6 +198,8 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("Codex", paths.codex_toml, "mcp_servers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _codex_entry),
+        RegistrationTarget("OpenClaw", paths.openclaw_config, "mcpServers",
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _openclaw_entry),
     ]
 
 

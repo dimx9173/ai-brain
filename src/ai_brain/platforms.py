@@ -28,6 +28,7 @@ class ToolPaths:
     opencode_json: Path
     cursor_json: Path
     codex_toml: Path
+    openclaw_config: Path
 
 
 def get_paths() -> ToolPaths:
@@ -64,6 +65,7 @@ def get_paths() -> ToolPaths:
         opencode_json=HOME() / ".config" / "opencode" / "opencode.json",
         cursor_json=HOME() / ".cursor" / "mcp.json",
         codex_toml=HOME() / ".codex" / "config.toml",
+        openclaw_config=HOME() / ".openclaw" / "config.json",
     )
 
 

@@ -22,7 +22,10 @@ from .constants import (
     INSTALL_SOURCE_REGISTRY,
     VERSION,
 )
-from .ui import print_blue as blue, print_green as green, print_red as red, print_yellow as yellow
+from .ui import print_blue as blue
+from .ui import print_green as green
+from .ui import print_red as red
+from .ui import print_yellow as yellow
 from .upgraders import print_summary, upgrade_all
 
 
@@ -34,7 +37,7 @@ import sys
 from pathlib import Path
 
 # Add source directory to path
-sys.path.insert(0, {repr(str(src_dir))})
+sys.path.insert(0, {str(src_dir)!r})
 
 from ai_brain.cli import main
 if __name__ == "__main__":

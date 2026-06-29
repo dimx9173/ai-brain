@@ -48,7 +48,7 @@ class InTempDir(unittest.TestCase):
     each access, so the stub is picked up automatically.
     """
 
-    def setUp(self) -> None:  # noqa: D401 — unittest hook
+    def setUp(self) -> None:
         self._orig_cwd = os.getcwd()
         self._orig_home = Path.home
         self.tmpdir = tempfile.mkdtemp(prefix="ai-brain-test-")
@@ -56,6 +56,6 @@ class InTempDir(unittest.TestCase):
         Path.home = lambda: Path(self.tmpdir)  # type: ignore[assignment]
         (Path(self.tmpdir) / ".claude").mkdir(exist_ok=True)
 
-    def tearDown(self) -> None:  # noqa: D401
+    def tearDown(self) -> None:
         os.chdir(self._orig_cwd)
         Path.home = self._orig_home  # type: ignore[assignment]

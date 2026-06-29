@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from ai_brain import registry
 from ai_brain._testing import InTempDir
@@ -70,3 +71,55 @@ class TestRegistry(InTempDir):
         self.assertTrue(registry.deregister_all_projects())
         self.assertEqual(len(registry.list_active()), 0)
         self.assertEqual(len(registry.list_archived()), 0)
+
+
+class TestRegistryErrorPaths(InTempDir):
+    def test_read_lines_returns_empty_on_open_error(self) -> None:
+        tmp = Path(self.tmpdir) / "registry.txt"
+        tmp.write_text("data\n", encoding="utf-8")
+        with patch("builtins.open", side_effect=PermissionError("denied")):
+            result = registry._read_lines(tmp)
+        self.assertEqual(result, [])
+
+    def test_write_lines_returns_false_on_open_error(self) -> None:
+        target = Path(self.tmpdir) / "new_reg.txt"
+        with patch("builtins.open", side_effect=PermissionError("denied")):
+            result = registry._write_lines(target, ["data"])
+        self.assertFalse(result)
+
+    def test_append_line_returns_false_on_open_error(self) -> None:
+        target = Path(self.tmpdir) / "new_reg.txt"
+        with patch("builtins.open", side_effect=PermissionError("denied")):
+            result = registry._append_line(target, "data")
+        self.assertFalse(result)
+
+    def test_register_current_append_failure_returns_false(self) -> None:
+        with patch("ai_brain.registry._append_line", return_value=False):
+            self.assertFalse(registry.register_current())
+
+    def test_deregister_all_projects_write_failure(self) -> None:
+        registry.register_current()
+        with patch("ai_brain.registry._write_lines", return_value=False):
+            self.assertFalse(registry.deregister_all_projects())
+
+    def test_enable_archive_append_failure_returns_false(self) -> None:
+        with patch("ai_brain.registry._append_line", return_value=False):
+            self.assertFalse(registry.enable_archive("/some/path"))
+
+    def test_disable_archive_not_in_list_returns_true(self) -> None:
+        self.assertTrue(registry.disable_archive("/not/registered"))
+
+    def test_disable_archive_write_failure_returns_false(self) -> None:
+        proj = registry.current_project_path()
+        registry.enable_archive(proj)
+        with patch("ai_brain.registry._write_lines", return_value=False):
+            self.assertFalse(registry.disable_archive(proj))
+
+    def test_clear_archive_write_failure_returns_false(self) -> None:
+        with patch("ai_brain.registry._write_lines", return_value=False):
+            self.assertFalse(registry.clear_archive())
+
+    def test_archive_all_active_write_failure_returns_false(self) -> None:
+        registry.register_current()
+        with patch("ai_brain.registry._write_lines", return_value=False):
+            self.assertFalse(registry.archive_all_active())
