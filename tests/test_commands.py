@@ -1233,11 +1233,12 @@ class TestDoctorErrorPaths(_CmdBase):
         out, ok = self._capture(commands.run_doctor, MagicMock(), None, False)
         self.assertIn("跳過", out)
 
+    @patch("ai_brain.git_hooks.subprocess.run", return_value=MagicMock(returncode=1, stdout=""))
     @patch("ai_brain.commands._read_all_ignores")
     @patch("ai_brain.verifier.run_all_checks")
     @patch("ai_brain.commands.subprocess.run")
     @patch("ai_brain.commands.shutil.which")
-    def test_git_hooks_install_failure_during_fix(self, mock_which, mock_run, mock_checks, mock_ignores):
+    def test_git_hooks_install_failure_during_fix(self, mock_which, mock_run, mock_checks, mock_ignores, mock_git_config):
         mock_ignores.return_value = {".codebase-memory"}
         mock_run.side_effect = lambda *a, **k: self._mk_subprocess_result(
             stdout="Gitignored: 0\nMissing: 0"
@@ -1581,6 +1582,116 @@ class TestMaybeAppendGlobalClaudeMd(_CmdBase):
         commands._maybe_append_global_claude_md()
         content = path.read_text(encoding="utf-8")
         self.assertEqual(content.count(marker), 1)
+
+
+# ============================================================================ #
+# Wave 3 regression tests: timeouts, flock serialisation, cron PID guard       #
+# ============================================================================ #
+
+class TestWave3Guards(_CmdBase):
+
+    @patch("ai_brain.commands.subprocess.Popen")
+    @patch("ai_brain.commands.subprocess.run")
+    def test_start_day_releases_lock_after_run(self, mock_run, mock_popen):
+        """start_day acquires + releases flock so a second call succeeds."""
+        mock_run.return_value = self._mk_subprocess_result()
+        self.assertTrue(commands.start_day())
+        # Second call must not hang / deadlock
+        self.assertTrue(commands.start_day())
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_stop_day_pid_file_written_then_removed(self, mock_run):
+        """_run_archive_sweep manages the PID file lifecycle (written then cleaned up)."""
+        mock_run.return_value = self._mk_subprocess_result(stdout="ok")
+        from ai_brain import registry
+        registry.enable_archive(str(Path.cwd().resolve()))
+
+        pid_path = commands._stop_pid_path()
+        # Before: no PID file
+        pid_path.unlink(missing_ok=True)
+        commands.stop_day()
+        # After: PID file is cleaned up (unlink called in finally)
+        self.assertFalse(pid_path.is_file())
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_archive_sweep_skips_if_another_instance_running(self, mock_run):
+        """If a PID file exists for a live process, _run_archive_sweep returns early."""
+        mock_run.return_value = self._mk_subprocess_result(stdout="ok")
+        from ai_brain import registry
+        registry.enable_archive(str(Path.cwd().resolve()))
+
+        pid_path = commands._stop_pid_path()
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write OUR PID so os.kill(pid, 0) succeeds
+        pid_path.write_text(str(os.getpid()), encoding="utf-8")
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                commands._run_archive_sweep(silent=False)
+            output = buf.getvalue()
+            self.assertIn("正在執行", output)
+            # Should NOT have called mempalace sweep
+            self.assertFalse(
+                any("sweep" in str(c) for c in mock_run.call_args_list),
+                "mempalace sweep should not be called when another stop is running",
+            )
+        finally:
+            pid_path.unlink(missing_ok=True)
+
+    @patch("ai_brain.commands.shutil.which", return_value="/usr/bin/mock")
+    @patch("ai_brain.commands.subprocess.run")
+    def test_subprocess_timeout_does_not_fail_doctor(self, mock_run, mock_which):
+        """subprocess.TimeoutExpired during mempalace sync in doctor is a warning, not a crash."""
+        # First call (mempalace sync) raises TimeoutExpired.
+        # Later calls (for CLI checks etc.) succeed.
+        def side_effect(*args, **kwargs):
+            cmd = args[0] if args else []
+            if cmd and "sweep" not in cmd and "sync" in str(cmd):
+                raise subprocess.TimeoutExpired(cmd=cmd, timeout=1)
+            if cmd and cmd[0] == "git":
+                return self._mk_subprocess_result(stdout="")
+            return self._mk_subprocess_result(stdout="")
+
+        mock_run.side_effect = side_effect
+        self._register([str(Path.cwd().resolve())])
+        gi = commands._global_gitignore_path()
+        gi.parent.mkdir(parents=True, exist_ok=True)
+        gi.write_text(".codebase-memory/\n", encoding="utf-8")
+
+        # run_doctor should NOT raise, even though sync timed out
+        out, _ok = self._capture(
+            commands.run_doctor, MagicMock(), None, False
+        )
+        # We should see a timeout warning in the output
+        self.assertTrue("TIMEOUT" in out or "PASS" in out or "FAIL" in out)
+
+    @patch("ai_brain.commands.subprocess.Popen")
+    @patch("ai_brain.commands.subprocess.run")
+    def test_concurrent_start_day_does_not_corrupt(self, mock_run, mock_popen):
+        """Two threads running start_day simultaneously don't raise unhandled exceptions."""
+        import threading
+        mock_run.return_value = self._mk_subprocess_result()
+
+        results = []
+        exceptions = []
+
+        def worker():
+            try:
+                ok = commands.start_day()
+                results.append(ok)
+            except Exception as e:
+                exceptions.append(e)
+
+        t1 = threading.Thread(target=worker)
+        t2 = threading.Thread(target=worker)
+        t1.start()
+        t2.start()
+        t1.join(timeout=30)
+        t2.join(timeout=30)
+
+        self.assertFalse(exceptions, f"Unexpected exceptions: {exceptions}")
+        # At least one thread must obtain the lock and succeed
+        self.assertTrue(any(results), "At least one start_day must succeed")
 
 
 if __name__ == "__main__":

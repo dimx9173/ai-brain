@@ -8,6 +8,7 @@ logic.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,89 @@ from .constants import (
 )
 from .mcp import deregister_all, register_all
 from .ui import blue, green, red, yellow
+
+# --- Global serialisation lock --------------------------------------------------
+
+# Re-entrance tracking: if the current thread already holds the lock, subsequent
+# _acquire_brain_lock() calls from within the same thread return the same fd
+# without re-issuing flock (which would deadlock via LOCK_NB).
+# We use RLock so that the same thread can re-enter _acquire_brain_lock safely.
+import threading as _thr
+_lock_re = _thr.RLock()
+_lock_state = {"depth": 0, "fd": None}
+
+
+def _acquire_brain_lock() -> int | None:
+    """Acquire exclusive flock on ~/.claude/ai_brain.lock. Returns fd on success, None on failure.
+    Re-entrant: if the current thread already holds the lock, returns the existing fd."""
+    import fcntl
+    with _lock_re:
+        if _lock_state["depth"] > 0:
+            _lock_state["depth"] += 1
+            return _lock_state["fd"]
+
+        lock_path = Path.home() / ".claude" / "ai_brain.lock"
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        try:
+            fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o644)
+        except OSError as e:
+            print(yellow(f"[ WARN ] 無法建立全域鎖檔 ({e})，跳過序列化"))
+            return None
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _lock_state["depth"] = 1
+            _lock_state["fd"] = fd
+            return fd
+        except (BlockingIOError, OSError):
+            os.close(fd)
+            return None
+
+
+def _release_brain_lock(fd: int | None) -> None:
+    """Release flock and close fd. No-op if fd is None.
+    Re-entrant: decrements depth; only actually unlocks when depth hits 0."""
+    if fd is None:
+        return
+    import fcntl
+    with _lock_re:
+        if _lock_state["depth"] > 1:
+            _lock_state["depth"] -= 1
+            return
+        _lock_state["depth"] = 0
+        _lock_state["fd"] = None
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+        except OSError:
+            pass
+
+
+# --- Cron collision guard -------------------------------------------------------
+
+def _stop_pid_path() -> Path:
+    return Path.home() / ".claude" / "ai_brain_stop.pid"
+
+
+def _another_stop_running() -> bool:
+    pid_path = _stop_pid_path()
+    if not pid_path.is_file():
+        return False
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+    except (ValueError, OSError):
+        pid_path.unlink(missing_ok=True)
+        return False
+    # Check if process is alive
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        pid_path.unlink(missing_ok=True)
+        return False
+    return True
+
 
 # --- init / clean / full-init ---------------------------------------------------
 
@@ -146,33 +230,55 @@ def uninstall_all(paths) -> bool:
 
 def start_day(fast: bool = False) -> bool:
     """Morning routine: kick off a background sweep if stale, then refresh graph."""
-    _ensure_codebase_memory_ignored()
-    if _should_run_background_sweep():
-        print(yellow("--> 偵測到大於 12 小時未進行對話歸檔，正在背景自動沉澱昨日對話記憶..."))
-        try:
-            subprocess.Popen(
-                [sys.executable, str(Path(__file__).resolve()), "stop"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception as e:
-            print(red(f"警告：背景歸檔啟動失敗 ({e})"))
-
-    print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
-    if not _run_codebase_memory_index():
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(yellow("[ WARN ] 另一個 ai-brain 正在執行，跳過 start_day"))
         return False
-    print(green("✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。"))
-    return True
+    try:
+        _ensure_codebase_memory_ignored()
+        if _should_run_background_sweep():
+            print(yellow("--> 偵測到大於 12 小時未進行對話歸檔，正在背景自動沉澱昨日對話記憶..."))
+            proc = None
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "stop"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                print(red(f"警告：背景歸檔啟動失敗 ({e})"))
+            else:
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+                except Exception:
+                    pass
+
+        print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
+        if not _run_codebase_memory_index():
+            return False
+        print(green("✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。"))
+        return True
+    finally:
+        _release_brain_lock(lock_fd)
 
 
 def stop_day() -> bool:
     """Evening routine: archive today's conversations to the long-term palace."""
-    print(blue("====== 🌇 下班收尾：記憶封存與去衝突歸檔 ======"))
-    print(yellow("正在掃描今日所有工具產生的對話歷史，並安全打包存入長期記憶宮殿..."))
-    _run_archive_sweep(silent=False)
-    _record_sweep_timestamp()
-    print(green("✅ 長期記憶歸檔完成！無死鎖風險，您可以安全關閉所有終端機。"))
-    return True
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(yellow("[ WARN ] 另一個 ai-brain 正在執行，跳過 stop_day"))
+        return False
+    try:
+        print(blue("====== 🌇 下班收尾：記憶封存與去衝突歸檔 ======"))
+        print(yellow("正在掃描今日所有工具產生的對話歷史，並安全打包存入長期記憶宮殿..."))
+        _run_archive_sweep(silent=False)
+        _record_sweep_timestamp()
+        print(green("✅ 長期記憶歸檔完成！無死鎖風險，您可以安全關閉所有終端機。"))
+        return True
+    finally:
+        _release_brain_lock(lock_fd)
 
 
 def check_status() -> bool:
@@ -189,8 +295,13 @@ def check_status() -> bool:
 
     proj_name = str(Path.cwd().resolve()).replace("/", "-").replace("_", "-").lower().strip("-")
     try:
-        res = subprocess.run(["codebase-memory-mcp", "cli", "list_projects"], capture_output=True, text=True)
+        res = subprocess.run(
+            ["codebase-memory-mcp", "cli", "list_projects"],
+            capture_output=True, text=True, timeout=30,
+        )
         codebase_memory_ok = proj_name in res.stdout.lower() or "active" in res.stdout.lower()
+    except subprocess.TimeoutExpired:
+        codebase_memory_ok = False
     except Exception:
         codebase_memory_ok = False
     status_line("Codebase-Memory 地圖", codebase_memory_ok, color_ok=GREEN,
@@ -282,8 +393,6 @@ def manage_list() -> bool:
     _print_archive_status()
     return True
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
-    import os
-
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
     if target:
@@ -467,44 +576,61 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     # 4. Check stale drawers in mempalace (sync check)
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
-    for proj in projects_to_check:
-        prefix = f"  [{proj.name}] " if multiple else "  "
+    doctor_lock_fd = _acquire_brain_lock()
+    if doctor_lock_fd is None:
+        print(yellow("  [ WARN ] 無法取得全域鎖檔，跳過步驟 4（另一個 ai-brain 正在執行）"))
+    else:
         try:
-            res = subprocess.run([TOOL_MEMPALACE, "sync", str(proj)], capture_output=True, text=True)
-            gitignored = 0
-            missing = 0
-            for line in res.stdout.splitlines():
-                if "Gitignored:" in line:
-                    parts = line.split(":")
-                    if len(parts) > 1:
-                        num = "".join(filter(str.isdigit, parts[1]))
-                        if num:
-                            gitignored = int(num)
-                elif "Missing:" in line:
-                    parts = line.split(":")
-                    if len(parts) > 1:
-                        num = "".join(filter(str.isdigit, parts[1]))
-                        if num:
-                            missing = int(num)
+            for proj in projects_to_check:
+                prefix = f"  [{proj.name}] " if multiple else "  "
+                try:
+                    res = subprocess.run(
+                        [TOOL_MEMPALACE, "sync", str(proj)],
+                        capture_output=True, text=True, timeout=120,
+                    )
+                    gitignored = 0
+                    missing = 0
+                    for line in res.stdout.splitlines():
+                        if "Gitignored:" in line:
+                            parts = line.split(":")
+                            if len(parts) > 1:
+                                num = "".join(filter(str.isdigit, parts[1]))
+                                if num:
+                                    gitignored = int(num)
+                        elif "Missing:" in line:
+                            parts = line.split(":")
+                            if len(parts) > 1:
+                                num = "".join(filter(str.isdigit, parts[1]))
+                                if num:
+                                    missing = int(num)
 
-            if gitignored > 0 or missing > 0:
-                print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
-                if fix:
-                    print(yellow(f"{prefix}  --> 正在自動執行 mempalace sync --apply {proj} 清理記憶庫..."))
-                    try:
-                        subprocess.run([TOOL_MEMPALACE, "sync", "--apply", str(proj)], check=True)
-                        print(green(f"{prefix}  [ FIXED ] 記憶庫清理完成！"))
-                    except Exception as e:
-                        print(red(f"{prefix}  [ ERROR ] 記憶庫清理失敗 ({e})"))
-                        all_pass = False
-                else:
-                    all_pass = False
-            else:
-                print(green(f"{prefix}[ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
-        except FileNotFoundError:
-            print(yellow(f"{prefix}[ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
-        except Exception as e:
-            print(red(f"{prefix}[ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
+                    if gitignored > 0 or missing > 0:
+                        print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
+                        if fix:
+                            print(yellow(f"{prefix}  --> 正在自動執行 mempalace sync --apply {proj} 清理記憶庫..."))
+                            try:
+                                subprocess.run(
+                                    [TOOL_MEMPALACE, "sync", "--apply", str(proj)],
+                                    check=True, timeout=120,
+                                )
+                                print(green(f"{prefix}  [ FIXED ] 記憶庫清理完成！"))
+                            except subprocess.TimeoutExpired:
+                                print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync --apply 已逾時 (>120s)，繼續處理其他專案"))
+                            except Exception as e:
+                                print(red(f"{prefix}  [ ERROR ] 記憶庫清理失敗 ({e})"))
+                                all_pass = False
+                        else:
+                            all_pass = False
+                    else:
+                        print(green(f"{prefix}[ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
+                except subprocess.TimeoutExpired:
+                    print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync 已逾時 (>120s)，繼續處理其他專案"))
+                except FileNotFoundError:
+                    print(yellow(f"{prefix}[ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
+                except Exception as e:
+                    print(red(f"{prefix}[ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
+        finally:
+            _release_brain_lock(doctor_lock_fd)
 
     print()
 
@@ -520,9 +646,14 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             if fix:
                 print(yellow(f"    --> 正在嘗試自動安裝 {pkg}..."))
                 try:
-                    subprocess.run(["uv", "tool", "install", pkg, "--force"], check=True)
+                    subprocess.run(
+                        ["uv", "tool", "install", pkg, "--force"],
+                        check=True, timeout=300,
+                    )
                     print(green(f"    [ FIXED ] 已自動安裝 {pkg}！"))
                     cli_ok = True
+                except subprocess.TimeoutExpired:
+                    print(yellow(f"    [ TIMEOUT ] uv tool install {pkg} 已逾時 (>300s)"))
                 except Exception as e:
                     print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
             else:
@@ -943,7 +1074,6 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 # --- Internal helpers -----------------------------------------------------------
 
 def _global_gitignore_path() -> Path:
-    import os
     real_home = Path(os.path.expanduser("~")).resolve()
     stubbed = Path.home().resolve() != real_home
 
@@ -953,6 +1083,7 @@ def _global_gitignore_path() -> Path:
                 ["git", "config", "--global", "core.excludesfile"],
                 capture_output=True,
                 text=True,
+                timeout=10,
             )
             if res.returncode == 0:
                 path_str = res.stdout.strip()
@@ -1013,7 +1144,13 @@ def _append_to_global_gitignore(pattern: str, comment: str) -> None:
             gitignore.parent.mkdir(parents=True, exist_ok=True)
             gitignore.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
             if gitignore == Path.home() / ".gitignore_global":
-                subprocess.run(["git", "config", "--global", "core.excludesfile", "~/.gitignore_global"])
+                try:
+                    subprocess.run(
+                        ["git", "config", "--global", "core.excludesfile", "~/.gitignore_global"],
+                        timeout=10,
+                    )
+                except subprocess.TimeoutExpired:
+                    print(yellow("[ WARN ] git config 設定已逾時 (>10s)"))
         except Exception as e:
             print(red(f"警告：更新全域 gitignore 失敗 ({e})"))
 
@@ -1025,15 +1162,26 @@ def _ensure_codebase_memory_ignored() -> None:
 
 def _run_mempalace_init() -> bool:
     try:
-        subprocess.run([TOOL_MEMPALACE, "init", "--yes", "--auto-mine", "--no-llm", "."], check=True)
+        subprocess.run(
+            [TOOL_MEMPALACE, "init", "--yes", "--auto-mine", "--no-llm", "."],
+            check=True, timeout=180,
+        )
         try:
-            # Sync to apply prune on newly ignored files like .codebase-memory/
-            subprocess.run([TOOL_MEMPALACE, "sync", "--apply", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                [TOOL_MEMPALACE, "sync", "--apply", "."],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            print(yellow("[ TIMEOUT ] mempalace sync --apply 已逾時 (>120s)，繼續處理"))
         except Exception:
             pass
         return True
     except FileNotFoundError:
         print(red("錯誤：未找到 mempalace 工具，請先執行: uv tool install mempalace --force"))
+        return False
+    except subprocess.TimeoutExpired:
+        print(yellow("[ TIMEOUT ] mempalace init 已逾時 (>180s)"))
         return False
     except subprocess.CalledProcessError as e:
         print(red(f"錯誤：mempalace 初始化失敗 ({e})"))
@@ -1043,12 +1191,18 @@ def _run_mempalace_init() -> bool:
 def _run_codebase_memory_init() -> bool:
     print_yellow("--> 初始化 Codebase-Memory 圖譜索引...")
     try:
-        subprocess.run([TOOL_CODEBASE_MEMORY, "cli", "index_repository",
-                        json.dumps({"repo_path": str(Path.cwd().resolve())})], check=True)
+        subprocess.run(
+            [TOOL_CODEBASE_MEMORY, "cli", "index_repository",
+             json.dumps({"repo_path": str(Path.cwd().resolve())})],
+            check=True, timeout=600,
+        )
         return True
     except FileNotFoundError:
         print(red("錯誤：未找到 codebase-memory-mcp 工具，請先執行: uv tool install codebase-memory-mcp --force"))
         return False
+    except subprocess.TimeoutExpired:
+        print(yellow("[ TIMEOUT ] codebase-memory-mcp index_repository 已逾時 (>600s)"))
+        return True  # partial install/init is still considered success
     except Exception as e:
         print(yellow(f"--> 初始化 Codebase-Memory 圖譜時發生警告 ({e})"))
         return True  # partial install/init is still considered success
@@ -1187,10 +1341,13 @@ def _run_codebase_memory_index() -> bool:
             "cli",
             "index_repository",
             json.dumps({"repo_path": str(Path.cwd().resolve())})
-        ], check=True)
+        ], check=True, timeout=600)
         return True
     except FileNotFoundError:
         print(red("錯誤：未找到 codebase-memory-mcp，請先執行: ai-brain install"))
+        return False
+    except subprocess.TimeoutExpired:
+        print(yellow("[ TIMEOUT ] codebase-memory-mcp index_repository 已逾時 (>600s)"))
         return False
     except Exception as e:
         print(red(f"錯誤：更新代碼地圖圖譜失敗 ({e})"))
@@ -1199,32 +1356,66 @@ def _run_codebase_memory_index() -> bool:
 
 def _run_archive_sweep(*, silent: bool) -> None:
     """Sweep every project in the auto-archive whitelist."""
-    archived = registry.list_archived()
-    if not archived:
+    # Cron skip-if-running guard
+    if _another_stop_running():
         if not silent:
-            print(yellow("--> 自動歸檔白名單為空，不執行任何自動歸檔。"))
-            print("💡 提示: 若要為此專案啟用自動定時歸檔，請執行: ai-brain include")
+            print(yellow("另一個 ai-brain stop 正在執行，跳過本次執行"))
         return
 
-    if not silent:
-        print(yellow("--> 讀取自動歸檔白名單，僅自動歸檔啟用之專案..."))
+    pid_path = _stop_pid_path()
+    try:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass
 
-    for proj_path in archived:
-        proj_dir = Path(proj_path)
-        if not proj_dir.is_dir():
-            continue
-        target = find_claude_folder_by_path(proj_path)
-        if not target:
-            continue
-        if not silent:
-            print(green(f"--> 掃描歸檔活躍專案: {target.name}"))
-        try:
-            stdout = subprocess.DEVNULL if silent else None
-            stderr = subprocess.DEVNULL if silent else None
-            subprocess.run([TOOL_MEMPALACE, "sweep", str(target)], stdout=stdout, stderr=stderr)
-        except Exception as e:
+    lock_fd = None
+    try:
+        lock_fd = _acquire_brain_lock()
+        if lock_fd is None:
             if not silent:
-                print(red(f"警告：歸檔 {target.name} 失敗 ({e})"))
+                print(yellow("[ WARN ] 無法取得全域鎖檔，跳過 _run_archive_sweep"))
+            return
+
+        archived = registry.list_archived()
+        if not archived:
+            if not silent:
+                print(yellow("--> 自動歸檔白名單為空，不執行任何自動歸檔。"))
+                print("💡 提示: 若要為此專案啟用自動定時歸檔，請執行: ai-brain include")
+            return
+
+        if not silent:
+            print(yellow("--> 讀取自動歸檔白名單，僅自動歸檔啟用之專案..."))
+
+        for proj_path in archived:
+            proj_dir = Path(proj_path)
+            if not proj_dir.is_dir():
+                continue
+            target = find_claude_folder_by_path(proj_path)
+            if not target:
+                continue
+            if not silent:
+                print(green(f"--> 掃描歸檔活躍專案: {target.name}"))
+            try:
+                stdout = subprocess.DEVNULL if silent else None
+                stderr = subprocess.DEVNULL if silent else None
+                subprocess.run(
+                    [TOOL_MEMPALACE, "sweep", str(target)],
+                    stdout=stdout, stderr=stderr, timeout=300,
+                )
+            except subprocess.TimeoutExpired:
+                if not silent:
+                    print(yellow(f"[ TIMEOUT ] mempalace sweep {target.name} 已逾時 (>300s)，繼續處理其他專案"))
+            except Exception as e:
+                if not silent:
+                    print(red(f"警告：歸檔 {target.name} 失敗 ({e})"))
+    finally:
+        if lock_fd is not None:
+            _release_brain_lock(lock_fd)
+        try:
+            pid_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def find_claude_folder_by_path(proj_path: str) -> Path | None:
