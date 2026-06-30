@@ -27,13 +27,14 @@ def _show_help() -> None:
     print("  ai-brain [指令]\n")
     print(yellow("可用指令:"))
     rows = [
-        ("init", "[一次性] 初始化專案 AI 大腦配置（MemPalace、codebase-memory-mcp、記憶鉤子與引導指南）"),
+        ("init", "[一次性] 初始化專案 AI 大腦配置（Palace 結構、代碼圖譜、記憶鉤子）"),
         ("full-init", "[一次性] 初始化配置，並一併在系統中註冊深夜 23:30 自動記憶歸檔 Cron Job"),
+        ("mine <target>", "[選擇性歸檔] 歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
         ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
         ("version", "[顯示版本] 顯示目前安裝的 ai-brain 工具版本"),
         ("start", "[每日晨間] 更新最新的代碼地圖圖譜（讓 AI 開發時不迷路且省 Token）"),
         ("stop", "[下班收尾] 安全掃描並歸檔一整天的對話到長期記憶中樞（防死鎖）"),
-        ("status", "[狀態檢查] 查看目前專案的大腦配置狀態"),
+        ("status", "[狀態檢查] 查看目前專案的大腦配置狀態（含 Palace 容量）"),
         ("verify", "[一鍵驗證] 檢測所有 AI 記憶套件與守護行程是否正確配置且運行正常"),
         ("clean", "[專案清理] 移除目前專案的 AI 大腦與記憶配置"),
         ("uninstall", "[全域移除] 清理目前的專案配置、全域排程、MCP 註冊與全域軟連結"),
@@ -44,7 +45,7 @@ def _show_help() -> None:
         ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
         ("list", "[查詢狀態] 顯示所有已註冊專案的自動歸檔狀態列表"),
         ("remove [key]", "[註銷專案] 自大腦活躍專案清單中移除指定專案的註冊"),
-        ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定與垃圾清理"),
+        ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定、MCP 路徑與垃圾清理"),
         ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
         ("gc", "[垃圾回收] 清理 drift 備份、同步記憶庫、壓縮 ChromaDB"),
         ("gc --apply", "[實際執行] 執行垃圾回收並實際修改資料庫"),
@@ -100,6 +101,14 @@ def _cmd_gc(args, _paths) -> int:
     return 0 if commands.run_gc(apply=args.apply) else 1
 
 
+def _cmd_mine(args, _paths) -> int:
+    return 0 if commands.mine_to_palace(
+        target=args.target or ".",
+        mode=args.mine_mode or "default",
+        wing=args.wing,
+    ) else 1
+
+
 def _cmd_mcp_sync(args, paths) -> int:
     return 0 if commands.sync_mcp_paths(paths, fix=args.fix) else 1
 
@@ -118,6 +127,7 @@ def _cmd_completions(args) -> int:
 COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "init": lambda a, p: 0 if commands.init_brain() else 1,
     "full-init": _cmd_full_init,
+    "mine": _cmd_mine,
     "install": lambda a, p: 0 if installer.install_or_update() else 1,
     "update": lambda a, p: 0 if installer.install_or_update() else 1,
     "version": lambda a, p: (_show_version(), 0)[1],
@@ -158,6 +168,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     _add_common("init", "Initialize local AI brain configuration")
     _add_common("full-init", "Initialize and register global cron + MCP")
+    p = sub.add_parser("mine", help="Selectively mine high-value content into L2 memory palace", add_help=False)
+    p.add_argument("target", nargs="?", default=".",
+                   help="file or directory to mine (default: current directory)")
+    p.add_argument("--mode", dest="mine_mode",
+                   choices=["default", "convos", "extract", "file"],
+                   default="default",
+                   help="mining mode: default=selective files, convos=conversations, extract=PDFs/docs, file=single file")
+    p.add_argument("--wing", default=None,
+                   help="palace wing to file under (default: auto-detect from project)")
     _add_common("install", "Install/update the global ai-brain command")
     _add_common("update", "Alias for install (auto-pulls from git source)")
     _add_common("version", "Show installed version")
@@ -252,6 +271,14 @@ class _Namespace_for:
         self.fix = "--fix" in rest
         self.fast = "--fast" in rest or "--no-cluster" in rest
         self.apply = "--apply" in rest
+        # `mine` subcommand args
+        self.mine_mode = None
+        self.wing = None
+        for i, arg in enumerate(rest):
+            if arg == "--mode" and i + 1 < len(rest):
+                self.mine_mode = rest[i + 1]
+            elif arg == "--wing" and i + 1 < len(rest):
+                self.wing = rest[i + 1]
 
 
 if __name__ == "__main__":

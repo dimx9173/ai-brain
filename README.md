@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.3.0-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.4.0-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -20,6 +20,16 @@
 <p align="center">
   <img src="./docs/images/architecture.png" alt="AI Brain System Architecture" width="850px" style="border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.4);" />
 </p>
+
+### 🧠 Three-Layer Memory Architecture
+
+| Layer | Tool | Purpose | Lifecycle | Target Size |
+|:------|:-----|:--------|:----------|:------------|
+| **L0** | `claude-mem` | **Working Memory** — session context, developer habits, task checkpoints | Session-bound | < 100KB |
+| **L1** | `codebase-memory-mcp` | **Structural Memory** — code topology, call graphs, module dependencies | Project-bound, rebuildable | Per-project |
+| **L2** | `mempalace` | **Long-term Memory** — conversations, decisions, debug experiences, lessons learned | Cross-project, permanent | < 500MB |
+
+> **⚠️ Important**: Do NOT mine entire codebases into mempalace (L2). Code indexing belongs in L1 (`codebase-memory-mcp`). L2 is for **curated, high-value memories only** — conversations, architecture decisions, debug war stories. Use `ai-brain mine` to selectively add specific content.
 
 ---
 

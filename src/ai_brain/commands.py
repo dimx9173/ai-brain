@@ -565,6 +565,64 @@ def run_gc(apply: bool = False) -> bool:
         _release_brain_lock(lock_fd)
 
 
+def mine_to_palace(
+    target: str = ".",
+    mode: str = "default",
+    wing: str | None = None,
+) -> bool:
+    """Selectively mine content into the L2 memory palace.
+
+    L2 (mempalace) is for high-value memories only:
+    - Conversations (``mode="convos"``)
+    - Documents / PDFs (``mode="extract"``)
+    - Specific important files (``mode="file"`` or targeted paths)
+
+    Do NOT use this to index entire codebases — that's L1's job
+    (codebase-memory-mcp).
+    """
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(yellow("[ WARN ] 另一個 ai-brain 正在執行，跳過 mine"))
+        return False
+    try:
+        print(blue("====== 📥 歸檔內容至長期記憶宮殿 ======"))
+
+        cmd = [TOOL_MEMPALACE, "mine"]
+
+        if mode == "convos":
+            print(yellow(f"--> 歸檔對話: {target}"))
+            cmd.extend([target, "--mode", "convos", "--no-llm"])
+        elif mode == "extract":
+            print(yellow(f"--> 萃取文件: {target}"))
+            cmd.extend([target, "--mode", "extract", "--no-llm"])
+        elif mode == "file":
+            print(yellow(f"--> 歸檔檔案: {target}"))
+            cmd.extend([target, "--no-llm"])
+        else:
+            print(yellow(f"--> 選擇性歸檔: {target}"))
+            cmd.extend([target, "--no-llm"])
+
+        if wing:
+            cmd.extend(["--wing", wing])
+            print(f"    Wing: {wing}")
+
+        try:
+            subprocess.run(cmd, check=True, timeout=300)
+            print(green("✅ 歸檔完成！"))
+            return True
+        except subprocess.TimeoutExpired:
+            print(yellow("[ TIMEOUT ] mempalace mine 已逾時 (>300s)"))
+            return False
+        except subprocess.CalledProcessError as e:
+            print(red(f"錯誤：mempalace mine 失敗 ({e})"))
+            return False
+        except FileNotFoundError:
+            print(red("錯誤：未找到 mempalace 工具，請先執行: uv tool install mempalace --force"))
+            return False
+    finally:
+        _release_brain_lock(lock_fd)
+
+
 # --- include / exclude ----------------------------------------------------------
 # Special tokens recognised by `_resolve_target` in addition to the existing
 # "." / "current" / keyword behaviour.
@@ -1629,10 +1687,17 @@ def _ensure_codebase_memory_ignored() -> None:
 
 
 def _run_mempalace_init() -> bool:
+    """Initialize mempalace structure only — no auto-mining.
+
+    L2 (mempalace) is for high-value memories (conversations, decisions,
+    debug experiences), NOT full code indexing. Code topology belongs
+    in L1 (codebase-memory-mcp). Users can selectively mine specific
+    content via `ai-brain mine`.
+    """
     try:
         subprocess.run(
-            [TOOL_MEMPALACE, "init", "--yes", "--auto-mine", "--no-llm", "."],
-            check=True, timeout=180,
+            [TOOL_MEMPALACE, "init", "--yes", "--no-llm", "."],
+            check=True, timeout=60,
         )
         try:
             subprocess.run(
