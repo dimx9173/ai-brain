@@ -49,6 +49,66 @@ CORE_TOOLS: tuple[UpgradableTool, ...] = (
 )
 
 
+# --- Pip-installed mempalace (MCP-active) --------------------------------------
+# MEMPALACE_MCP_COMMAND() prefers pip-installed `python3 -m mempalace.mcp_server`
+# over the uv binary because uv 3.5.0 hangs on large ChromaDBs.
+# Track the pip version separately so `ai-brain update` reports accurately.
+
+def _pip_python() -> str | None:
+    """Return the python3 path that has mempalace pip-installed, or None."""
+    python3 = shutil.which("python3")
+    if not python3:
+        return None
+    try:
+        result = subprocess.run(
+            [python3, "-c", "import mempalace; print(mempalace.__version__)"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return python3
+    except Exception:
+        pass
+    return None
+
+
+def get_pip_mempalace_version() -> str | None:
+    """Return the pip-installed mempalace version, or None."""
+    python3 = _pip_python()
+    if not python3:
+        return None
+    try:
+        result = subprocess.run(
+            [python3, "-c", "import mempalace; print(mempalace.__version__)"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def upgrade_pip_mempalace() -> tuple[bool, str]:
+    """Upgrade pip-installed mempalace if present. Returns (ok, message)."""
+    python3 = _pip_python()
+    if not python3:
+        return True, "(pip 版未安裝，MCP 使用 uv 版)"
+    try:
+        result = subprocess.run(
+            [python3, "-m", "pip", "install", "--upgrade", "mempalace"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            new_ver = get_pip_mempalace_version()
+            return True, f"pip upgraded → {new_ver or '?'}"
+        err = (result.stderr or "").strip().splitlines()
+        return False, err[-1] if err else f"exit {result.returncode}"
+    except subprocess.TimeoutExpired:
+        return False, "pip install timeout (>120s)"
+    except Exception as e:
+        return False, str(e)
+
+
 # --- Version parsing ------------------------------------------------------------
 
 # Some tools print "name 1.2.3", "name v1.2.3", "v1.2.3", or "1.2.3".
@@ -257,15 +317,13 @@ class UpgradeOutcome:
 def upgrade_all() -> list[UpgradeOutcome]:
     """Upgrade every tool in CORE_TOOLS, returning one outcome per tool.
 
-    Used by `ai-brain update`. We deliberately iterate *all* tools even if
-    one fails — the user wants to see the full picture, not bail on the
-    first error.
+    Also upgrades pip-installed mempalace if present (used by MCP server).
+    We deliberately iterate *all* tools even if one fails — the user wants
+    to see the full picture, not bail on the first error.
     """
     outcomes: list[UpgradeOutcome] = []
     for tool in CORE_TOOLS:
         if not shutil.which(tool.binary):
-            # Don't try to upgrade a binary that isn't there — uv will just
-            # do a fresh install, but the user already opted in, so let it.
             pass
         ok, msg = upgrade(tool)
         outcomes.append(UpgradeOutcome(
@@ -274,6 +332,16 @@ def upgrade_all() -> list[UpgradeOutcome]:
             message=msg,
             version_after=get_version(tool.binary, package=tool.package),
         ))
+
+    # Also upgrade pip-installed mempalace (MCP-active version)
+    pip_ok, pip_msg = upgrade_pip_mempalace()
+    if pip_msg and not pip_msg.startswith("(pip"):
+        # Append pip result to the MemPalace outcome
+        for o in outcomes:
+            if o.tool.label == "MemPalace":
+                o.message = f"{o.message} | {pip_msg}"
+                break
+
     return outcomes
 
 
@@ -283,20 +351,31 @@ def print_summary(outcomes: list[UpgradeOutcome], self_version: str) -> None:
     """Print the post-upgrade version table.
 
     Columns: name, version (after), result.
+    For MemPalace, also shows the pip-installed version (MCP-active).
 
     Imported lazily by installer.update() so we don't have a circular import
     with `ui`. Pure stdout — no exceptions raised.
     """
     from .ui import print_blue as blue
     from .ui import print_green as green
+    from .ui import print_yellow as yellow
 
     print()
     blue("====== 📦 安裝完成！以下是所有套件目前版本 ======")
     rows: list[tuple[str, str, str]] = [
         ("ai-brain", self_version, "(self)"),
-        *((o.tool.label, o.version_after, "✅ upgraded" if o.upgraded else f"❌ {o.message}")
-          for o in outcomes),
     ]
+    for o in outcomes:
+        status = "✅ upgraded" if o.upgraded else f"❌ {o.message}"
+        ver = o.version_after
+        # For MemPalace, show both uv and pip versions
+        if o.tool.label == "MemPalace":
+            pip_ver = get_pip_mempalace_version()
+            if pip_ver:
+                ver = f"uv:{o.version_after} pip:{pip_ver}"
+                status = f"{status} (MCP 使用 pip 版)"
+        rows.append((o.tool.label, ver, status))
+
     # Pick column widths from the data so the table stays tidy.
     name_w = max(len(r[0]) for r in rows)
     ver_w = max(len(r[1]) for r in rows)
@@ -310,4 +389,13 @@ def print_summary(outcomes: list[UpgradeOutcome], self_version: str) -> None:
             red(line)
         else:
             print(line)
+
+    # Show which binary MCP actually uses
+    from .constants import MEMPALACE_MCP_COMMAND
+    mcp_cmd = MEMPALACE_MCP_COMMAND()
+    mcp_display = " ".join(mcp_cmd)
+    if "mempalace.mcp_server" in mcp_display:
+        yellow(f"\n  💡 MemPalace MCP 使用 pip 版 (python3 -m mempalace.mcp_server)")
+    else:
+        yellow(f"\n  💡 MemPalace MCP 使用 uv 版 ({mcp_display})")
     print()
