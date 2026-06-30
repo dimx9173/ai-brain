@@ -62,6 +62,10 @@ def LAST_SWEEP_FILE() -> Path:
     return Path.home() / ".claude" / "last_sweep_timestamp"
 
 
+def LAST_GC_FILE() -> Path:
+    return Path.home() / ".claude" / "last_gc_timestamp"
+
+
 def GLOBAL_AI_BRAIN() -> Path:
     return Path.home() / ".local" / "bin" / "ai-brain"
 
@@ -91,9 +95,9 @@ def MEMPALACE_MCP_COMMAND() -> list[str]:
     import shutil
     import subprocess
 
-    python3 = shutil.which("python3")
-    if python3:
-        try:
+    try:
+        python3 = shutil.which("python3")
+        if python3:
             result = subprocess.run(
                 [python3, "-c", "import mempalace.mcp_server"],
                 capture_output=True,
@@ -102,8 +106,8 @@ def MEMPALACE_MCP_COMMAND() -> list[str]:
             if result.returncode == 0:
                 _MEMPALACE_MCP_COMMAND = [python3, "-m", "mempalace.mcp_server"]
                 return _MEMPALACE_MCP_COMMAND
-        except Exception:
-            pass
+    except BaseException:
+        pass
 
     _MEMPALACE_MCP_COMMAND = [str(GLOBAL_MEMPALACE_MCP())]
     return _MEMPALACE_MCP_COMMAND
@@ -122,12 +126,13 @@ UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "codebase-memory-mcp")
 
 # --- Time & thresholds ----------------------------------------------------------
 SWEEP_BACKGROUND_GAP_SECONDS = 12 * 60 * 60
+GC_BACKGROUND_GAP_SECONDS = 7 * 24 * 60 * 60  # 7 days
 CRON_SCHEDULE = "30 23 * * *"
 CRON_CMD = '$HOME/.local/bin/ai-brain stop > /dev/null 2>&1'
 
 # --- Project artifacts ---------------------------------------------------------
 PROJECT_CONFIG_FILE = ".claude/config.json"
-PROJECT_CLAUDE_MD = "CLAUDE.md"
+PROJECT_CLAUDE_MD = ".claude/CLAUDE.md"
 PROJECT_MEMPALACE_FILES = ("mempalace.yaml", "entities.json")
 CODEBASE_MEMORY_OUT_DIR = ".codebase-memory"
 LOCAL_CODEBASE_MEMORY_SKILL = ".claude/skills/codebase-memory"

@@ -1,8 +1,8 @@
-"""Crontab management for the daily auto-archive job.
+"""Crontab management for the daily auto-archive and weekly GC jobs.
 
 `crontab -l` reads, `crontab -` writes. We append a marker line containing
-"ai-brain stop" so we can reliably detect / clean up our entry later
-without touching other users' cron jobs.
+"ai-brain stop" / "ai-brain gc" so we can reliably detect / clean up our
+entries later without touching other users' cron jobs.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from typing import List
 
-from .constants import CRON_CMD, CRON_SCHEDULE
+from .constants import CRON_CMD, CRON_GC_CMD, CRON_GC_MARKER, CRON_GC_SCHEDULE, CRON_SCHEDULE
 from .ui import print_blue as blue
 from .ui import print_green as green
 from .ui import print_red as red
@@ -18,6 +18,7 @@ from .ui import print_yellow as yellow
 
 CRON_MARKER = "ai-brain stop"
 CRON_LINE = f"{CRON_SCHEDULE} {CRON_CMD}"
+CRON_GC_LINE = f"{CRON_GC_SCHEDULE} {CRON_GC_CMD}"
 
 
 def _read_crontab() -> List[str]:
@@ -85,6 +86,39 @@ def uninstall() -> bool:
     remaining = [line for line in lines if CRON_MARKER not in line]
     if _write_crontab(remaining):
         green("✅ Cron Job 已成功移除！已停止自動記憶歸檔。")
+        uninstall_gc()
         return True
     red("❌ 移除 Cron Job 失敗")
+    return False
+
+
+def install_gc() -> bool:
+    """Register the weekly Sunday 03:00 GC cron (idempotent)."""
+    if not shutil.which("crontab"):
+        return False
+
+    lines = _read_crontab()
+    if any(CRON_GC_MARKER in line for line in lines):
+        return True
+
+    lines.append(CRON_GC_LINE)
+    if _write_crontab(lines):
+        green("✅ 每週日 03:00 GC Cron Job 註冊成功！")
+        return True
+    return False
+
+
+def uninstall_gc() -> bool:
+    """Remove ai-brain GC cron lines (idempotent)."""
+    if not shutil.which("crontab"):
+        return False
+
+    lines = _read_crontab()
+    if not any(CRON_GC_MARKER in line for line in lines):
+        return True
+
+    remaining = [line for line in lines if CRON_GC_MARKER not in line]
+    if _write_crontab(remaining):
+        green("✅ GC Cron Job 已成功移除！")
+        return True
     return False

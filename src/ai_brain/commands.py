@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -34,7 +35,7 @@ from .constants import (
     TOOL_MEMPALACE,
 )
 from .mcp import deregister_all, register_all
-from .ui import blue, green, red, yellow
+from .ui import BLUE, GREEN, NC, RED, YELLOW, blue, green, red, yellow
 
 # --- Global serialisation lock --------------------------------------------------
 
@@ -154,6 +155,7 @@ def full_init(paths) -> bool:
     print()
     from . import cron
     cron.install()
+    cron.install_gc()
 
     register_all(paths)
 
@@ -317,7 +319,234 @@ def check_status() -> bool:
     color = GREEN if enabled else RED
     suffix = "已啟用 (Active)" if enabled else "停用中 (預設不歸檔)"
     print(f"定時自動歸檔: {color}{suffix}{NC}")
+
+    # Palace capacity section
+    print()
+    print(blue("====== 📊 Palace 容量 ======"))
+    palace_dir = Path.home() / ".mempalace" / "palace"
+    needs_maintenance = False
+    needs_urgent = False
+
+    # Chroma DB size
+    chroma_db = palace_dir / "chroma.sqlite3"
+    if chroma_db.is_file():
+        try:
+            db_bytes = chroma_db.stat().st_size
+            db_gb = db_bytes / (1024 ** 3)
+            db_mb = db_bytes / (1024 ** 2)
+            if db_gb > 2:
+                db_display = f"{RED}{db_gb:.2f} GB{NC}"
+                needs_urgent = True
+            elif db_gb > 1:
+                db_display = f"{YELLOW}{db_gb:.2f} GB{NC}"
+                needs_maintenance = True
+            else:
+                db_display = f"{GREEN}{db_mb:.0f} MB{NC}"
+            print(f"ChromaDB 大小: {db_display}")
+        except Exception:
+            print(f"ChromaDB 大小: {RED}無法讀取{NC}")
+    else:
+        print(f"ChromaDB 大小: {NC}未初始化")
+
+    # HNSW index size
+    hnsw_found = False
+    hnsw_total = 0
+    if palace_dir.is_dir():
+        for level0 in palace_dir.rglob("data_level0.bin"):
+            try:
+                hnsw_total += level0.stat().st_size
+                hnsw_found = True
+            except Exception:
+                pass
+    if hnsw_found:
+        hnsw_mb = hnsw_total / (1024 ** 2)
+        if hnsw_mb > 500:
+            hnsw_display = f"{YELLOW}{hnsw_mb:.0f} MB{NC}"
+            needs_maintenance = True
+        else:
+            hnsw_display = f"{GREEN}{hnsw_mb:.0f} MB{NC}"
+        print(f"HNSW 索引大小: {hnsw_display}")
+    else:
+        print("HNSW 索引大小: 未建立")
+
+    # Embedding count
+    if chroma_db.is_file():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(chroma_db))
+            cursor = conn.execute("SELECT COUNT(*) FROM embeddings")
+            embed_count = cursor.fetchone()[0]
+            conn.close()
+            if embed_count > 500000:
+                embed_display = f"{YELLOW}{embed_count:,}{NC}"
+                needs_maintenance = True
+            else:
+                embed_display = f"{GREEN}{embed_count:,}{NC}"
+            print(f"Embedding 數量: {embed_display}")
+        except Exception:
+            print(f"Embedding 數量: {RED}無法查詢{NC}")
+    else:
+        print("Embedding 數量: 無資料庫")
+
+    # Drift backup presence
+    drift_dirs = list(palace_dir.glob("*.drift-*")) if palace_dir.is_dir() else []
+    if drift_dirs:
+        drift_display = f"{YELLOW}{len(drift_dirs)} 個{NC}"
+        needs_maintenance = True
+    else:
+        drift_display = f"{GREEN}無{NC}"
+    print(f"Drift 備份: {drift_display}")
+
+    # Health assessment
+    if needs_urgent:
+        health = f"{RED}🔴 需要立即維護{NC}"
+    elif needs_maintenance:
+        health = f"{YELLOW}⚠️ 建議維護{NC}"
+    else:
+        health = f"{GREEN}OK{NC}"
+    print(f"健康評估: {health}")
+
     return True
+
+
+def run_gc(apply: bool = False) -> bool:
+    """Garbage-collect the MemPalace: clean drift backups, sync, compress."""
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(yellow("[ WARN ] 另一個 ai-brain 正在執行，無法執行 gc"))
+        return False
+
+    try:
+        print(blue("====== 🗑️ 開始 Palace 垃圾回收 ======"))
+        palace_dir = Path.home() / ".mempalace" / "palace"
+
+        # -- Step 1: Clean drift backups --
+        print(blue("1. 掃描 drift 備份..."))
+        drift_dirs = sorted(palace_dir.glob("*.drift-*")) if palace_dir.is_dir() else []
+        if drift_dirs:
+            total_drift = 0
+            for d in drift_dirs:
+                try:
+                    size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+                    total_drift += size
+                    size_mb = size / (1024 ** 2)
+                    print(f"  {d.name}: {size_mb:.1f} MB")
+                except Exception:
+                    print(f"  {d.name}: (無法計算大小)")
+            drift_mb = total_drift / (1024 ** 2)
+            if apply:
+                for d in drift_dirs:
+                    try:
+                        shutil.rmtree(d)
+                    except Exception as e:
+                        print(red(f"  [ ERROR ] 無法移除 {d.name} ({e})"))
+                print(green(f"  已清除 {len(drift_dirs)} 個 drift 備份 (釋放 {drift_mb:.1f} MB)"))
+            else:
+                print(yellow(f"  發現 {len(drift_dirs)} 個 drift 備份 (共 {drift_mb:.1f} MB)，使用 --apply 清除"))
+        else:
+            print(green("  無 drift 備份"))
+
+        print()
+
+        # -- Step 2: mempalace sync --
+        print(blue("2. 執行記憶庫同步..."))
+        sync_cmd = [TOOL_MEMPALACE, "sync"]
+        if apply:
+            sync_cmd.append("--apply")
+        sync_cmd.append(".")
+        try:
+            res = subprocess.run(sync_cmd, capture_output=True, text=True, timeout=120)
+            if res.returncode == 0:
+                print(green("  記憶庫同步完成"))
+            else:
+                print(yellow(f"  記憶庫同步結束 (exit code {res.returncode})"))
+                if res.stderr:
+                    print(yellow(f"  {res.stderr.strip()}"))
+        except subprocess.TimeoutExpired:
+            print(yellow("  [ TIMEOUT ] mempalace sync 已逾時 (>120s)"))
+        except FileNotFoundError:
+            print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
+        except Exception as e:
+            print(red(f"  [ ERROR ] mempalace sync 失敗 ({e})"))
+
+        print()
+
+        # -- Step 3: Show chroma DB size before --
+        chroma_db = palace_dir / "chroma.sqlite3"
+        size_before = 0
+        if chroma_db.is_file():
+            try:
+                size_before = chroma_db.stat().st_size
+                size_before_mb = size_before / (1024 ** 2)
+                print(blue(f"3. 壓縮前 ChromaDB 大小: {size_before_mb:.1f} MB"))
+            except Exception:
+                print(blue("3. 壓縮前 ChromaDB 大小: 無法讀取"))
+        else:
+            print(blue("3. ChromaDB 尚未初始化"))
+
+        print()
+
+        # -- Step 4: mempalace compress --
+        print(blue("4. 執行 ChromaDB 壓縮..."))
+        compress_cmd = [TOOL_MEMPALACE, "compress"]
+        if not apply:
+            compress_cmd.append("--dry-run")
+        try:
+            res = subprocess.run(compress_cmd, capture_output=True, text=True, timeout=300)
+            if res.returncode == 0:
+                if apply:
+                    print(green("  ChromaDB 壓縮完成"))
+                else:
+                    print(green("  ChromaDB 壓縮預演完成（未實際修改）"))
+                    print(yellow("  使用 --apply 以實際執行壓縮"))
+            else:
+                print(yellow(f"  壓縮結束 (exit code {res.returncode})"))
+                if res.stderr:
+                    print(yellow(f"  {res.stderr.strip()}"))
+        except subprocess.TimeoutExpired:
+            print(yellow("  [ TIMEOUT ] mempalace compress 已逾時 (>300s)"))
+        except FileNotFoundError:
+            print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
+        except Exception as e:
+            print(red(f"  [ ERROR ] mempalace compress 失敗 ({e})"))
+
+        print()
+
+        # -- Step 5: Show chroma DB size after --
+        size_after = 0
+        if chroma_db.is_file():
+            try:
+                size_after = chroma_db.stat().st_size
+                size_after_mb = size_after / (1024 ** 2)
+                print(blue(f"5. 壓縮後 ChromaDB 大小: {size_after_mb:.1f} MB"))
+            except Exception:
+                print(blue("5. 壓縮後 ChromaDB 大小: 無法讀取"))
+        else:
+            print(blue("5. ChromaDB 不存在"))
+
+        # -- Summary --
+        print()
+        print(blue("====== 📊 GC 摘要 ======"))
+        if size_before > 0 and size_after > 0:
+            delta = size_before - size_after
+            delta_mb = delta / (1024 ** 2)
+            if delta > 0:
+                print(green(f"  釋放空間: {delta_mb:.1f} MB"))
+            elif delta == 0:
+                print(yellow("  資料庫大小無變化"))
+            else:
+                print(yellow(f"  資料庫增長: {abs(delta_mb):.1f} MB"))
+        elif size_before == 0 and size_after == 0:
+            print(yellow("  無 ChromaDB 需要處理"))
+
+        if not apply:
+            print()
+            print(yellow("💡 以上為預演模式。確認無誤後請執行: ai-brain gc --apply"))
+
+        print(green("====== 🎉 垃圾回收結束 ======"))
+        return True
+    finally:
+        _release_brain_lock(lock_fd)
 
 
 # --- include / exclude ----------------------------------------------------------
@@ -392,6 +621,49 @@ def manage_list() -> bool:
     """Show the auto-archive status of all registered projects."""
     _print_archive_status()
     return True
+
+
+def sync_mcp_paths(paths, fix: bool = False) -> bool:
+    """Synchronise all MCP server command paths to the fastest available binary."""
+    from .mcp import sync_all_mcp_commands
+    from .constants import MEMPALACE_MCP_COMMAND
+
+    expected = MEMPALACE_MCP_COMMAND()
+    print(blue("====== 🔗 MCP 指令路徑同步 ======"))
+    print(f"偵測到最快指令: {green(' '.join(expected))}")
+    print()
+
+    stale_count, msgs = sync_all_mcp_commands(paths, fix=False)
+
+    if not msgs:
+        print(green("未找到任何 MCP 伺服器配置。"))
+        return True
+
+    for msg in msgs:
+        print(msg)
+
+    print()
+    if stale_count == 0:
+        print(green("🎉 所有 MCP 指令路徑均為最新，無需更新。"))
+        return True
+
+    print(yellow(f"發現 {stale_count} 個過時路徑。"))
+    if not fix:
+        print(yellow("執行 `ai-brain mcp-sync --fix` 自動修正。"))
+        return True
+
+    fixed, fix_msgs = sync_all_mcp_commands(paths, fix=True)
+    for msg in fix_msgs:
+        print(msg)
+    print()
+    if fixed > 0:
+        print(green(f"✅ 已同步 {fixed} 個 MCP 指令路徑。"))
+        print(yellow("💡 請重啟 IDE / Claude Code 使設定生效。"))
+    else:
+        print(red("❌ 同步失敗，請檢查檔案權限。"))
+    return fixed > 0
+
+
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
@@ -574,6 +846,98 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
+    # 3b. Check orphaned MCP processes (Global Check - run once)
+    print(blue("3b. 檢查 MemPalace MCP 幽靈進程..."))
+    orphaned_pids: list[int] = []
+    try:
+        ps_proc = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in ps_proc.stdout.splitlines():
+            if "mempalace-mcp" not in line:
+                continue
+            # Skip the grep process itself
+            if "grep" in line:
+                continue
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+            try:
+                pid = int(parts[1])
+            except (ValueError, IndexError):
+                continue
+            terminal = parts[7] if len(parts) > 7 else ""
+            if terminal == "??":
+                orphaned_pids.append(pid)
+    except Exception as e:
+        print(yellow(f"  [ WARN ] 無法掃描進程列表 ({e})"))
+
+    if orphaned_pids:
+        # Check which orphans are referenced in lock files
+        lock_pids: set[int] = set()
+        if locks_dir.is_dir():
+            for lock_file in locks_dir.glob("*.lock"):
+                try:
+                    content = lock_file.read_text(encoding="utf-8").strip()
+                    if content:
+                        parts = content.split(maxsplit=1)
+                        if parts and parts[0].isdigit():
+                            lock_pids.add(int(parts[0]))
+                except Exception:
+                    pass
+
+        orphaned_with_lock = [p for p in orphaned_pids if p in lock_pids]
+        orphaned_no_lock = [p for p in orphaned_pids if p not in lock_pids]
+
+        if orphaned_with_lock:
+            print(red(f"  [ FAIL ] 發現 {len(orphaned_with_lock)} 個幽靈 MCP 進程持有鎖檔 (PID: {', '.join(str(p) for p in orphaned_with_lock)})"))
+        if orphaned_no_lock:
+            print(yellow(f"  [ WARN ] 發現 {len(orphaned_no_lock)} 個無終端機 MCP 進程 (PID: {', '.join(str(p) for p in orphaned_no_lock)})"))
+
+        if fix:
+            killed = 0
+            for pid in orphaned_pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    killed += 1
+                except OSError:
+                    pass
+            if killed:
+                print(green(f"  [ FIXED ] 已終止 {killed} 個幽靈 MCP 進程"))
+            else:
+                print(yellow("  [ WARN ] 無法終止任何幽靈進程（可能已結束）"))
+        else:
+            all_pass = False
+    else:
+        print(green("  [ PASS ] 無幽靈 MCP 進程"))
+
+    print()
+
+    # 3c. Check ChromaDB database size (Global Check - run once)
+    print(blue("3c. 檢查 ChromaDB 資料庫大小..."))
+    chroma_db_path = Path.home() / ".mempalace" / "palace" / "chroma.sqlite3"
+    if chroma_db_path.is_file():
+        try:
+            db_size_bytes = chroma_db_path.stat().st_size
+            db_size_gb = db_size_bytes / (1024 ** 3)
+            if db_size_gb > 2:
+                print(red(f"  [ FAIL ] ChromaDB 資料庫過大: {db_size_gb:.2f} GB (> 2 GB)"))
+                if fix:
+                    print(yellow("  --> 建議執行: ai-brain gc --apply 清理資料庫"))
+                else:
+                    all_pass = False
+            elif db_size_gb > 1:
+                print(yellow(f"  [ WARN ] ChromaDB 資料庫偏大: {db_size_gb:.2f} GB (> 1 GB)"))
+            else:
+                print(green(f"  [ PASS ] ChromaDB 資料庫大小正常: {db_size_gb:.2f} GB"))
+        except Exception as e:
+            print(yellow(f"  [ WARN ] 無法讀取 ChromaDB 大小 ({e})"))
+    else:
+        print(green("  [ PASS ] ChromaDB 尚未初始化（略過）"))
+
+    print()
+
     # 4. Check stale drawers in mempalace (sync check)
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
     doctor_lock_fd = _acquire_brain_lock()
@@ -707,6 +1071,94 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             all_pass = False
     else:
         print(green("  [ PASS ] MCP 大腦配置與伺服器載入完全正常"))
+
+    print()
+
+    # 6b. MCP connectivity probe (Global Check - run once)
+    print(blue("6b. 檢查 MemPalace MCP 連線可用性..."))
+    mcp_probe_ok = False
+    mcp_probe_time = 0.0
+    mcp_proc = None
+    try:
+        mcp_proc = subprocess.Popen(
+            [TOOL_MEMPALACE, "mcp"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        init_msg = json.dumps({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "ai-brain-doctor", "version": "1.0.0"},
+            },
+        }) + "\n"
+        probe_start = time.monotonic()
+        assert mcp_proc.stdin is not None
+        mcp_proc.stdin.write(init_msg)
+        mcp_proc.stdin.flush()
+
+        # Read response with timeout
+        import select as _select
+        ready = _select.select([mcp_proc.stdout], [], [], 30)
+        if ready[0]:
+            response_line = mcp_proc.stdout.readline()
+            probe_elapsed = time.monotonic() - probe_start
+            if response_line.strip():
+                resp = json.loads(response_line)
+                if "result" in resp or "id" in resp:
+                    mcp_probe_ok = True
+                    mcp_probe_time = probe_elapsed
+        else:
+            probe_elapsed = time.monotonic() - probe_start
+    except json.JSONDecodeError:
+        pass
+    except Exception as e:
+        print(yellow(f"  [ WARN ] MCP 連線探測異常 ({e})"))
+    finally:
+        if mcp_proc is not None:
+            try:
+                mcp_proc.terminate()
+                mcp_proc.wait(timeout=5)
+            except Exception:
+                try:
+                    mcp_proc.kill()
+                except Exception:
+                    pass
+
+    if mcp_probe_ok:
+        print(green(f"  [ PASS ] MemPalace MCP 連線正常 (回應時間: {mcp_probe_time:.2f}s)"))
+    else:
+        print(yellow("  [ WARN ] MemPalace MCP 連線探測未通過（無回應或逾時 30s），可稍後手動驗證"))
+
+    print()
+
+    # 6c. Check MCP command path consistency
+    print(blue("6c. 檢查 MCP 指令路徑一致性..."))
+    from .mcp import sync_all_mcp_commands
+    stale_count, stale_msgs = sync_all_mcp_commands(paths, fix=False)
+    if stale_msgs:
+        for msg in stale_msgs:
+            print(msg)
+    if stale_count > 0:
+        print(red(f"  [ FAIL ] 發現 {stale_count} 個過時 MCP 指令路徑"))
+        if fix:
+            from .mcp import sync_all_mcp_commands as _sync
+            fixed, fix_msgs = _sync(paths, fix=True)
+            for msg in fix_msgs:
+                print(msg)
+            if fixed > 0:
+                print(green(f"  [ FIXED ] 已同步 {fixed} 個 MCP 指令路徑"))
+            print(yellow("  💡 請重啟 IDE / Claude Code 使設定生效"))
+        else:
+            all_pass = False
+            print(yellow("  💡 執行 `ai-brain doctor --fix` 或 `ai-brain mcp-sync --fix` 自動修正"))
+    else:
+        print(green("  [ PASS ] 所有 MCP 指令路徑均為最新"))
 
     print()
 
@@ -869,7 +1321,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     for proj in projects_to_check:
         short = proj.name
-        for rel in ("CLAUDE.md", ".claude/CLAUDE.md"):
+        for rel in (".claude/CLAUDE.md",):
             md_path = proj / rel
             if md_path.is_file():
                 if not _fix_claude_md(f"[{short}] {rel}", md_path):
@@ -1221,13 +1673,14 @@ def _write_project_hooks_config() -> bool:
 
 
 def _write_project_claude_md() -> bool:
-    print_yellow("--> 建立 CLAUDE.md 大腦引導指南...")
+    print_yellow("--> 建立 .claude/CLAUDE.md 大腦引導指南...")
     try:
-        with open(PROJECT_CLAUDE_MD, "w", encoding="utf-8") as f:
-            f.write(LOCAL_CLAUDE_MD_TEMPLATE)
+        target = Path(PROJECT_CLAUDE_MD)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(LOCAL_CLAUDE_MD_TEMPLATE, encoding="utf-8")
         return True
     except Exception as e:
-        print(red(f"錯誤：建立 CLAUDE.md 失敗 ({e})"))
+        print(red(f"錯誤：建立 .claude/CLAUDE.md 失敗 ({e})"))
         return False
 
 

@@ -12,11 +12,12 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_REQUIRED_SERVERS
+from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_REQUIRED_SERVERS, MEMPALACE_MCP_COMMAND
 from .ui import green, red, yellow
 
 PASS = "OK"
@@ -134,6 +135,78 @@ def check_openclaw_daemon() -> CheckResult:
         return CheckResult(name, WARN, "(OpenClaw 已安裝但未啟動)")
     except Exception:
         return CheckResult(name, WARN, "(無法偵測 OpenClaw 運行狀態)")
+
+
+def check_mempalace_connectivity() -> CheckResult:
+    """Probe mempalace-mcp via JSON-RPC initialize and measure response time."""
+    name = "檢查 MemPalace MCP 連線能力"
+    cmd = MEMPALACE_MCP_COMMAND()
+
+    # If the resolved command is the uv shim that doesn't exist, bail early.
+    exe = cmd[0]
+    if not (shutil.which(exe) or (exe.startswith("/") and os.access(exe, os.X_OK))):
+        return CheckResult(name, INFO, "(mempalace-mcp 未安裝，略過)")
+
+    init_request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "ai-brain", "version": "1.0"},
+        },
+    }
+
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        start = time.monotonic()
+        assert proc.stdin is not None
+        proc.stdin.write((json.dumps(init_request) + "\n").encode("utf-8"))
+        proc.stdin.flush()
+
+        # Read one response line, waiting up to 30 seconds.
+        assert proc.stdout is not None
+        line = b""
+        for _ in range(300):  # 300 * 0.1s = 30s
+            ch = proc.stdout.read(1)
+            if not ch:
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.1)
+                continue
+            if ch == b"\n":
+                break
+            line += ch
+
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+
+        if not line:
+            return CheckResult(
+                name, FAIL,
+                f"(30 秒內無回應 ({elapsed_ms} ms)；建議執行 ai-brain gc --apply 或 ai-brain doctor --fix)",
+            )
+
+        return CheckResult(name, PASS, f"({elapsed_ms} ms)")
+
+    except Exception as e:
+        return CheckResult(
+            name, FAIL,
+            f"(連線失敗: {e}；建議執行 ai-brain gc --apply 或 ai-brain doctor --fix)",
+        )
+    finally:
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 # --- Pretty printer -------------------------------------------------------------

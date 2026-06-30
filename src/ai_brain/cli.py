@@ -46,6 +46,10 @@ def _show_help() -> None:
         ("remove [key]", "[註銷專案] 自大腦活躍專案清單中移除指定專案的註冊"),
         ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定與垃圾清理"),
         ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
+        ("gc", "[垃圾回收] 清理 drift 備份、同步記憶庫、壓縮 ChromaDB"),
+        ("gc --apply", "[實際執行] 執行垃圾回收並實際修改資料庫"),
+        ("mcp-sync", "[MCP 同步] 檢查所有 IDE 的 MCP 指令路徑是否為最新"),
+        ("mcp-sync --fix", "[MCP 修復] 自動同步所有 MCP 指令路徑至最快可用版本"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
     ]
     for name, desc in rows:
@@ -92,6 +96,14 @@ def _cmd_doctor(args, paths) -> int:
     return 0 if commands.run_doctor(paths, target=args.target, fix=args.fix) else 1
 
 
+def _cmd_gc(args, _paths) -> int:
+    return 0 if commands.run_gc(apply=args.apply) else 1
+
+
+def _cmd_mcp_sync(args, paths) -> int:
+    return 0 if commands.sync_mcp_paths(paths, fix=args.fix) else 1
+
+
 def _cmd_completions(args) -> int:
     """Dispatch to ai_brain.completions.main for the completions subcommand."""
     from . import completions as _completions
@@ -126,6 +138,8 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "include-all": lambda a, p: (commands.include_all(), 0)[1],
     "list": lambda a, p: (commands.manage_list(), 0)[1],
     "doctor": _cmd_doctor,
+    "gc": _cmd_gc,
+    "mcp-sync": _cmd_mcp_sync,
     "completions": lambda a, p: _cmd_completions(a),
 }
 
@@ -157,6 +171,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("target", nargs="?", default=None,
                    help="project keyword, 1-based index, '.', 'current', or omitted to check all registered projects")
     p.add_argument("--fix", action="store_true", help="Automatically fix detected issues")
+    p = sub.add_parser("gc", help="Garbage-collect palace drift backups and compress ChromaDB", add_help=False)
+    p.add_argument("--apply", action="store_true", help="Actually perform changes (default is dry-run)")
+    p = sub.add_parser("mcp-sync", help="Sync all MCP server command paths to fastest binary", add_help=False)
+    p.add_argument("--fix", action="store_true", help="Actually update stale paths")
     _add_common("clean", "Remove local brain configuration")
     _add_common("uninstall", "Global removal of all configs and crons")
     _add_common("stop-cron", "Remove the daily auto-archive cron job")
@@ -233,6 +251,7 @@ class _Namespace_for:
         self.shell = rest[1] if len(rest) > 1 else None
         self.fix = "--fix" in rest
         self.fast = "--fast" in rest or "--no-cluster" in rest
+        self.apply = "--apply" in rest
 
 
 if __name__ == "__main__":

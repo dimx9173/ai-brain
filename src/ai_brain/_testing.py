@@ -55,7 +55,15 @@ class InTempDir(unittest.TestCase):
         os.chdir(self.tmpdir)
         Path.home = lambda: Path(self.tmpdir)  # type: ignore[assignment]
         (Path(self.tmpdir) / ".claude").mkdir(exist_ok=True)
+        # Reset the MEMPALACE_MCP_COMMAND cache so each test re-detects
+        # the best binary (the cache depends on Path.home() via
+        # GLOBAL_MEMPALACE_MCP).
+        import ai_brain.constants as _const
+        self._orig_mcp_cmd = _const._MEMPALACE_MCP_COMMAND
+        _const._MEMPALACE_MCP_COMMAND = None
 
     def tearDown(self) -> None:
         os.chdir(self._orig_cwd)
         Path.home = self._orig_home  # type: ignore[assignment]
+        import ai_brain.constants as _const
+        _const._MEMPALACE_MCP_COMMAND = self._orig_mcp_cmd

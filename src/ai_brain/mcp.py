@@ -7,6 +7,7 @@ and let the registry do the rest.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -257,6 +258,111 @@ def _register_in_file(target: RegistrationTarget) -> bool:
         from .config import modify_toml_file
         return modify_toml_file(target.path, _modifier)
     return modify_json_file(target.path, _modifier)
+
+
+def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
+    """Scan all MCP configs and fix stale ``mempalace-mcp`` binary references.
+
+    Covers both top-level ``mcpServers`` and per-project entries inside
+    ``~/.claude.json`` (which ``register_all`` does not touch).
+
+    Returns ``(fixed_count, messages)``.  When *fix* is False only reports.
+    """
+    from .constants import MEMPALACE_MCP_COMMAND, MCP_MEMPALACE
+    from .ui import GREEN, NC, RED, YELLOW
+
+    expected = MEMPALACE_MCP_COMMAND()
+    expected_cmd = expected[0]
+    expected_args = expected[1:]
+    fixed_count = 0
+    messages: list[str] = []
+
+    def _label(tag: str, path: Path) -> str:
+        return f"[{tag}] {path}"
+
+    # --- 1. Scan all top-level IDE config files ---------------------------------
+    for target in _all_targets(paths):
+        if not target.path or not target.path.is_file():
+            continue
+        try:
+            data = json.loads(target.path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        servers = data.get(target.server_key, {})
+        if not isinstance(servers, dict):
+            continue
+        entry = servers.get(MCP_MEMPALACE)
+        if not isinstance(entry, dict):
+            continue
+        current_cmd = entry.get("command", "")
+        if current_cmd == expected_cmd and entry.get("args") == expected_args:
+            messages.append(f"  {GREEN}✓{NC} {_label(target.label, target.path)}")
+            continue
+        # Stale entry in an existing file — always fixable
+        tag = target.label
+        if fix:
+            servers[MCP_MEMPALACE] = target.entry_builder(MCP_MEMPALACE)
+            try:
+                target.path.write_text(
+                    json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                fixed_count += 1
+                messages.append(
+                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_cmd!r}"
+                )
+            except Exception as e:
+                messages.append(f"  {RED}[ ERROR ]{NC} {tag}: {e}")
+        else:
+            fixed_count += 1  # count stale for summary
+            messages.append(
+                f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r} (expected {expected_cmd!r})"
+            )
+
+    # --- 2. Scan per-project entries in ~/.claude.json --------------------------
+    claude_json = paths.claude_json
+    if claude_json.is_file():
+        try:
+            data = json.loads(claude_json.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        changed = False
+        for proj_key, proj_val in data.get("projects", {}).items():
+            if not isinstance(proj_val, dict):
+                continue
+            servers = proj_val.get("mcpServers", {})
+            if not isinstance(servers, dict):
+                continue
+            entry = servers.get(MCP_MEMPALACE)
+            if not isinstance(entry, dict):
+                continue
+            current_cmd = entry.get("command", "")
+            if current_cmd == expected_cmd and entry.get("args") == expected_args:
+                messages.append(f"  {GREEN}✓{NC} [project] {proj_key}")
+                continue
+            tag = f"project:{proj_key}"
+            if fix:
+                entry["command"] = expected_cmd
+                entry["args"] = list(expected_args)
+                changed = True
+                fixed_count += 1
+                messages.append(
+                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_cmd!r}"
+                )
+            else:
+                messages.append(
+                    f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r}"
+                )
+        if changed:
+            try:
+                claude_json.write_text(
+                    json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+            except Exception as e:
+                messages.append(f"  {RED}[ ERROR ]{NC} writing ~/.claude.json: {e}")
+
+    return fixed_count, messages
 
 
 def _deregister_in_file(target: RegistrationTarget) -> bool:

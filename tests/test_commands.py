@@ -432,7 +432,8 @@ class TestCleanBrain(_CmdBase):
         Path("mempalace.yaml").write_text("rooms: []\n", encoding="utf-8")
         Path("entities.json").write_text("{}", encoding="utf-8")
         Path(".claude/config.json").write_text("{}", encoding="utf-8")
-        Path(PROJECT_CLAUDE_MD := "CLAUDE.md").write_text(
+        Path(".claude").mkdir(exist_ok=True)
+        Path(".claude/CLAUDE.md").write_text(
             "# AI Agent 大腦與記憶指引\nold content\n", encoding="utf-8",
         )
         self._register([str(Path.cwd().resolve())])
@@ -739,8 +740,8 @@ class TestWriteConfigFiles(_CmdBase):
     def test_write_claude_md(self):
         ok = commands._write_project_claude_md()
         self.assertTrue(ok)
-        self.assertTrue(Path("CLAUDE.md").is_file())
-        content = Path("CLAUDE.md").read_text(encoding="utf-8")
+        self.assertTrue(Path(".claude/CLAUDE.md").is_file())
+        content = Path(".claude/CLAUDE.md").read_text(encoding="utf-8")
         self.assertIn("Memory", content)
 
     def test_remove_path_file(self):
@@ -774,16 +775,18 @@ class TestWriteConfigFiles(_CmdBase):
         self.assertTrue(d.exists())
 
     def test_maybe_unlink_claude_md_removes_managed(self):
-        Path("CLAUDE.md").write_text(
+        Path(".claude").mkdir(exist_ok=True)
+        Path(".claude/CLAUDE.md").write_text(
             "# AI Agent 大腦與記憶指引\nold content\n", encoding="utf-8",
         )
         commands._maybe_unlink_claude_md()
-        self.assertFalse(Path("CLAUDE.md").exists())
+        self.assertFalse(Path(".claude/CLAUDE.md").exists())
 
     def test_maybe_unlink_claude_md_preserves_custom(self):
-        Path("CLAUDE.md").write_text("# My Custom Guide\n", encoding="utf-8")
+        Path(".claude").mkdir(exist_ok=True)
+        Path(".claude/CLAUDE.md").write_text("# My Custom Guide\n", encoding="utf-8")
         commands._maybe_unlink_claude_md()
-        self.assertTrue(Path("CLAUDE.md").exists())
+        self.assertTrue(Path(".claude/CLAUDE.md").exists())
 
 
 # ============================================================================ #
@@ -864,7 +867,8 @@ class TestDoctorExtra(_CmdBase):
     @patch("ai_brain.verifier.run_all_checks")
     @patch("ai_brain.commands.subprocess.run")
     def test_doctor_stale_claude_md_fix(self, mock_run, mock_checks, mock_hooks):
-        Path("CLAUDE.md").write_text(
+        Path(".claude").mkdir(exist_ok=True)
+        Path(".claude/CLAUDE.md").write_text(
             "# Old\n\n## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)\n"
             "old block\n", encoding="utf-8",
         )
@@ -879,7 +883,7 @@ class TestDoctorExtra(_CmdBase):
                    return_value=[CheckResult("Mock", VERIFY_PASS)]):
             out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
             self.assertTrue(ok)
-            content = Path("CLAUDE.md").read_text(encoding="utf-8")
+            content = Path(".claude/CLAUDE.md").read_text(encoding="utf-8")
             self.assertIn("ALWAYS prefer", content)
 
     @patch("ai_brain.commands.git_hooks.install")
@@ -1363,14 +1367,15 @@ class TestMaybeRmdirEmpty(_CmdBase):
 
 class TestMaybeUnlinkClaudeMd(_CmdBase):
     def test_unlinks_matching_templates(self):
+        Path(".claude").mkdir(exist_ok=True)
         for title in (
             "AI Agent 認知工作流與大腦記憶指引",
             "AI Agent Cognitive Workflow and Memory Guide",
             "AI Agent Cognitive Workflow and Memory Guidelines",
         ):
-            Path("CLAUDE.md").write_text(f"# {title}\ncontent\n", encoding="utf-8")
+            Path(".claude/CLAUDE.md").write_text(f"# {title}\ncontent\n", encoding="utf-8")
             commands._maybe_unlink_claude_md()
-            self.assertFalse(Path("CLAUDE.md").exists())
+            self.assertFalse(Path(".claude/CLAUDE.md").exists())
 
 
 class TestGlobalCognitiveErrors(_CmdBase):
