@@ -1148,8 +1148,33 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
-    # 6b. MCP connectivity probe (Global Check - run once)
-    print(blue("6b. 檢查 MemPalace MCP 連線可用性..."))
+    # 6b. Check MCP command path consistency (fast — run first)
+    print(blue("6b. 檢查 MCP 指令路徑一致性..."))
+    from .mcp import sync_all_mcp_commands
+    stale_count, stale_msgs = sync_all_mcp_commands(paths, fix=False)
+    if stale_msgs:
+        for msg in stale_msgs:
+            print(msg)
+    if stale_count > 0:
+        print(red(f"  [ FAIL ] 發現 {stale_count} 個過時 MCP 指令路徑"))
+        if fix:
+            from .mcp import sync_all_mcp_commands as _sync
+            fixed, fix_msgs = _sync(paths, fix=True)
+            for msg in fix_msgs:
+                print(msg)
+            if fixed > 0:
+                print(green(f"  [ FIXED ] 已同步 {fixed} 個 MCP 指令路徑"))
+            print(yellow("  💡 請重啟 IDE / Claude Code 使設定生效"))
+        else:
+            all_pass = False
+            print(yellow("  💡 執行 `ai-brain doctor --fix` 或 `ai-brain mcp-sync --fix` 自動修正"))
+    else:
+        print(green("  [ PASS ] 所有 MCP 指令路徑均為最新"))
+
+    print()
+
+    # 6c. MCP connectivity probe (slow — up to 30s, run after path fix)
+    print(blue("6c. 檢查 MemPalace MCP 連線可用性..."))
     mcp_probe_ok = False
     mcp_probe_time = 0.0
     mcp_proc = None
@@ -1208,31 +1233,6 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         print(green(f"  [ PASS ] MemPalace MCP 連線正常 (回應時間: {mcp_probe_time:.2f}s)"))
     else:
         print(yellow("  [ WARN ] MemPalace MCP 連線探測未通過（無回應或逾時 30s），可稍後手動驗證"))
-
-    print()
-
-    # 6c. Check MCP command path consistency
-    print(blue("6c. 檢查 MCP 指令路徑一致性..."))
-    from .mcp import sync_all_mcp_commands
-    stale_count, stale_msgs = sync_all_mcp_commands(paths, fix=False)
-    if stale_msgs:
-        for msg in stale_msgs:
-            print(msg)
-    if stale_count > 0:
-        print(red(f"  [ FAIL ] 發現 {stale_count} 個過時 MCP 指令路徑"))
-        if fix:
-            from .mcp import sync_all_mcp_commands as _sync
-            fixed, fix_msgs = _sync(paths, fix=True)
-            for msg in fix_msgs:
-                print(msg)
-            if fixed > 0:
-                print(green(f"  [ FIXED ] 已同步 {fixed} 個 MCP 指令路徑"))
-            print(yellow("  💡 請重啟 IDE / Claude Code 使設定生效"))
-        else:
-            all_pass = False
-            print(yellow("  💡 執行 `ai-brain doctor --fix` 或 `ai-brain mcp-sync --fix` 自動修正"))
-    else:
-        print(green("  [ PASS ] 所有 MCP 指令路徑均為最新"))
 
     print()
 
