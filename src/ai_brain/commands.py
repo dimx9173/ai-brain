@@ -422,8 +422,13 @@ def check_status() -> bool:
     return True
 
 
-def run_gc(apply: bool = False) -> bool:
-    """Garbage-collect the MemPalace: clean drift backups, sync, compress."""
+def run_gc(apply: bool = False, purge_wing: str | None = None) -> bool:
+    """Garbage-collect the MemPalace: clean drift backups, sync, compress.
+
+    If *purge_wing* is set, directly delete all embeddings for that wing
+    from the ChromaDB (bypasses slow sync/compress — useful for bloated
+    palaces that can't complete normal GC within timeouts).
+    """
     lock_fd = _acquire_brain_lock()
     if lock_fd is None:
         print(yellow("[ WARN ] 另一個 ai-brain 正在執行，無法執行 gc"))
@@ -432,6 +437,88 @@ def run_gc(apply: bool = False) -> bool:
     try:
         print(blue("====== 🗑️ 開始 Palace 垃圾回收 ======"))
         palace_dir = Path.home() / ".mempalace" / "palace"
+        chroma_db = palace_dir / "chroma.sqlite3"
+
+        # -- Step 0: Purge specific wing (if requested) --
+        if purge_wing:
+            print(blue(f"0. 清除 wing '{purge_wing}' 的所有 embeddings..."))
+            if not chroma_db.is_file():
+                print(red("  ChromaDB 不存在，無法清除"))
+            elif not apply:
+                # Show what would be deleted
+                try:
+                    import sqlite3
+                    conn = sqlite3.connect(str(chroma_db))
+                    cur = conn.cursor()
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT em.id)
+                        FROM embedding_metadata em
+                        WHERE em.key = 'wing' AND em.string_value = ?
+                    """, (purge_wing,))
+                    count = cur.fetchone()[0]
+                    cur.execute("""
+                        SELECT COUNT(*) FROM embedding_metadata
+                    """)
+                    total = cur.fetchone()[0]
+                    conn.close()
+                    size_mb = chroma_db.stat().st_size / (1024 ** 2)
+                    print(yellow(f"  Wing '{purge_wing}': {count:,} embeddings"))
+                    print(yellow(f"  Total: {total:,} embeddings, DB: {size_mb:.0f} MB"))
+                    print(yellow(f"  使用 --apply --purge-wing {purge_wing} 以實際刪除"))
+                except Exception as e:
+                    print(red(f"  [ ERROR ] 無法讀取 ChromaDB ({e})"))
+            else:
+                try:
+                    import sqlite3
+                    size_before = chroma_db.stat().st_size
+
+                    conn = sqlite3.connect(str(chroma_db))
+                    cur = conn.cursor()
+
+                    # Get embedding IDs for this wing
+                    cur.execute("""
+                        SELECT DISTINCT id FROM embedding_metadata
+                        WHERE key = 'wing' AND string_value = ?
+                    """, (purge_wing,))
+                    ids_to_delete = [row[0] for row in cur.fetchall()]
+                    count = len(ids_to_delete)
+
+                    if count == 0:
+                        print(green(f"  Wing '{purge_wing}' 無 embeddings，無需清除"))
+                        conn.close()
+                    else:
+                        # Batch delete (SQLite has 999 variable limit)
+                        _BATCH = 900
+                        deleted = 0
+                        for i in range(0, len(ids_to_delete), _BATCH):
+                            batch = ids_to_delete[i:i + _BATCH]
+                            placeholders = ",".join("?" * len(batch))
+                            for table in ("embedding_metadata", "embeddings"):
+                                try:
+                                    cur.execute(f"DELETE FROM {table} WHERE id IN ({placeholders})", batch)
+                                except Exception:
+                                    pass
+                            try:
+                                cur.execute(f"DELETE FROM embedding_fulltext_search WHERE id IN ({placeholders})", batch)
+                            except Exception:
+                                pass
+                            deleted += len(batch)
+                            if deleted % 10000 < _BATCH:
+                                print(f"  進度: {deleted:,} / {count:,}")
+
+                        conn.commit()
+                        print(green(f"  已刪除 {deleted:,} 筆。執行 VACUUM..."))
+                        conn.execute("VACUUM")
+                        conn.close()
+
+                        size_after = chroma_db.stat().st_size
+                        freed_mb = (size_before - size_after) / (1024 ** 2)
+                        print(green(f"  釋放空間: {freed_mb:.0f} MB ({size_before / 1024**2:.0f} MB → {size_after / 1024**2:.0f} MB)"))
+
+                except Exception as e:
+                    print(red(f"  [ ERROR ] 清除 wing 失敗 ({e})"))
+
+            print()
 
         # -- Step 1: Clean drift backups --
         print(blue("1. 掃描 drift 備份..."))
@@ -461,26 +548,30 @@ def run_gc(apply: bool = False) -> bool:
 
         print()
 
-        # -- Step 2: mempalace sync --
-        print(blue("2. 執行記憶庫同步..."))
-        sync_cmd = [TOOL_MEMPALACE, "sync"]
-        if apply:
-            sync_cmd.append("--apply")
-        sync_cmd.append(".")
-        try:
-            res = subprocess.run(sync_cmd, capture_output=True, text=True, timeout=120)
-            if res.returncode == 0:
-                print(green("  記憶庫同步完成"))
-            else:
-                print(yellow(f"  記憶庫同步結束 (exit code {res.returncode})"))
-                if res.stderr:
-                    print(yellow(f"  {res.stderr.strip()}"))
-        except subprocess.TimeoutExpired:
-            print(yellow("  [ TIMEOUT ] mempalace sync 已逾時 (>120s)"))
-        except FileNotFoundError:
-            print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
-        except Exception as e:
-            print(red(f"  [ ERROR ] mempalace sync 失敗 ({e})"))
+        # -- Step 2: mempalace sync (skip if purge_wing already cleaned up) --
+        if purge_wing and apply:
+            print(blue("2. 執行記憶庫同步..."))
+            print(green("  已跳過（purge-wing 已直接清理 DB）"))
+        else:
+            print(blue("2. 執行記憶庫同步..."))
+            sync_cmd = [TOOL_MEMPALACE, "sync"]
+            if apply:
+                sync_cmd.append("--apply")
+            sync_cmd.append(".")
+            try:
+                res = subprocess.run(sync_cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode == 0:
+                    print(green("  記憶庫同步完成"))
+                else:
+                    print(yellow(f"  記憶庫同步結束 (exit code {res.returncode})"))
+                    if res.stderr:
+                        print(yellow(f"  {res.stderr.strip()}"))
+            except subprocess.TimeoutExpired:
+                print(yellow("  [ TIMEOUT ] mempalace sync 已逾時 (>120s)"))
+            except FileNotFoundError:
+                print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
+            except Exception as e:
+                print(red(f"  [ ERROR ] mempalace sync 失敗 ({e})"))
 
         print()
 
@@ -499,29 +590,33 @@ def run_gc(apply: bool = False) -> bool:
 
         print()
 
-        # -- Step 4: mempalace compress --
-        print(blue("4. 執行 ChromaDB 壓縮..."))
-        compress_cmd = [TOOL_MEMPALACE, "compress"]
-        if not apply:
-            compress_cmd.append("--dry-run")
-        try:
-            res = subprocess.run(compress_cmd, capture_output=True, text=True, timeout=300)
-            if res.returncode == 0:
-                if apply:
-                    print(green("  ChromaDB 壓縮完成"))
+        # -- Step 4: mempalace compress (skip if purge_wing already VACUUMed) --
+        if purge_wing and apply:
+            print(blue("4. 執行 ChromaDB 壓縮..."))
+            print(green("  已跳過（purge-wing 已執行 VACUUM）"))
+        else:
+            print(blue("4. 執行 ChromaDB 壓縮..."))
+            compress_cmd = [TOOL_MEMPALACE, "compress"]
+            if not apply:
+                compress_cmd.append("--dry-run")
+            try:
+                res = subprocess.run(compress_cmd, capture_output=True, text=True, timeout=300)
+                if res.returncode == 0:
+                    if apply:
+                        print(green("  ChromaDB 壓縮完成"))
+                    else:
+                        print(green("  ChromaDB 壓縮預演完成（未實際修改）"))
+                        print(yellow("  使用 --apply 以實際執行壓縮"))
                 else:
-                    print(green("  ChromaDB 壓縮預演完成（未實際修改）"))
-                    print(yellow("  使用 --apply 以實際執行壓縮"))
-            else:
-                print(yellow(f"  壓縮結束 (exit code {res.returncode})"))
-                if res.stderr:
-                    print(yellow(f"  {res.stderr.strip()}"))
-        except subprocess.TimeoutExpired:
-            print(yellow("  [ TIMEOUT ] mempalace compress 已逾時 (>300s)"))
-        except FileNotFoundError:
-            print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
-        except Exception as e:
-            print(red(f"  [ ERROR ] mempalace compress 失敗 ({e})"))
+                    print(yellow(f"  壓縮結束 (exit code {res.returncode})"))
+                    if res.stderr:
+                        print(yellow(f"  {res.stderr.strip()}"))
+            except subprocess.TimeoutExpired:
+                print(yellow("  [ TIMEOUT ] mempalace compress 已逾時 (>300s)"))
+            except FileNotFoundError:
+                print(yellow("  [ WARN ] 未找到 mempalace CLI，跳過"))
+            except Exception as e:
+                print(red(f"  [ ERROR ] mempalace compress 失敗 ({e})"))
 
         print()
 

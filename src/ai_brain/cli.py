@@ -49,6 +49,7 @@ def _show_help() -> None:
         ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
         ("gc", "[垃圾回收] 清理 drift 備份、同步記憶庫、壓縮 ChromaDB"),
         ("gc --apply", "[實際執行] 執行垃圾回收並實際修改資料庫"),
+        ("gc --purge-wing <name>", "[清除 wing] 直接刪除指定 wing 的所有 embeddings（快速釋放空間）"),
         ("mcp-sync", "[MCP 同步] 檢查所有 IDE 的 MCP 指令路徑是否為最新"),
         ("mcp-sync --fix", "[MCP 修復] 自動同步所有 MCP 指令路徑至最快可用版本"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
@@ -98,7 +99,7 @@ def _cmd_doctor(args, paths) -> int:
 
 
 def _cmd_gc(args, _paths) -> int:
-    return 0 if commands.run_gc(apply=args.apply) else 1
+    return 0 if commands.run_gc(apply=args.apply, purge_wing=args.purge_wing) else 1
 
 
 def _cmd_mine(args, _paths) -> int:
@@ -192,6 +193,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fix", action="store_true", help="Automatically fix detected issues")
     p = sub.add_parser("gc", help="Garbage-collect palace drift backups and compress ChromaDB", add_help=False)
     p.add_argument("--apply", action="store_true", help="Actually perform changes (default is dry-run)")
+    p.add_argument("--purge-wing", default=None,
+                   help="Delete all embeddings for a specific wing (bypasses slow sync/compress)")
     p = sub.add_parser("mcp-sync", help="Sync all MCP server command paths to fastest binary", add_help=False)
     p.add_argument("--fix", action="store_true", help="Actually update stale paths")
     _add_common("clean", "Remove local brain configuration")
@@ -274,11 +277,14 @@ class _Namespace_for:
         # `mine` subcommand args
         self.mine_mode = None
         self.wing = None
+        self.purge_wing = None
         for i, arg in enumerate(rest):
             if arg == "--mode" and i + 1 < len(rest):
                 self.mine_mode = rest[i + 1]
             elif arg == "--wing" and i + 1 < len(rest):
                 self.wing = rest[i + 1]
+            elif arg == "--purge-wing" and i + 1 < len(rest):
+                self.purge_wing = rest[i + 1]
 
 
 if __name__ == "__main__":
