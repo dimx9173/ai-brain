@@ -22,8 +22,10 @@ from .constants import (
     CODEBASE_MEMORY_OUT_DIR,
     COGNITIVE_PRINCIPLES_BLOCK,
     COGNITIVE_PRINCIPLES_MARKER,
+    GC_BACKGROUND_GAP_SECONDS,
     HOOK_BEGIN_MARKER,
     HOOKS_CONFIG,
+    LAST_GC_FILE,
     LAST_SWEEP_FILE,
     LOCAL_CLAUDE_MD_TEMPLATE,
     LOCAL_CODEBASE_MEMORY_SKILL,
@@ -155,7 +157,6 @@ def full_init(paths) -> bool:
     print()
     from . import cron
     cron.install()
-    cron.install_gc()
 
     register_all(paths)
 
@@ -256,6 +257,18 @@ def start_day(fast: bool = False) -> bool:
                     pass
                 except Exception:
                     pass
+
+        # Idle-based GC: trigger background GC if >7 days since last one
+        if _should_run_gc():
+            print(yellow("--> 偵測到距上次 GC 已超过 7 天，正在背景執行記憶宮殿垃圾回收..."))
+            try:
+                subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "gc", "--apply"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                print(red(f"警告：背景 GC 啟動失敗 ({e})"))
 
         print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
         if not _run_codebase_memory_index():
@@ -542,6 +555,9 @@ def run_gc(apply: bool = False) -> bool:
         if not apply:
             print()
             print(yellow("💡 以上為預演模式。確認無誤後請執行: ai-brain gc --apply"))
+
+        if apply:
+            _record_gc_timestamp()
 
         print(green("====== 🎉 垃圾回收結束 ======"))
         return True
@@ -1783,6 +1799,25 @@ def _record_sweep_timestamp() -> None:
     try:
         LAST_SWEEP_FILE().parent.mkdir(parents=True, exist_ok=True)
         LAST_SWEEP_FILE().write_text(str(int(time.time())) + "\n")
+    except Exception:
+        pass
+
+
+def _should_run_gc() -> bool:
+    """Return True if more than GC_BACKGROUND_GAP_SECONDS since last GC."""
+    if not LAST_GC_FILE().is_file():
+        return True
+    try:
+        last = int(LAST_GC_FILE().read_text().strip())
+    except Exception:
+        return True
+    return (int(time.time()) - last) > GC_BACKGROUND_GAP_SECONDS
+
+
+def _record_gc_timestamp() -> None:
+    try:
+        LAST_GC_FILE().parent.mkdir(parents=True, exist_ok=True)
+        LAST_GC_FILE().write_text(str(int(time.time())) + "\n")
     except Exception:
         pass
 

@@ -536,6 +536,9 @@ class TestStartDay(_CmdBase):
         lsf.parent.mkdir(parents=True, exist_ok=True)
         import time
         lsf.write_text(str(int(time.time()) - 100), encoding="utf-8")
+        # Also create a recent GC timestamp so _should_run_gc() is False
+        lgf = commands.LAST_GC_FILE()
+        lgf.write_text(str(int(time.time()) - 100), encoding="utf-8")
 
         commands.start_day()
         self.assertFalse(mock_popen.called)
