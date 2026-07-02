@@ -85,16 +85,16 @@ ai-brain full-init
 
 | Command | Description | Recommended Usage | Safety |
 | :--- | :--- | :--- | :--- |
-| `init` | Initialize local wing configurations, codebase index, CLAUDE.md, and Git Hook bindings. | Run once per new project | ✅ Safe |
+| `init` | Initialize local wing configurations, codebase index, `.claude/CLAUDE.md`, and Git Hook bindings. | Run once per new project | ✅ Safe |
 | `full-init` | Perform `init` plus register the global daily auto-archive Cron Job at 23:30. | Run once per system setup | ✅ Safe |
 | `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |
 | `update` | Alias for `install` (supports auto Git-pull and copy-updating from the cloned source repo). | Run to update | ✅ Safe |
 | `start` | Generate or update the latest codebase architecture maps. | Runs automatically via Git Hooks | ✅ Safe |
 | `stop` | Safe scan, sweep, and archive of the day's local chat context to the long-term SQLite memory palace. | Run at end of day | ✅ Safe |
-| `status` | Print current project memory status (MemPalace, Codebase-Memory, CLAUDE.md, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
+| `status` | Print current project memory status (MemPalace, Codebase-Memory, `.claude/CLAUDE.md`, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
 | `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
 | `doctor` | Perform comprehensive diagnostics (check gitignore, stale locks, CLI paths) across all projects. | Run for deep troubleshooting | 🔍 Read-only |
-| `doctor --fix` | Diagnoses and auto-fixes configuration errors, updating obsolete cognitive rules in CLAUDE.md files. | Run to auto-heal system | 🔧 Modifying |
+| `doctor --fix` | Diagnoses and auto-fixes configuration errors, updating obsolete cognitive rules in `.claude/CLAUDE.md` files. | Run to auto-heal system | 🔧 Modifying |
 | `list` | Show auto-archive status of all registered active projects in the system. | Run to see project list | 🔍 Read-only |
 | `remove [key]` | Remove/deregister a project (by index or keyword) from the active registry list. | Run to clean active list | 🗑️ Destructive |
 | `version` | Display the installed version of `ai-brain`. | Run to check version | 🔍 Read-only |
@@ -121,7 +121,7 @@ ai-brain remove [key]      # Deregister a project from the system (accepts index
 - **Claude Code / Rufus / OpenClaw**: Automatically registered on `full-init` via stdio command configuration.
 - **Gemini / Antigravity IDE / OpenCode**: Registered in `~/.gemini/config/mcp_config.json` and `~/.mcp.json` to launch `codebase-memory-mcp` as a stdio server.
 - **Codex Agent**: TOML configuration is automatically managed at `~/.codex/config.toml` to register stdio-based MCP servers.
-- **Cursor / VS Code / Claude Desktop**: Integrates with local `.git/hooks`, `CLAUDE.md`, and `.codebase-memory/` automatically, registering the MCP server for agent-wide context search.
+- **Cursor / VS Code / Claude Desktop**: Integrates with local `.git/hooks`, `.claude/CLAUDE.md`, and `.codebase-memory/` automatically, registering the MCP server for agent-wide context search.
 
 ---
 
