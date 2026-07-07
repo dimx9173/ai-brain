@@ -701,6 +701,36 @@ class TestRunMempalaceInit(_CmdBase):
         self.assertFalse(ok)
 
 
+class TestMineToPalace(_CmdBase):
+    @patch("ai_brain.commands.subprocess.run")
+    def test_mine_to_palace_success(self, mock_run):
+        mock_run.return_value = self._mk_subprocess_result()
+        ok = commands.mine_to_palace(target=".", mode="default")
+        self.assertTrue(ok)
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        self.assertIn("mine", args)
+        self.assertNotIn("timeout", mock_run.call_args[1])
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_mine_to_palace_missing_tool(self, mock_run):
+        mock_run.side_effect = FileNotFoundError("no mempalace")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ok = commands.mine_to_palace(target=".", mode="default")
+        self.assertFalse(ok)
+        self.assertIn("未找到", out.getvalue())
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_mine_to_palace_command_failed(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mempalace")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ok = commands.mine_to_palace(target=".", mode="default")
+        self.assertFalse(ok)
+        self.assertIn("失敗", out.getvalue())
+
+
 class TestRunCodebaseMemoryInit(_CmdBase):
     @patch("ai_brain.commands.subprocess.run")
     def test_success(self, mock_run):

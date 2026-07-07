@@ -702,12 +702,9 @@ def mine_to_palace(
             print(f"    Wing: {wing}")
 
         try:
-            subprocess.run(cmd, check=True, timeout=300)
+            subprocess.run(cmd, check=True)
             print(green("✅ 歸檔完成！"))
             return True
-        except subprocess.TimeoutExpired:
-            print(yellow("[ TIMEOUT ] mempalace mine 已逾時 (>300s)"))
-            return False
         except subprocess.CalledProcessError as e:
             print(red(f"錯誤：mempalace mine 失敗 ({e})"))
             return False
@@ -1792,24 +1789,18 @@ def _run_mempalace_init() -> bool:
     try:
         subprocess.run(
             [TOOL_MEMPALACE, "init", "--yes", "--no-llm", "."],
-            check=True, timeout=60,
+            check=True,
         )
         try:
             subprocess.run(
                 [TOOL_MEMPALACE, "sync", "--apply", "."],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=120,
             )
-        except subprocess.TimeoutExpired:
-            print(yellow("[ TIMEOUT ] mempalace sync --apply 已逾時 (>120s)，繼續處理"))
         except Exception:
             pass
         return True
     except FileNotFoundError:
         print(red("錯誤：未找到 mempalace 工具，請先執行: uv tool install mempalace --force"))
-        return False
-    except subprocess.TimeoutExpired:
-        print(yellow("[ TIMEOUT ] mempalace init 已逾時 (>180s)"))
         return False
     except subprocess.CalledProcessError as e:
         print(red(f"錯誤：mempalace 初始化失敗 ({e})"))
