@@ -1267,12 +1267,14 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     # 6c. MCP connectivity probe (slow — up to 30s, run after path fix)
     print(blue("6c. 檢查 MemPalace MCP 連線可用性..."))
+    from .constants import MEMPALACE_MCP_COMMAND
     mcp_probe_ok = False
     mcp_probe_time = 0.0
     mcp_proc = None
     try:
+        mcp_cmd = MEMPALACE_MCP_COMMAND()
         mcp_proc = subprocess.Popen(
-            [TOOL_MEMPALACE, "mcp"],
+            mcp_cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
