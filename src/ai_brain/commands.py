@@ -1193,9 +1193,19 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     # 6. Check MCP verifies (Global Check - run once)
     print(blue("6. 檢查 IDE MCP 大腦配置與伺服器載入..."))
+    try:
+        os.fstat(1)
+        print("FD 1 is OK before run_all_checks", file=sys.stderr)
+    except OSError:
+        print("FD 1 is BAD before run_all_checks", file=sys.stderr)
     from .verifier import FAIL as VERIFY_FAIL
     from .verifier import run_all_checks
     mcp_results = run_all_checks(paths)
+    try:
+        os.fstat(1)
+        print("FD 1 is OK after run_all_checks", file=sys.stderr)
+    except OSError:
+        print("FD 1 is BAD after run_all_checks", file=sys.stderr)
     mcp_failures = 0
     for r in mcp_results:
         if r.status == VERIFY_FAIL:
@@ -1267,6 +1277,11 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     # 6c. MCP connectivity probe (slow — up to 30s, run after path fix)
     print(blue("6c. 檢查 MemPalace MCP 連線可用性..."))
+    try:
+        os.fstat(1)
+        print("FD 1 is OK before 6c start", file=sys.stderr)
+    except OSError:
+        print("FD 1 is BAD before 6c start", file=sys.stderr)
     mcp_probe_ok = False
     mcp_probe_time = 0.0
     mcp_proc = None
@@ -1278,6 +1293,11 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
             stderr=subprocess.PIPE,
             text=True,
         )
+        try:
+            os.fstat(1)
+            print("FD 1 is OK after Popen", file=sys.stderr)
+        except OSError:
+            print("FD 1 is BAD after Popen", file=sys.stderr)
         init_msg = json.dumps({
             "jsonrpc": "2.0",
             "id": 1,
@@ -1311,7 +1331,23 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     except Exception as e:
         print(yellow(f"  [ WARN ] MCP 連線探測異常 ({e})"))
     finally:
+        try:
+            os.fstat(1)
+            print("FD 1 is OK before pipe close", file=sys.stderr)
+        except OSError:
+            print("FD 1 is BAD before pipe close", file=sys.stderr)
         if mcp_proc is not None:
+            for pipe in (mcp_proc.stdin, mcp_proc.stdout, mcp_proc.stderr):
+                if pipe is not None:
+                    try:
+                        pipe.close()
+                    except Exception:
+                        pass
+            try:
+                os.fstat(1)
+                print("FD 1 is OK after pipe close", file=sys.stderr)
+            except OSError:
+                print("FD 1 is BAD after pipe close", file=sys.stderr)
             try:
                 mcp_proc.terminate()
                 mcp_proc.wait(timeout=5)
@@ -1320,6 +1356,11 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     mcp_proc.kill()
                 except Exception:
                     pass
+            try:
+                os.fstat(1)
+                print("FD 1 is OK after terminate/wait", file=sys.stderr)
+            except OSError:
+                print("FD 1 is BAD after terminate/wait", file=sys.stderr)
 
     if mcp_probe_ok:
         print(green(f"  [ PASS ] MemPalace MCP 連線正常 (回應時間: {mcp_probe_time:.2f}s)"))

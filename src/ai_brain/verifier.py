@@ -43,7 +43,7 @@ def check_mcp_config(
 ) -> CheckResult:
     """Verify that *config_path* declares every server in *required_servers*."""
     name = f"檢查 {label} MCP 記憶載入與內容正確性"
-    if not config_path:
+    if not config_path or not isinstance(config_path, Path):
         return CheckResult(name, INFO, "(此環境未安裝，略過)")
 
     if not config_path.is_file():
@@ -208,12 +208,19 @@ def check_mempalace_connectivity() -> CheckResult:
             f"(連線失敗: {e}；建議執行 ai-brain gc --apply 或 ai-brain doctor --fix)",
         )
     finally:
-        if proc is not None and proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+        if proc is not None:
+            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                if pipe is not None:
+                    try:
+                        pipe.close()
+                    except Exception:
+                        pass
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
 
 
 # --- Pretty printer -------------------------------------------------------------
@@ -288,11 +295,13 @@ def run_all_checks(paths) -> List[CheckResult]:
     kilo_paths: List[Path] = []
     if HOME().joinpath(".config", "kilo").is_dir():
         kilo_paths.append(HOME() / ".config" / "kilo" / "kilo.json")
-    if paths.vscode_kilo and paths.vscode_kilo.parent.is_dir():
+    if paths.vscode_kilo and isinstance(paths.vscode_kilo, Path) and paths.vscode_kilo.parent.is_dir():
         kilo_paths.append(paths.vscode_kilo)
     if kilo_paths:
         first_fail = None
         for p in kilo_paths:
+            if not isinstance(p, Path) or not p.is_file():
+                continue
             # Kilo config has the same content but may nest under `mcp` instead of `mcpServers`.
             try:
                 with open(p, encoding="utf-8") as f:
@@ -304,7 +313,7 @@ def run_all_checks(paths) -> List[CheckResult]:
             if r.status != PASS:
                 first_fail = r
                 break
-        results.append(first_fail or CheckResult("檢查 Kilo MCP 記憶載入與內容正確性", PASS))
+        results.append(first_fail or CheckResult("檢查 Kilo MCP 記憶載入與內容正确性", PASS))
     else:
         results.append(CheckResult("檢查 Kilo MCP 記憶載入與內容正確性", INFO,
                                    "(此環境未安裝 Kilo，跳過檢查)"))

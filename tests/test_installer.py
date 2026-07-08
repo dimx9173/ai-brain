@@ -151,19 +151,21 @@ class TestInstallFromSource(InTempDir):
 
     def test_success_path_with_path_in_env(self) -> None:
         script = self._prepare_fake_source_tree()
-        installer.GLOBAL_AI_BRAIN = lambda: Path(self.tmpdir) / ".local" / "bin" / "ai-brain"
-        with patch("ai_brain.installer._write_global_shim", return_value=True):
-            with patch.dict(os.environ, {"PATH": str(Path.home() / ".local" / "bin")}):
-                ok = installer._install_from_source(script)
+        resolved = Path(self.tmpdir) / ".local" / "bin" / "ai-brain"
+        with patch("ai_brain.installer.GLOBAL_AI_BRAIN", return_value=resolved):
+            with patch("ai_brain.installer._write_global_shim", return_value=True):
+                with patch.dict(os.environ, {"PATH": str(Path.home() / ".local" / "bin")}):
+                    ok = installer._install_from_source(script)
         self.assertTrue(ok)
         self.assertTrue(INSTALL_SOURCE_REGISTRY().is_file())
 
     def test_warns_when_path_missing_local_bin(self) -> None:
         script = self._prepare_fake_source_tree()
-        installer.GLOBAL_AI_BRAIN = lambda: Path(self.tmpdir) / ".local" / "bin" / "ai-brain"
-        with patch("ai_brain.installer._write_global_shim", return_value=True):
-            with patch.dict(os.environ, {"PATH": "/usr/bin"}, clear=True):
-                ok = installer._install_from_source(script)
+        resolved = Path(self.tmpdir) / ".local" / "bin" / "ai-brain"
+        with patch("ai_brain.installer.GLOBAL_AI_BRAIN", return_value=resolved):
+            with patch("ai_brain.installer._write_global_shim", return_value=True):
+                with patch.dict(os.environ, {"PATH": "/usr/bin"}, clear=True):
+                    ok = installer._install_from_source(script)
         self.assertTrue(ok)
 
     def test_returns_false_when_shim_write_fails(self) -> None:

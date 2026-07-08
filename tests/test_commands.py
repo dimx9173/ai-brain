@@ -26,6 +26,21 @@ class _CmdBase(InTempDir):
         gi = commands._global_gitignore_path()
         gi.parent.mkdir(parents=True, exist_ok=True)
         gi.write_text(".codebase-memory/\n", encoding="utf-8")
+        self._popen_patcher = unittest.mock.patch("subprocess.Popen")
+        self.mock_popen = self._popen_patcher.start()
+        self.mock_proc = unittest.mock.MagicMock()
+        self.mock_proc.poll.return_value = 0
+        self.mock_proc.returncode = 0
+        self.mock_proc.stdin = unittest.mock.MagicMock()
+        self.mock_proc.stdout = unittest.mock.MagicMock()
+        self.mock_proc.stderr = unittest.mock.MagicMock()
+        self.mock_proc.stdout.readline.return_value = '{"jsonrpc":"2.0","result":{}}\n'
+        self.mock_proc.stdout.read.return_value = b'{"jsonrpc":"2.0","result":{}}\n'
+        self.mock_popen.return_value = self.mock_proc
+
+    def tearDown(self):
+        self._popen_patcher.stop()
+        super().tearDown()
 
     def _register(self, paths: list[str]) -> None:
         registry.REGISTRY_PATH().parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +84,24 @@ class _CmdBase(InTempDir):
 # ============================================================================ #
 
 class _RegisterSeveralMixin(InTempDir):
+    def setUp(self):
+        super().setUp()
+        self._popen_patcher = unittest.mock.patch("subprocess.Popen")
+        self.mock_popen = self._popen_patcher.start()
+        self.mock_proc = unittest.mock.MagicMock()
+        self.mock_proc.poll.return_value = 0
+        self.mock_proc.returncode = 0
+        self.mock_proc.stdin = unittest.mock.MagicMock()
+        self.mock_proc.stdout = unittest.mock.MagicMock()
+        self.mock_proc.stderr = unittest.mock.MagicMock()
+        self.mock_proc.stdout.readline.return_value = '{"jsonrpc":"2.0","result":{}}\n'
+        self.mock_proc.stdout.read.return_value = b'{"jsonrpc":"2.0","result":{}}\n'
+        self.mock_popen.return_value = self.mock_proc
+
+    def tearDown(self):
+        self._popen_patcher.stop()
+        super().tearDown()
+
     def _register(self, paths: list[str]) -> None:
         target = registry.REGISTRY_PATH()
         target.parent.mkdir(parents=True, exist_ok=True)
