@@ -202,7 +202,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("Codex", paths.codex_toml, "mcp_servers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _codex_entry),
-        RegistrationTarget("OpenClaw", paths.openclaw_config, "mcpServers",
+        RegistrationTarget("OpenClaw", paths.openclaw_config, "mcp.servers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _openclaw_entry),
     ]
 
@@ -240,7 +240,11 @@ def deregister_all(paths) -> int:
 
 def _register_in_file(target: RegistrationTarget) -> bool:
     def _modifier(data: dict[str, Any]) -> dict[str, Any]:
-        servers = data.setdefault(target.server_key, {})
+        parts = target.server_key.split('.')
+        curr = data
+        for p in parts[:-1]:
+            curr = curr.setdefault(p, {})
+        servers = curr.setdefault(parts[-1], {})
         if "graphify" in servers:
             del servers["graphify"]
             print(f"Successfully cleaned up obsolete server graphify from {target.label}")
@@ -288,7 +292,18 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
             data = json.loads(target.path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        servers = data.get(target.server_key, {})
+        parts = target.server_key.split('.')
+        curr = data
+        found = True
+        for p in parts[:-1]:
+            if isinstance(curr, dict) and p in curr and isinstance(curr[p], dict):
+                curr = curr[p]
+            else:
+                found = False
+                break
+        if not found or not isinstance(curr, dict) or parts[-1] not in curr:
+            continue
+        servers = curr[parts[-1]]
         if not isinstance(servers, dict):
             continue
         entry = servers.get(MCP_MEMPALACE)
@@ -367,12 +382,22 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
 
 def _deregister_in_file(target: RegistrationTarget) -> bool:
     def _modifier(data: dict[str, Any]) -> dict[str, Any]:
-        if target.server_key in data:
-            if "graphify" in data[target.server_key]:
-                del data[target.server_key]["graphify"]
+        parts = target.server_key.split('.')
+        curr = data
+        found = True
+        for p in parts[:-1]:
+            if p in curr and isinstance(curr[p], dict):
+                curr = curr[p]
+            else:
+                found = False
+                break
+        if found and parts[-1] in curr and isinstance(curr[parts[-1]], dict):
+            servers = curr[parts[-1]]
+            if "graphify" in servers:
+                del servers["graphify"]
             for server in target.servers:
-                if server in data[target.server_key]:
-                    del data[target.server_key][server]
+                if server in servers:
+                    del servers[server]
             print(f"Successfully deregistered servers from {target.label}")
         return data
 

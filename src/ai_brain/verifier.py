@@ -60,7 +60,14 @@ def check_mcp_config(
         fmt = "TOML" if config_path.suffix == ".toml" else "JSON"
         return CheckResult(name, FAIL, f"({fmt} 格式損壞 ({e}))")
 
-    mcp_servers = data.get(server_key, {})
+    parts = server_key.split('.')
+    mcp_servers = data
+    for p in parts:
+        if isinstance(mcp_servers, dict):
+            mcp_servers = mcp_servers.get(p, {})
+        else:
+            mcp_servers = {}
+            break
     for server in required_servers:
         if server not in mcp_servers:
             return CheckResult(name, FAIL, f"(未註冊 {server})")

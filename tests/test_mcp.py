@@ -65,7 +65,7 @@ def _minimal_paths() -> ToolPaths:
         opencode_json=base / ".config" / "opencode" / "opencode.json",
         cursor_json=base / ".cursor" / "mcp.json",
         codex_toml=base / ".codex" / "config.toml",
-        openclaw_config=base / ".openclaw" / "config.json",
+        openclaw_config=base / ".openclaw" / "openclaw.json",
     )
 
 
@@ -293,6 +293,19 @@ class TestRegisterInFileJSON(InTempDir):
         _register_in_file(rt)
         data = _read_json(target)
         self.assertNotIn("graphify", data["mcpServers"])
+
+    def test_supports_dotted_key_paths(self):
+        target = Path.home() / "cfg.json"
+        rt = RegistrationTarget(
+            "Test", target, "mcp.servers", ALL_SERVERS, _stdio_server_entry,
+        )
+        result = _register_in_file(rt)
+        self.assertTrue(result)
+        data = _read_json(target)
+        self.assertIn("mcp", data)
+        self.assertIn("servers", data["mcp"])
+        self.assertIn(MCP_MEMPALACE, data["mcp"]["servers"])
+        self.assertIn(MCP_CODEBASE_MEMORY, data["mcp"]["servers"])
 
 
 # ---------------------------------------------------------------------------
