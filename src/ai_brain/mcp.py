@@ -272,12 +272,9 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
 
     Returns ``(fixed_count, messages)``.  When *fix* is False only reports.
     """
-    from .constants import MEMPALACE_MCP_COMMAND, MCP_MEMPALACE
+    from .constants import MCP_MEMPALACE
     from .ui import GREEN, NC, RED, YELLOW
 
-    expected = MEMPALACE_MCP_COMMAND()
-    expected_cmd = expected[0]
-    expected_args = expected[1:]
     fixed_count = 0
     messages: list[str] = []
 
@@ -309,14 +306,21 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
         entry = servers.get(MCP_MEMPALACE)
         if not isinstance(entry, dict):
             continue
-        current_cmd = entry.get("command", "")
-        if current_cmd == expected_cmd and entry.get("args") == expected_args:
+
+        # Build the expected entry for this target so we compare the exact
+        # canonical shape (some IDEs use list-form "command" instead of
+        # separate "command"+"args" fields, e.g. Kilo CLI, OpenClaw).
+        expected_entry = target.entry_builder(MCP_MEMPALACE)
+        if entry == expected_entry:
             messages.append(f"  {GREEN}✓{NC} {_label(target.label, target.path)}")
             continue
+
         # Stale entry in an existing file — always fixable
+        # For display, show the command portion (may be a list or string).
+        current_cmd = entry.get("command", "")
         tag = target.label
         if fix:
-            servers[MCP_MEMPALACE] = target.entry_builder(MCP_MEMPALACE)
+            servers[MCP_MEMPALACE] = expected_entry
             try:
                 target.path.write_text(
                     json.dumps(data, indent=2, ensure_ascii=False) + "\n",
@@ -324,14 +328,14 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
                 )
                 fixed_count += 1
                 messages.append(
-                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_cmd!r}"
+                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_entry.get('command')!r}"
                 )
             except Exception as e:
                 messages.append(f"  {RED}[ ERROR ]{NC} {tag}: {e}")
         else:
             fixed_count += 1  # count stale for summary
             messages.append(
-                f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r} (expected {expected_cmd!r})"
+                f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r} (expected {expected_entry.get('command')!r})"
             )
 
     # --- 2. Scan per-project entries in ~/.claude.json --------------------------

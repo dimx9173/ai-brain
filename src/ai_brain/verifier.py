@@ -335,7 +335,7 @@ def run_all_checks(paths) -> List[CheckResult]:
                     _oc_found = _root
                     break
     if _oc_found:
-        results.append(check_mcp_config("OpenClaw", paths.openclaw_config))
+        results.append(check_mcp_config("OpenClaw", paths.openclaw_config, server_key="mcp.servers"))
     else:
         results.append(CheckResult("檢查 OpenClaw MCP 記憶載入與內容正確性", INFO,
                                    "(此環境未安裝 OpenClaw CLI，跳過檢查)"))
