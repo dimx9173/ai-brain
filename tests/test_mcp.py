@@ -28,6 +28,7 @@ from ai_brain.mcp import (
     _stdio_server_entry,
     deregister_all,
     register_all,
+    sync_all_mcp_commands,
 )
 from ai_brain.platforms import ToolPaths, get_paths
 
@@ -520,3 +521,117 @@ class TestRoundtrip(InTempDir):
         _deregister_in_file(rt)
         content = target.read_text(encoding="utf-8")
         self.assertNotIn("mempalace", content)
+
+
+# ---------------------------------------------------------------------------
+# sync_all_mcp_commands — both servers must be checked
+# ---------------------------------------------------------------------------
+
+class TestSyncAllMcpCommands(InTempDir):
+    """Regression coverage: ``sync_all_mcp_commands`` must scan every server
+    the target declares, not just ``MCP_MEMPALACE``.  Without this, an
+    outdated ``MCP_CODEBASE_MEMORY`` entry (e.g. legacy OpenClaw Zod-rejected
+    shape) survives ``doctor --fix`` and only gets rewritten by full
+    ``register_all``.
+
+    We exercise the function with stub ``RegistrationTarget`` instances
+    substituted for ``_all_targets`` so we don't depend on host config paths.
+    """
+
+    def _stub_path(self, name: str) -> Path:
+        p = Path.home() / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def _stub_targets(self, paths: dict[str, Path]) -> list[RegistrationTarget]:
+        """Build the minimal target set used in these tests."""
+        return [
+            RegistrationTarget(
+                "StubSvr", paths["svr"], "mcpServers",
+                ALL_SERVERS, _stdio_server_entry,
+            ),
+            RegistrationTarget(
+                "StubPath", paths["path"], "mcp.servers",
+                ALL_SERVERS, _stdio_server_entry,
+            ),
+        ]
+
+    def test_reports_and_fixes_codebase_memory_drift(self):
+        svr = self._stub_path("test_sync_svr.json")
+        path = self._stub_path("test_sync_path.json")
+        _write_json(svr, {"mcpServers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: {"command": "old-cmd", "args": []},
+        }})
+        _write_json(path, {"mcp": {"servers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: {"command": "old-cmd", "args": []},
+        }}})
+
+        with mock.patch(
+            "ai_brain.mcp._all_targets",
+            return_value=self._stub_targets({"svr": svr, "path": path}),
+        ):
+            count, msgs = sync_all_mcp_commands(_minimal_paths(), fix=False)
+
+        # Both files have a stale codebase-memory-mcp entry.
+        self.assertEqual(count, 2)
+        # The STALE line should reference the codebase-memory-mcp server,
+        # not just `mempalace`.
+        joined = "\n".join(msgs)
+        self.assertIn(MCP_CODEBASE_MEMORY, joined)
+        self.assertNotIn("[STALE]", joined)  # symbols; the lowercase token is enough
+
+    def test_fix_rewrites_both_servers(self):
+        svr = self._stub_path("test_fix_svr.json")
+        path = self._stub_path("test_fix_path.json")
+        _write_json(svr, {"mcpServers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: {"command": "stale", "args": []},
+        }})
+        _write_json(path, {"mcp": {"servers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: {"command": "stale", "args": []},
+        }}})
+
+        with mock.patch(
+            "ai_brain.mcp._all_targets",
+            return_value=self._stub_targets({"svr": svr, "path": path}),
+        ):
+            count, _ = sync_all_mcp_commands(_minimal_paths(), fix=True)
+
+        self.assertEqual(count, 2)
+        # Both files should now hold the canonical entry on both servers.
+        svr_data = _read_json(svr)
+        self.assertEqual(
+            svr_data["mcpServers"][MCP_CODEBASE_MEMORY],
+            _stdio_server_entry(MCP_CODEBASE_MEMORY),
+        )
+        path_data = _read_json(path)
+        self.assertEqual(
+            path_data["mcp"]["servers"][MCP_CODEBASE_MEMORY],
+            _stdio_server_entry(MCP_CODEBASE_MEMORY),
+        )
+
+    def test_all_in_sync_emits_check_marks(self):
+        svr = self._stub_path("test_ok_svr.json")
+        path = self._stub_path("test_ok_path.json")
+        _write_json(svr, {"mcpServers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: _stdio_server_entry(MCP_CODEBASE_MEMORY),
+        }})
+        _write_json(path, {"mcp": {"servers": {
+            MCP_MEMPALACE: _stdio_server_entry(MCP_MEMPALACE),
+            MCP_CODEBASE_MEMORY: _stdio_server_entry(MCP_CODEBASE_MEMORY),
+        }}})
+
+        with mock.patch(
+            "ai_brain.mcp._all_targets",
+            return_value=self._stub_targets({"svr": svr, "path": path}),
+        ):
+            count, msgs = sync_all_mcp_commands(_minimal_paths(), fix=False)
+
+        self.assertEqual(count, 0)
+        joined = "\n".join(msgs)
+        self.assertIn("StubSvr", joined)
+        self.assertIn("StubPath", joined)

@@ -279,7 +279,7 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
 
     Returns ``(fixed_count, messages)``.  When *fix* is False only reports.
     """
-    from .constants import MCP_MEMPALACE
+    from .constants import MCP_CODEBASE_MEMORY, MCP_MEMPALACE
     from .ui import GREEN, NC, RED, YELLOW
 
     fixed_count = 0
@@ -289,6 +289,11 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
         return f"[{tag}] {path}"
 
     # --- 1. Scan all top-level IDE config files ---------------------------------
+    # Each target declares which servers it must register (see
+    # ``RegistrationTarget.servers``).  Iterate over **all** of them so a drift
+    # in ``codebase-memory-mcp`` (e.g. leftover OpenClaw shape from before the
+    # canonical Zod-compliant format) is reported and fixed, not just
+    # ``mempalace``.
     for target in _all_targets(paths):
         if not target.path or not target.path.is_file():
             continue
@@ -310,49 +315,58 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
         servers = curr[parts[-1]]
         if not isinstance(servers, dict):
             continue
-        entry = servers.get(MCP_MEMPALACE)
-        if not isinstance(entry, dict):
-            continue
 
-        # Build the expected entry for this target so we compare the exact
-        # canonical shape (some IDEs use list-form "command" instead of
-        # separate "command"+"args" fields, e.g. Kilo CLI, OpenClaw).
-        expected_entry = target.entry_builder(MCP_MEMPALACE)
-        if entry == expected_entry:
-            messages.append(f"  {GREEN}✓{NC} {_label(target.label, target.path)}")
-            continue
+        all_ok = True
+        for server in target.servers:
+            entry = servers.get(server)
+            if not isinstance(entry, dict):
+                # Missing entry — out of scope for the stale-detector; the
+                # registration path owns that case.
+                continue
 
-        # Stale entry in an existing file — always fixable
-        # For display, show the command portion (may be a list or string).
-        current_cmd = entry.get("command", "")
-        tag = target.label
-        if fix:
-            servers[MCP_MEMPALACE] = expected_entry
-            try:
-                target.path.write_text(
-                    json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8",
-                )
-                fixed_count += 1
+            # Build the expected entry for this target so we compare the exact
+            # canonical shape (some IDEs use list-form "command" instead of
+            # separate "command"+"args" fields, e.g. Kilo CLI, OpenClaw).
+            expected_entry = target.entry_builder(server)
+            if entry == expected_entry:
+                continue
+
+            all_ok = False
+            # Drift on this server — always fixable when the file already
+            # declares the entry.  Tag the message with the server name so the
+            # user can tell which entry got rewritten.
+            current_cmd = entry.get("command", "")
+            tag = f"{target.label}/{server}"
+            if fix:
+                servers[server] = expected_entry
+                try:
+                    target.path.write_text(
+                        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
+                    fixed_count += 1
+                    messages.append(
+                        f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_entry.get('command')!r}"
+                    )
+                except Exception as e:
+                    messages.append(f"  {RED}[ ERROR ]{NC} {tag}: {e}")
+            else:
+                fixed_count += 1  # count stale for summary
                 messages.append(
-                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_entry.get('command')!r}"
+                    f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r} (expected {expected_entry.get('command')!r})"
                 )
-            except Exception as e:
-                messages.append(f"  {RED}[ ERROR ]{NC} {tag}: {e}")
-        else:
-            fixed_count += 1  # count stale for summary
-            messages.append(
-                f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r} (expected {expected_entry.get('command')!r})"
-            )
+
+        # Only emit the file-level ✓ if every server we *do* see is in sync.
+        # Mirrors the legacy behavior, where a file with no entries was simply
+        # skipped silently.
+        if all_ok and isinstance(servers.get(MCP_MEMPALACE), dict):
+            messages.append(f"  {GREEN}✓{NC} {_label(target.label, target.path)}")
 
     # --- 2. Scan per-project entries in ~/.claude.json --------------------------
     # Per-project entries use the same stdio shape as the top-level ~/.claude.json
     # target, so derive the canonical command/args once from _claude_code_entry
-    # instead of copy-pasting the MEMPALACE_MCP_COMMAND() split.
-    expected_entry = _claude_code_entry(MCP_MEMPALACE)
-    expected_cmd = expected_entry["command"]
-    expected_args = expected_entry.get("args", [])
-
+    # instead of copy-pasting the MEMPALACE_MCP_COMMAND() split.  Iterate over
+    # both servers for the same reason as section 1.
     claude_json = paths.claude_json
     if claude_json.is_file():
         try:
@@ -366,26 +380,38 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
             servers = proj_val.get("mcpServers", {})
             if not isinstance(servers, dict):
                 continue
-            entry = servers.get(MCP_MEMPALACE)
-            if not isinstance(entry, dict):
-                continue
-            current_cmd = entry.get("command", "")
-            if current_cmd == expected_cmd and entry.get("args") == expected_args:
+
+            per_project_all_ok = True
+            had_any_entry = False
+            for server in (MCP_MEMPALACE, MCP_CODEBASE_MEMORY):
+                entry = servers.get(server)
+                if not isinstance(entry, dict):
+                    continue
+                had_any_entry = True
+
+                expected_entry = _claude_code_entry(server)
+                expected_cmd = expected_entry["command"]
+                expected_args = expected_entry.get("args", [])
+                current_cmd = entry.get("command", "")
+                if current_cmd == expected_cmd and entry.get("args") == expected_args:
+                    continue
+
+                per_project_all_ok = False
+                tag = f"project:{proj_key}/{server}"
+                if fix:
+                    entry["command"] = expected_cmd
+                    entry["args"] = list(expected_args)
+                    changed = True
+                    fixed_count += 1
+                    messages.append(
+                        f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_cmd!r}"
+                    )
+                else:
+                    messages.append(
+                        f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r}"
+                    )
+            if had_any_entry and per_project_all_ok:
                 messages.append(f"  {GREEN}✓{NC} [project] {proj_key}")
-                continue
-            tag = f"project:{proj_key}"
-            if fix:
-                entry["command"] = expected_cmd
-                entry["args"] = list(expected_args)
-                changed = True
-                fixed_count += 1
-                messages.append(
-                    f"  {GREEN}[ FIXED ]{NC} {tag}: {current_cmd!r} → {expected_cmd!r}"
-                )
-            else:
-                messages.append(
-                    f"  {YELLOW}[ STALE ]{NC} {tag}: {current_cmd!r}"
-                )
         if changed:
             try:
                 claude_json.write_text(
