@@ -203,17 +203,21 @@ class TestOpenClawEntry(InTempDir):
     def test_mempalace(self):
         entry = _openclaw_entry(MCP_MEMPALACE)
         expected = MEMPALACE_MCP_COMMAND()
-        self.assertEqual(entry["type"], "local")
-        self.assertIsInstance(entry["command"], list)
-        self.assertTrue(entry["enabled"])
-        self.assertEqual(entry["command"], expected)
+        # OpenClaw Zod schema requires `command` as a single executable string.
+        self.assertNotIn("type", entry)
+        self.assertNotIn("enabled", entry)
+        self.assertIsInstance(entry["command"], str)
+        self.assertEqual(entry["command"], expected[0])
+        self.assertEqual(entry["args"], expected[1:])
 
     def test_codebase_memory(self):
         from ai_brain.constants import GLOBAL_CODEBASE_MEMORY_MCP
         entry = _openclaw_entry(MCP_CODEBASE_MEMORY)
-        self.assertEqual(entry["type"], "local")
-        self.assertTrue(entry["enabled"])
-        self.assertEqual(str(GLOBAL_CODEBASE_MEMORY_MCP()), entry["command"][0])
+        self.assertNotIn("type", entry)
+        self.assertNotIn("enabled", entry)
+        self.assertIsInstance(entry["command"], str)
+        self.assertEqual(entry["command"], str(GLOBAL_CODEBASE_MEMORY_MCP()))
+        self.assertEqual(entry["args"], [])
 
     def test_unknown_server(self):
         with self.assertRaises(ValueError):

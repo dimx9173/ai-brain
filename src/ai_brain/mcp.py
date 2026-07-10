@@ -150,18 +150,25 @@ def _codex_entry(server: str) -> dict[str, Any]:
 
 
 def _openclaw_entry(server: str) -> dict[str, Any]:
-    """OpenClaw uses mcpServers key with local type and array command."""
+    """OpenClaw canonical stdio MCP server shape.
+
+    Schema reference (OpenClaw 2026.6+ ``openclaw.json`` ``mcp.servers`` block):
+    ``command`` is validated by Zod as a single executable string, ``args`` is an
+    optional string array. The ``type`` field is reserved for HTTP transports
+    (``sse`` / ``http`` / ``streamable-http``) and is not valid on stdio entries;
+    including ``type: "local"`` triggers
+    ``mcp.servers.<name>.command: Invalid input`` and stops the Gateway.
+    """
     if server == MCP_MEMPALACE:
+        cmd = MEMPALACE_MCP_COMMAND()
         return {
-            "type": "local",
-            "command": MEMPALACE_MCP_COMMAND(),
-            "enabled": True,
+            "command": cmd[0],
+            "args": cmd[1:],
         }
     if server == MCP_CODEBASE_MEMORY:
         return {
-            "type": "local",
-            "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
-            "enabled": True,
+            "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
+            "args": [],
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
