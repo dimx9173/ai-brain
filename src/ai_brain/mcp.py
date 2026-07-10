@@ -339,6 +339,13 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
             )
 
     # --- 2. Scan per-project entries in ~/.claude.json --------------------------
+    # Per-project entries use the same stdio shape as the top-level ~/.claude.json
+    # target, so derive the canonical command/args once from _claude_code_entry
+    # instead of copy-pasting the MEMPALACE_MCP_COMMAND() split.
+    expected_entry = _claude_code_entry(MCP_MEMPALACE)
+    expected_cmd = expected_entry["command"]
+    expected_args = expected_entry.get("args", [])
+
     claude_json = paths.claude_json
     if claude_json.is_file():
         try:
