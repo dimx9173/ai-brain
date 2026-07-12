@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.5.11"
+VERSION = "2.6.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -156,6 +156,7 @@ You must actively traverse and respect the three cognitive memory layers before 
      4. `query_graph` — run Cypher queries for complex patterns
      5. `get_architecture` — high-level project summary
    - **Fallback to grep/glob** only when: searching string literals/error messages, non-code files (Dockerfiles, shell scripts), or when MCP tools return insufficient results.
+   - **Non-Text Documents**: Non-plain-text docs (PDF, Docx, Xlsx) in docs/ are parsed into markdown in `.ai-brain/parsed-docs/`. Proactively read them when analyzing specifications.
    - **Purpose**: Full code indexing — functions, classes, call graphs, dependencies.
    - **Lifecycle**: Project-bound, rebuilt on `git pull`/`checkout`. **This is where code lives.**
 
@@ -187,6 +188,7 @@ You must actively traverse and respect the three cognitive memory layers before 
      4. `query_graph` — run Cypher queries for complex patterns
      5. `get_architecture` — high-level project summary
    - **Fallback to grep/glob** only when: searching string literals/error messages, non-code files (Dockerfiles, shell scripts), or when MCP tools return insufficient results.
+   - **Non-Text Documents**: Non-plain-text docs (PDF, Docx, Xlsx) in docs/ are parsed into markdown in `.ai-brain/parsed-docs/`. Proactively read them when analyzing specifications.
    - **Purpose**: Full code indexing — functions, classes, call graphs, dependencies.
    - **Lifecycle**: Project-bound, rebuilt on `git pull`/`checkout`. **This is where code lives.**
 

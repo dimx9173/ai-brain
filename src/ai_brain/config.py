@@ -236,3 +236,32 @@ def modify_toml_file(
     except Exception as e:
         red(f"錯誤：無法寫入 {path} ({e})")
         return False
+
+
+DEFAULT_GLOBAL_CONFIG_CONTENT = """[preferences]
+coding_style = "PEP 8 for Python, standard formatting for Go"
+preferred_frameworks = []
+custom_rules = []
+
+[memory]
+priority_weight = "L0 (Working Memory) > L1 (Codebase Topology) > L2 (Long-Term Memory)"
+"""
+
+
+def ensure_global_config(path: Path) -> dict[str, Any]:
+    """Ensure global config exists, and return parsed data."""
+    if not path.is_file():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write_text(path, DEFAULT_GLOBAL_CONFIG_CONTENT)
+        except Exception as e:
+            red(f"警告：建立全域設定檔 {path} 失敗 ({e})")
+            return parse_toml(DEFAULT_GLOBAL_CONFIG_CONTENT)
+
+    try:
+        content = path.read_text(encoding="utf-8")
+        return parse_toml(content)
+    except Exception as e:
+        red(f"警告：讀取全域設定檔 {path} 失敗 ({e})，使用預設值。")
+        return parse_toml(DEFAULT_GLOBAL_CONFIG_CONTENT)
+

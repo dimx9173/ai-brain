@@ -53,6 +53,7 @@ def _show_help() -> None:
         ("mcp-sync", "[MCP 同步] 檢查所有 IDE 的 MCP 指令路徑是否為最新"),
         ("mcp-sync --fix", "[MCP 修復] 自動同步所有 MCP 指令路徑至最快可用版本"),
         ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
+        ("config global", "[全域配置] 顯示或設定 AI 大腦全域偏好與衝突覆寫規則"),
     ]
     for name, desc in rows:
         print(f"  {green(name):<24} - {desc}")
@@ -114,6 +115,10 @@ def _cmd_mcp_sync(args, paths) -> int:
     return 0 if commands.sync_mcp_paths(paths, fix=args.fix) else 1
 
 
+def _cmd_config(args, paths) -> int:
+    return 0 if commands.run_config(paths, args) else 1
+
+
 def _cmd_completions(args) -> int:
     """Dispatch to ai_brain.completions.main for the completions subcommand."""
     from . import completions as _completions
@@ -152,6 +157,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "gc": _cmd_gc,
     "mcp-sync": _cmd_mcp_sync,
     "completions": lambda a, p: _cmd_completions(a),
+    "config": _cmd_config,
 }
 
 
@@ -197,6 +203,10 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Delete all embeddings for a specific wing (bypasses slow sync/compress)")
     p = sub.add_parser("mcp-sync", help="Sync all MCP server command paths to fastest binary", add_help=False)
     p.add_argument("--fix", action="store_true", help="Actually update stale paths")
+    p = sub.add_parser("config", help="Manage global configuration settings", add_help=False)
+    p.add_argument("action", choices=["global"], help="scope: global")
+    p.add_argument("--set", dest="config_set", help="set parameter (key=value or section.key=value)")
+    p.add_argument("--list", dest="config_list", action="store_true", help="list all configurations")
     _add_common("clean", "Remove local brain configuration")
     _add_common("uninstall", "Global removal of all configs and crons")
     _add_common("stop-cron", "Remove the daily auto-archive cron job")
@@ -278,6 +288,9 @@ class _Namespace_for:
         self.mine_mode = None
         self.wing = None
         self.purge_wing = None
+        # `config` subcommand args
+        self.config_list = "--list" in rest
+        self.config_set = None
         for i, arg in enumerate(rest):
             if arg == "--mode" and i + 1 < len(rest):
                 self.mine_mode = rest[i + 1]
@@ -285,6 +298,8 @@ class _Namespace_for:
                 self.wing = rest[i + 1]
             elif arg == "--purge-wing" and i + 1 < len(rest):
                 self.purge_wing = rest[i + 1]
+            elif arg == "--set" and i + 1 < len(rest):
+                self.config_set = rest[i + 1]
 
 
 if __name__ == "__main__":

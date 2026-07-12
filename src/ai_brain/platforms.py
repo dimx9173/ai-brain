@@ -28,6 +28,7 @@ class ToolPaths:
     cursor_json: Path
     codex_toml: Path
     openclaw_config: Path
+    global_config: Path
 
 
 def get_paths() -> ToolPaths:
@@ -64,6 +65,7 @@ def get_paths() -> ToolPaths:
         cursor_json=HOME() / ".cursor" / "mcp.json",
         codex_toml=HOME() / ".codex" / "config.toml",
         openclaw_config=HOME() / ".openclaw" / "openclaw.json",
+        global_config=HOME() / ".config" / "ai-brain" / "config.toml",
     )
 
 

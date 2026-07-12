@@ -271,6 +271,7 @@ def start_day(fast: bool = False) -> bool:
                 print(red(f"警告：背景 GC 啟動失敗 ({e})"))
 
         print(blue("====== 🌅 晨間啟動：建立/更新最新代碼地圖 ======"))
+        _parse_unstructured_documents()
         if not _run_codebase_memory_index():
             return False
         print(green("✅ 代碼圖譜更新完成！AI 代理們現在能使用最新、最省 Token 的全景地圖了。"))
@@ -830,6 +831,148 @@ def sync_mcp_paths(paths, fix: bool = False) -> bool:
     return fixed > 0
 
 
+def _build_global_preferences_block(paths) -> str:
+    from .config import ensure_global_config
+    data = ensure_global_config(paths.global_config)
+    pref = data.get("preferences", {})
+    mem = data.get("memory", {})
+
+    coding_style = pref.get("coding_style", "PEP 8 for Python, standard formatting for Go")
+    frameworks = pref.get("preferred_frameworks", [])
+    custom_rules = pref.get("custom_rules", [])
+    priority = mem.get("priority_weight", "L0 (Working Memory) > L1 (Codebase Topology) > L2 (Long-Term Memory)")
+
+    lines = [
+        "## 🎨 Global Developer Preferences",
+        f"- **Coding Style**: {coding_style}",
+    ]
+    if frameworks:
+        lines.append(f"- **Preferred Frameworks**: {', '.join(frameworks)}")
+    lines.append(f"- **Memory Priorities**: {priority}")
+    if custom_rules:
+        lines.append("- **Custom Rules**:")
+        for rule in custom_rules:
+            lines.append(f"  * {rule}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _strip_graphify_lines(content: str) -> tuple[str, bool]:
+    """Remove lines referencing graphify. Returns (new_content, was_changed)."""
+    new_lines = []
+    skip_block = False
+    changed = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## ") and "graphify" in stripped.lower():
+            skip_block = True
+            changed = True
+            continue
+        if skip_block and (stripped.startswith("## ") or stripped.startswith("# ")):
+            skip_block = False
+        if skip_block:
+            changed = True
+            continue
+        if "graphify" in line.lower() and not any(t in line for t in ("codebase-memory-mcp", "graph tools")):
+            changed = True
+            continue
+        new_lines.append(line)
+    while new_lines and not new_lines[-1].strip():
+        new_lines.pop()
+    return "\n".join(new_lines) + "\n" if new_lines else "", changed
+
+
+def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
+    """Return True if file is OK (or was fixed), False if needs user action."""
+    from .constants import COGNITIVE_PRINCIPLES_BLOCK, COGNITIVE_PRINCIPLES_MARKER
+    from .ui import print_green as green, print_red as red, print_yellow as yellow
+
+    try:
+        content = md_path.read_text(encoding="utf-8")
+    except Exception:
+        return True
+
+    original_content = content
+    freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
+    
+    # 1. Strip graphify lines if present
+    content, had_graphify = _strip_graphify_lines(content)
+    
+    # 2. Check and insert/update cognitive principles
+    has_marker = COGNITIVE_PRINCIPLES_MARKER in content
+    has_freshness = freshness_marker in content
+    
+    updated_content = content
+    was_updated = False
+    
+    if not (has_marker and has_freshness):
+        if has_marker:
+            # Update stale block
+            lines = content.splitlines()
+            new_lines = []
+            skip = False
+            for line in lines:
+                if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
+                    skip = True
+                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
+                    continue
+                if skip:
+                    if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
+                        skip = False
+                        new_lines.append(line)
+                else:
+                    new_lines.append(line)
+            updated_content = "\n".join(new_lines) + "\n"
+            was_updated = True
+        else:
+            # Append at the end
+            updated_content = content.rstrip() + "\n\n" + COGNITIVE_PRINCIPLES_BLOCK + "\n"
+            was_updated = True
+            
+    # 3. Insert/update preferences block
+    pref_block = _build_global_preferences_block(paths)
+    lines = updated_content.splitlines()
+    pref_lines = pref_block.splitlines()
+    
+    new_lines = []
+    skip = False
+    pref_found = False
+    for line in lines:
+        if line.strip() == "## 🎨 Global Developer Preferences":
+            skip = True
+            pref_found = True
+            new_lines.extend(pref_lines)
+            continue
+        if skip:
+            if line.startswith("## ") or line.startswith("# "):
+                skip = False
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+            
+    if not pref_found:
+        new_lines.append("")
+        new_lines.extend(pref_lines)
+        was_updated = True
+        
+    final_content = "\n".join(new_lines) + "\n"
+    
+    if final_content != original_content or had_graphify or was_updated:
+        print(yellow(f"  [ WARN ] {label} 規則版本過舊或與全域偏好不一致"))
+        if fix:
+            try:
+                md_path.write_text(final_content, encoding="utf-8")
+                print(green(f"    [ FIXED ] 已更新 {label} 規則與全域偏好"))
+                return True
+            except Exception as e:
+                print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                return False
+        return False
+        
+    print(green(f"  [ PASS ] {label} 工具規則與全域偏好為最新版本"))
+    return True
+
+
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
@@ -1386,109 +1529,10 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 8. Check CLAUDE.md AI 工具使用規則版本
     print(blue("8. 檢查 CLAUDE.md AI 工具使用規則版本..."))
     rules_ok = True
-    freshness_marker = "ALWAYS prefer `codebase-memory-mcp` graph tools"
-
-    def _strip_graphify_lines(content: str) -> tuple[str, bool]:
-        """Remove lines referencing graphify. Returns (new_content, was_changed)."""
-        new_lines = []
-        skip_block = False
-        changed = False
-        for line in content.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("## ") and "graphify" in stripped.lower():
-                skip_block = True
-                changed = True
-                continue
-            if skip_block and (stripped.startswith("## ") or stripped.startswith("# ")):
-                skip_block = False
-            if skip_block:
-                changed = True
-                continue
-            if "graphify" in line.lower() and not any(t in line for t in ("codebase-memory-mcp", "graph tools")):
-                changed = True
-                continue
-            new_lines.append(line)
-        while new_lines and not new_lines[-1].strip():
-            new_lines.pop()
-        return "\n".join(new_lines) + "\n" if new_lines else "", changed
-
-    def _fix_claude_md(label: str, md_path: Path) -> bool:
-        """Return True if file is OK (or was fixed), False if needs user action."""
-        try:
-            content = md_path.read_text(encoding="utf-8")
-        except Exception:
-            return True
-
-        has_marker = COGNITIVE_PRINCIPLES_MARKER in content
-        has_freshness = freshness_marker in content
-
-        if has_marker and has_freshness:
-            stripped, had_graphify = _strip_graphify_lines(content)
-            if had_graphify:
-                print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 殘留內容（認知規則已是最新）"))
-                if fix:
-                    md_path.write_text(stripped, encoding="utf-8")
-                    print(green(f"    [ FIXED ] 已清除 {label} 中的 graphify 殘留"))
-                    content = stripped
-                else:
-                    return False
-            print(green(f"  [ PASS ] {label} 工具規則為最新版本"))
-            return True
-
-        if has_marker:
-            # Stale block — update it
-            print(yellow(f"  [ WARN ] {label} 工具規則版本過舊"))
-            if fix:
-                try:
-                    lines = content.splitlines()
-                    new_lines: list[str] = []
-                    skip = False
-                    for line in lines:
-                        if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
-                            skip = True
-                            new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
-                            continue
-                        if skip:
-                            if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
-                                skip = False
-                                new_lines.append(line)
-                        else:
-                            new_lines.append(line)
-                    updated = "\n".join(new_lines) + "\n"
-                    updated, _ = _strip_graphify_lines(updated)
-                    md_path.write_text(updated, encoding="utf-8")
-                    print(green(f"    [ FIXED ] 已更新 {label} 至最新工具規則版本"))
-                    return True
-                except Exception as e:
-                    print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
-                    return False
-            return False  # WARN counts as failure in check-only mode
-
-        # No cognitive block — check for stale graphify content
-        if "graphify" in content.lower():
-            print(yellow(f"  [ WARN ] {label} 含有過時的 graphify 引導內容"))
-            if fix:
-                try:
-                    new_lines = [l for l in content.splitlines() if "graphify" not in l.lower()]
-                    while new_lines and not new_lines[-1].strip():
-                        new_lines.pop()
-                    new_lines.append("")
-                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
-                    md_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-                    print(green(f"    [ FIXED ] 已清除 {label} 中的舊 graphify 引導並補上最新工具規則"))
-                    return True
-                except Exception as e:
-                    print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
-                    return False
-            return False
-
-        print(green(f"  [ INFO ] {label} 中無 ai-brain 管理的認知規則區塊，略過"))
-        return True
-
 
     global_md = Path.home() / ".claude" / "CLAUDE.md"
     if not target and global_md.is_file():
-        if not _fix_claude_md("全域 ~/.claude/CLAUDE.md", global_md):
+        if not _fix_claude_md("全域 ~/.claude/CLAUDE.md", global_md, paths, fix=fix):
             rules_ok = False
             if not fix:
                 all_pass = False
@@ -1498,7 +1542,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         for rel in (".claude/CLAUDE.md",):
             md_path = proj / rel
             if md_path.is_file():
-                if not _fix_claude_md(f"[{short}] {rel}", md_path):
+                if not _fix_claude_md(f"[{short}] {rel}", md_path, paths, fix=fix):
                     rules_ok = False
                     if not fix:
                         all_pass = False
@@ -1784,6 +1828,7 @@ def _append_to_global_gitignore(pattern: str, comment: str) -> None:
 def _ensure_codebase_memory_ignored() -> None:
     _append_to_global_gitignore(".codebase-memory", "codebase-memory-mcp cache and graphs")
     _append_to_global_gitignore(".worktree", "git worktree checkouts")
+    _append_to_global_gitignore(".ai-brain", "ai-brain local parsed docs and cache")
 
 
 def _run_mempalace_init() -> bool:
@@ -1853,6 +1898,8 @@ def _write_project_claude_md() -> bool:
         target = Path(PROJECT_CLAUDE_MD)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(LOCAL_CLAUDE_MD_TEMPLATE, encoding="utf-8")
+        from .platforms import get_paths
+        _fix_claude_md(f"[local] {PROJECT_CLAUDE_MD}", target, get_paths(), fix=True)
         return True
     except Exception as e:
         print(red(f"錯誤：建立 .claude/CLAUDE.md 失敗 ({e})"))
@@ -1979,6 +2026,72 @@ def _record_gc_timestamp() -> None:
         LAST_GC_FILE().write_text(str(int(time.time())) + "\n")
     except Exception:
         pass
+
+
+def _parse_unstructured_documents() -> None:
+    """Scan docs/ subfolders for non-text documents and convert them to md."""
+    from .ui import print_yellow as yellow, print_red as red, print_green as green
+    proj_root = Path.cwd().resolve()
+    
+    doc_dirs = ["docs", "doc", "documents", "document"]
+    target_dirs = [proj_root / d for d in doc_dirs if (proj_root / d).is_dir()]
+    if not target_dirs:
+        return
+        
+    doc_extensions = {".pdf", ".docx", ".xlsx", ".pptx"}
+    has_markitdown = shutil.which("markitdown") is not None
+    has_pandoc = shutil.which("pandoc") is not None
+    
+    warned_missing_tools = False
+    
+    for target_dir in target_dirs:
+        for ext in doc_extensions:
+            for filepath in target_dir.rglob(f"*{ext}"):
+                if not filepath.is_file():
+                    continue
+                
+                rel_path = filepath.relative_to(proj_root)
+                dest_dir = proj_root / ".ai-brain" / "parsed-docs" / rel_path.parent
+                dest_file = dest_dir / f"{filepath.name}.md"
+                
+                if dest_file.is_file():
+                    try:
+                        if dest_file.stat().st_mtime >= filepath.stat().st_mtime:
+                            continue
+                    except Exception:
+                        pass
+                
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                if has_markitdown:
+                    try:
+                        subprocess.run(
+                            ["markitdown", str(filepath), "-o", str(dest_file)],
+                            check=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=60,
+                        )
+                        print(green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}"))
+                    except Exception as e:
+                        print(red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})"))
+                elif has_pandoc and filepath.suffix in (".docx", ".pptx", ".xlsx"):
+                    try:
+                        subprocess.run(
+                            ["pandoc", str(filepath), "-t", "markdown", "-o", str(dest_file)],
+                            check=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=60,
+                        )
+                        print(green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}"))
+                    except Exception as e:
+                        print(red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})"))
+                else:
+                    if not warned_missing_tools:
+                        print(yellow("  [ WARN ] 偵測到 docs/ 下有非文字檔，但系統未安裝 markitdown 或 pandoc，略過轉譯。"))
+                        print(yellow("           請執行 `pipx install markitdown` 或 `brew install pandoc` 以支援非結構化文件讀取。"))
+                        warned_missing_tools = True
 
 
 def _run_codebase_memory_index() -> bool:
@@ -2146,3 +2259,74 @@ def print_yellow(text: str) -> None:
     """Local re-export to avoid import shadowing in this module."""
     from .ui import yellow as _yellow
     print(_yellow(text))
+
+
+def _parse_value(value_str: str) -> Any:
+    val = value_str.strip()
+    if val.lower() == "true":
+        return True
+    if val.lower() == "false":
+        return False
+    if val.startswith("[") and val.endswith("]"):
+        try:
+            return json.loads(val.replace("'", '"'))
+        except Exception:
+            items = val[1:-1].split(",")
+            return [i.strip().strip('"').strip("'") for i in items if i.strip()]
+    if val.startswith('"') and val.endswith('"'):
+        return val[1:-1]
+    if val.startswith("'") and val.endswith("'"):
+        return val[1:-1]
+    if val.isdigit():
+        return int(val)
+    return val
+
+
+def run_config(paths, args) -> bool:
+    from .config import ensure_global_config, modify_toml_file
+    from .ui import print_blue as blue, print_green as green, print_red as red
+    
+    global_config_path = paths.global_config
+    if args.action != "global":
+        print(red(f"錯誤：不支援的配置 action: {args.action}"))
+        return False
+
+    if args.config_list or (not args.config_set):
+        data = ensure_global_config(global_config_path)
+        print(blue("====== 🎨 AI 大腦全域偏好配置 ======"))
+        print(f"設定檔路徑: {global_config_path}")
+        print()
+        from .config import serialize_toml
+        print(serialize_toml(data))
+        return True
+
+    if args.config_set:
+        if "=" not in args.config_set:
+            print(red("錯誤：--set 格式必須為 key=value 或 section.key=value"))
+            return False
+        
+        target_key, val_str = args.config_set.split("=", 1)
+        target_key = target_key.strip()
+        parsed_val = _parse_value(val_str)
+
+        if "." in target_key:
+            section, key = target_key.split(".", 1)
+        else:
+            if target_key in ("coding_style", "preferred_frameworks", "custom_rules"):
+                section, key = "preferences", target_key
+            elif target_key in ("priority_weight",):
+                section, key = "memory", target_key
+            else:
+                section, key = "preferences", target_key
+
+        def modifier(data: dict[str, Any]) -> dict[str, Any]:
+            sec_dict = data.setdefault(section, {})
+            sec_dict[key] = parsed_val
+            return data
+
+        if modify_toml_file(global_config_path, modifier):
+            print(green(f"✅ 成功設定全域配置 [{section}] {key} = {parsed_val}"))
+            return True
+        else:
+            return False
+
