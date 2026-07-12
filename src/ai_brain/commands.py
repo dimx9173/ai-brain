@@ -958,18 +958,18 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
     final_content = "\n".join(new_lines) + "\n"
     
     if final_content != original_content or had_graphify or was_updated:
-        print(yellow(f"  [ WARN ] {label} 規則版本過舊或與全域偏好不一致"))
+        yellow(f"  [ WARN ] {label} 規則版本過舊或與全域偏好不一致")
         if fix:
             try:
                 md_path.write_text(final_content, encoding="utf-8")
-                print(green(f"    [ FIXED ] 已更新 {label} 規則與全域偏好"))
+                green(f"    [ FIXED ] 已更新 {label} 規則與全域偏好")
                 return True
             except Exception as e:
-                print(red(f"    [ ERROR ] 更新 {label} 失敗 ({e})"))
+                red(f"    [ ERROR ] 更新 {label} 失敗 ({e})")
                 return False
         return False
-        
-    print(green(f"  [ PASS ] {label} 工具規則與全域偏好為最新版本"))
+
+    green(f"  [ PASS ] {label} 工具規則與全域偏好為最新版本")
     return True
 
 
@@ -2072,9 +2072,9 @@ def _parse_unstructured_documents() -> None:
                             stderr=subprocess.DEVNULL,
                             timeout=60,
                         )
-                        print(green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}"))
+                        green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}")
                     except Exception as e:
-                        print(red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})"))
+                        red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})")
                 elif has_pandoc and filepath.suffix in (".docx", ".pptx", ".xlsx"):
                     try:
                         subprocess.run(
@@ -2084,13 +2084,13 @@ def _parse_unstructured_documents() -> None:
                             stderr=subprocess.DEVNULL,
                             timeout=60,
                         )
-                        print(green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}"))
+                        green(f"  [ FIXED ] 已成功將 {rel_path} 轉譯至 {dest_file.relative_to(proj_root)}")
                     except Exception as e:
-                        print(red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})"))
+                        red(f"  [ ERROR ] 轉譯 {rel_path} 失敗 ({e})")
                 else:
                     if not warned_missing_tools:
-                        print(yellow("  [ WARN ] 偵測到 docs/ 下有非文字檔，但系統未安裝 markitdown 或 pandoc，略過轉譯。"))
-                        print(yellow("           請執行 `pipx install markitdown` 或 `brew install pandoc` 以支援非結構化文件讀取。"))
+                        yellow("  [ WARN ] 偵測到 docs/ 下有非文字檔，但系統未安裝 markitdown 或 pandoc，略過轉譯。")
+                        yellow("           請執行 `pipx install markitdown` 或 `brew install pandoc` 以支援非結構化文件讀取。")
                         warned_missing_tools = True
 
 
@@ -2288,12 +2288,12 @@ def run_config(paths, args) -> bool:
     
     global_config_path = paths.global_config
     if args.action != "global":
-        print(red(f"錯誤：不支援的配置 action: {args.action}"))
+        red(f"錯誤：不支援的配置 action: {args.action}")
         return False
 
     if args.config_list or (not args.config_set):
         data = ensure_global_config(global_config_path)
-        print(blue("====== 🎨 AI 大腦全域偏好配置 ======"))
+        blue("====== 🎨 AI 大腦全域偏好配置 ======")
         print(f"設定檔路徑: {global_config_path}")
         print()
         from .config import serialize_toml
@@ -2302,7 +2302,7 @@ def run_config(paths, args) -> bool:
 
     if args.config_set:
         if "=" not in args.config_set:
-            print(red("錯誤：--set 格式必須為 key=value 或 section.key=value"))
+            red("錯誤：--set 格式必須為 key=value 或 section.key=value")
             return False
         
         target_key, val_str = args.config_set.split("=", 1)
@@ -2325,7 +2325,7 @@ def run_config(paths, args) -> bool:
             return data
 
         if modify_toml_file(global_config_path, modifier):
-            print(green(f"✅ 成功設定全域配置 [{section}] {key} = {parsed_val}"))
+            green(f"✅ 成功設定全域配置 [{section}] {key} = {parsed_val}")
             return True
         else:
             return False
