@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.5.1-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.6.7-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -72,11 +72,11 @@ cd ~/cwork/ai-brain
 In any project workspace root, run the initialization command:
 
 ```bash
-# Initialize core configurations, codebase index, and git hook bindings
+# Fully automatic initialization (registers background Git Hooks and daily 23:30 auto-archive Cron Job)
 ai-brain init
 
-# OR initialize everything + register daily 23:30 auto-archive Cron Job
-ai-brain full-init
+# OR standard manual initialization (requires manually running start/stop)
+ai-brain init -m
 ```
 
 ---
@@ -85,8 +85,9 @@ ai-brain full-init
 
 | Command | Description | Recommended Usage | Safety |
 | :--- | :--- | :--- | :--- |
-| `init` | Initialize local wing configurations, codebase index, `.claude/CLAUDE.md`, and Git Hook bindings. | Run once per new project | ✅ Safe |
-| `full-init` | Perform `init` plus register the global daily auto-archive Cron Job at 23:30. | Run once per system setup | ✅ Safe |
+| `init` | Perform fully automatic initialization (registers local wing configurations, codebase index, `.claude/CLAUDE.md`, Git Hooks, and global auto-archive Cron Job). | Run once per new project | ✅ Safe |
+| `init -m` | Perform standard manual initialization (no global Cron registration, requires manually running start/stop). | Run once per new project | ✅ Safe |
+| `full-init` | Legacy alias command to perform `init` (fully automatic initialization). | Legacy use | ✅ Safe |
 | `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |
 | `update` | Alias for `install` (supports auto Git-pull and copy-updating from the cloned source repo). | Run to update | ✅ Safe |
 | `start` | Generate or update the latest codebase architecture maps. | Runs automatically via Git Hooks | ✅ Safe |
@@ -118,7 +119,7 @@ ai-brain remove [key]      # Deregister a project from the system (accepts index
 
 ## 💡 Editor Integrations
 
-- **Claude Code / Rufus / OpenClaw**: Automatically registered on `full-init` via stdio command configuration.
+- **Claude Code / Rufus / OpenClaw**: Automatically registered on `init` (fully automatic) via stdio command configuration.
 - **Gemini / Antigravity IDE / OpenCode**: Registered in `~/.gemini/config/mcp_config.json` and `~/.mcp.json` to launch `codebase-memory-mcp` as a stdio server.
 - **Codex Agent**: TOML configuration is automatically managed at `~/.codex/config.toml` to register stdio-based MCP servers.
 - **Cursor / VS Code / Claude Desktop**: Integrates with local `.git/hooks`, `.claude/CLAUDE.md`, and `.codebase-memory/` automatically, registering the MCP server for agent-wide context search.

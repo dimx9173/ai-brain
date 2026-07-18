@@ -75,6 +75,27 @@ class TestCli(unittest.TestCase):
     def test_full_init_dispatch_returns_one_on_fail(self, mock_fn) -> None:
         self.assertEqual(cli.main(["full-init"]), 1)
 
+    @patch("ai_brain.cli.commands.full_init")
+    @patch("ai_brain.cli.commands.init_brain", return_value=True)
+    def test_init_manual_calls_init_brain(self, mock_ib, mock_fi) -> None:
+        self.assertEqual(cli.main(["init", "-m"]), 0)
+        mock_ib.assert_called_once()
+        mock_fi.assert_not_called()
+
+    @patch("ai_brain.cli.commands.full_init")
+    @patch("ai_brain.cli.commands.init_brain", return_value=True)
+    def test_init_manual_long_calls_init_brain(self, mock_ib, mock_fi) -> None:
+        self.assertEqual(cli.main(["init", "--manual"]), 0)
+        mock_ib.assert_called_once()
+        mock_fi.assert_not_called()
+
+    @patch("ai_brain.cli.commands.full_init", return_value=True)
+    @patch("ai_brain.cli.commands.init_brain")
+    def test_init_default_calls_full_init(self, mock_ib, mock_fi) -> None:
+        self.assertEqual(cli.main(["init"]), 0)
+        mock_fi.assert_called_once()
+        mock_ib.assert_not_called()
+
     @patch("ai_brain.cli.commands.uninstall_all", return_value=True)
     def test_uninstall_dispatch_returns_zero(self, mock_fn) -> None:
         self.assertEqual(cli.main(["uninstall"]), 0)

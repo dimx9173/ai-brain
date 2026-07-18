@@ -27,8 +27,8 @@ def _show_help() -> None:
     print("  ai-brain [指令]\n")
     print(yellow("可用指令:"))
     rows = [
-        ("init", "[一次性] 初始化專案 AI 大腦配置（⚠️ 需手動：後續需手動執行 start/stop）"),
-        ("full-init", "[一次性] 初始化配置 + 註冊定時任務（✅ 全自動：Git Hook 背景更新地圖 + 深夜自動歸檔）"),
+        ("init", "[一次性] 全自動初始化（✅ Git Hook 背景更新 + 註冊深夜自動歸檔）"),
+        ("init -m", "[一次性] 標準初始化（❌ 需手動：後續需手動執行 start/stop）"),
         ("mine <target>", "[選擇性歸檔] 歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
         ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
         ("version", "[顯示版本] 顯示目前安裝的 ai-brain 工具版本"),
@@ -62,8 +62,8 @@ def _show_help() -> None:
     print(yellow("💡 核心工作流指引 (Core Workflows):"))
     print(f"  {blue('1. 專案初始化 (一次性)')}")
     print("     在新專案根目錄下執行以下指令，以完成大腦空間、規則檔及 Git Hook 配置：")
-    print(f"     ➔ {green('ai-brain init')}         (標準初始化 ─ ⚠️ 後續需手動執行 start/stop)")
-    print(f"     ➔ {green('ai-brain full-init')}    (全自動初始化 ─ ✅ 自動透過 Git Hook 更新地圖 + 註冊深夜自動歸檔)")
+    print(f"     ➔ {green('ai-brain init')}         (全自動初始化 ─ ✅ 自動透過 Git Hook 更新地圖 + 註冊深夜自動歸檔)")
+    print(f"     ➔ {green('ai-brain init -m')}      (標準初始化 ─ ❌ 後續需手動執行 start/stop)")
     print()
     print(f"  {blue('2. 每日開發上工 (平常上工)')}")
     print("     每天早上開始工作時，在專案目錄下執行：")
@@ -152,7 +152,7 @@ def _cmd_completions(args) -> int:
 # --- Dispatch table: name -> (callable, takes_args_and_paths) ------------------
 # Using a dict + dict of factory functions so the argparse binding stays explicit.
 COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
-    "init": lambda a, p: 0 if commands.init_brain() else 1,
+    "init": lambda a, p: 0 if (commands.init_brain() if a.manual else commands.full_init(p)) else 1,
     "full-init": _cmd_full_init,
     "mine": _cmd_mine,
     "install": lambda a, p: 0 if installer.install_or_update() else 1,
@@ -194,7 +194,8 @@ def _build_parser() -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=help_text, add_help=False)
         return p
 
-    _add_common("init", "Initialize local AI brain configuration")
+    p = sub.add_parser("init", help="Initialize local AI brain configuration", add_help=False)
+    p.add_argument("-m", "--manual", action="store_true", help="Manual (standard) initialization without cron registration")
     _add_common("full-init", "Initialize and register global cron + MCP")
     p = sub.add_parser("mine", help="Selectively mine high-value content into L2 memory palace", add_help=False)
     p.add_argument("target", nargs="?", default=".",
@@ -305,6 +306,7 @@ class _Namespace_for:
         self.fix = "--fix" in rest
         self.fast = "--fast" in rest or "--no-cluster" in rest
         self.apply = "--apply" in rest
+        self.manual = "-m" in rest or "--manual" in rest
         # `mine` subcommand args
         self.mine_mode = None
         self.wing = None
