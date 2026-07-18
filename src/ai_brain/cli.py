@@ -58,6 +58,27 @@ def _show_help() -> None:
     for name, desc in rows:
         print(f"  {green(name):<24} - {desc}")
 
+    print()
+    print(yellow("💡 核心工作流指引 (Core Workflows):"))
+    print(f"  {blue('1. 專案初始化 (一次性)')}")
+    print("     在新專案根目錄下執行以下指令，以完成大腦空間、規則檔及 Git Hook 配置：")
+    print(f"     ➔ {green('ai-brain init')}         (標準初始化)")
+    print(f"     ➔ {green('ai-brain full-init')}    (標準初始化 + 註冊深夜 23:30 自動記憶歸檔排程)")
+    print()
+    print(f"  {blue('2. 每日開發上工 (平常上工)')}")
+    print("     每天早上開始工作時，在專案目錄下執行：")
+    print(f"     ➔ {green('ai-brain start')}        (自動掃描 docs/ 文件，並建立/更新最新代碼地圖)")
+    print()
+    print(f"  {blue('3. 每日下班收尾 (關閉終端機前)')}")
+    print("     工作結束要關閉終端機前，在專案目錄下執行：")
+    print(f"     ➔ {green('ai-brain stop')}         (安全將今日對話與調試經驗打包歸檔至長期記憶宮殿)")
+    print()
+    print(f"  {blue('4. 當大腦異常或發生錯誤時 (排查修復)')}")
+    print("     當代理程式出現怪異行為、遺失規則檔、連線逾時或檔案被鎖定時：")
+    print(f"     ➔ {green('ai-brain status')}       (查看專案大腦健康狀態與 Palace 容量)")
+    print(f"     ➔ {green('ai-brain doctor --fix')} (全面健康診斷，並自動修正所有配置與衝突問題)")
+    print()
+
 
 def _show_version() -> None:
     print(blue(f"{APP_EMOJI} {APP_NAME} v{VERSION}"))
