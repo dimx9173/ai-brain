@@ -1842,11 +1842,13 @@ def _run_mempalace_init() -> bool:
     try:
         subprocess.run(
             [TOOL_MEMPALACE, "init", "--yes", "--no-llm", "."],
+            stdin=subprocess.DEVNULL,
             check=True,
         )
         try:
             subprocess.run(
                 [TOOL_MEMPALACE, "sync", "--apply", "."],
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
         except Exception:
