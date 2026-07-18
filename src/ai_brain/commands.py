@@ -2220,13 +2220,62 @@ def _print_archive_status() -> None:
     print(blue("====== 🗂️ 全域自動記憶歸檔狀態清單 ======"))
     print("目前註冊的專案與其自動歸檔狀態：\n")
     from .ui import GREEN, NC, RED
+
+    indexed_map = {}
+    try:
+        res = subprocess.run(
+            ["codebase-memory-mcp", "cli", "list_projects"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True, text=True, timeout=10,
+        )
+        data = json.loads(res.stdout)
+        for p in data.get("projects", []):
+            p_root = p.get("root_path", "")
+            if p_root:
+                try:
+                    resolved_p = str(Path(p_root).resolve())
+                    indexed_map[resolved_p] = p
+                except Exception:
+                    indexed_map[p_root] = p
+    except Exception:
+        pass
+
     enabled = set(registry.list_archived())
     for i, proj_path in enumerate(registry.list_active(), 1):
         base = Path(proj_path).name
+
+        p_stats = None
+        try:
+            resolved_proj = Path(proj_path).resolve()
+            for r_path, p in indexed_map.items():
+                try:
+                    if Path(r_path).resolve() == resolved_proj:
+                        p_stats = p
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        if not p_stats:
+            p_stats = indexed_map.get(proj_path)
+
         if proj_path in enabled:
-            print(f"  [{i}] {GREEN}[ 已啟用自動歸檔 (Active) ]{NC} {base} ({proj_path})")
+            archive_lbl = f"{GREEN}[已啟用自動歸檔]{NC}"
         else:
-            print(f"  [{i}] {RED}[ 預設不歸檔 (Inactive) ]{NC} {base} ({proj_path})")
+            archive_lbl = f"{RED}[預設不歸檔]{NC}"
+
+        if p_stats:
+            nodes = p_stats.get("nodes", 0)
+            edges = p_stats.get("edges", 0)
+            size_bytes = p_stats.get("size_bytes", 0)
+            size_mb = size_bytes / (1024 * 1024)
+            size_str = f"{size_mb:.2f}MB" if size_mb >= 0.1 else f"{size_bytes/1024:.1f}KB"
+            map_lbl = f"{GREEN}[地圖: {nodes} 節點, {edges} 關係, {size_str}]{NC}"
+        else:
+            map_lbl = f"{RED}[尚未生成地圖]{NC}"
+
+        print(f"  [{i}] {archive_lbl} {map_lbl} {base} ({proj_path})")
     print()
     print(yellow("用法提示:"))
     from .ui import GREEN as G
