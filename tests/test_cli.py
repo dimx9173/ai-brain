@@ -96,6 +96,13 @@ class TestCli(unittest.TestCase):
         mock_fi.assert_called_once()
         mock_ib.assert_not_called()
 
+    @patch("ai_brain.registry.enable_archive", return_value=True)
+    @patch("ai_brain.cli.commands.full_init", return_value=True)
+    def test_init_auto_archive_calls_enable_archive(self, mock_fi, mock_ea) -> None:
+        self.assertEqual(cli.main(["init", "-a"]), 0)
+        mock_fi.assert_called_once()
+        mock_ea.assert_called_once()
+
     @patch("ai_brain.cli.commands.uninstall_all", return_value=True)
     def test_uninstall_dispatch_returns_zero(self, mock_fn) -> None:
         self.assertEqual(cli.main(["uninstall"]), 0)

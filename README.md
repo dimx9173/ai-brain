@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.6.8-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.6.9-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -72,7 +72,10 @@ cd ~/cwork/ai-brain
 In any project workspace root, run the initialization command:
 
 ```bash
-# Fully automatic initialization (registers background Git Hooks and daily 23:30 auto-archive Cron Job)
+# Fully automatic initialization + enable auto-archiving (recommended)
+ai-brain init -a
+
+# Fully automatic initialization (registers background Git Hooks and auto-archive Cron, but project excluded from archiving by default)
 ai-brain init
 
 # OR standard manual initialization (requires manually running start/stop)
@@ -85,7 +88,8 @@ ai-brain init -m
 
 | Command | Description | Recommended Usage | Safety |
 | :--- | :--- | :--- | :--- |
-| `init` | Perform fully automatic initialization (registers local wing configurations, codebase index, `.claude/CLAUDE.md`, Git Hooks, and global auto-archive Cron Job). | Run once per new project | ✅ Safe |
+| `init` | Perform fully automatic initialization (registers local wing configurations, codebase index, `.claude/CLAUDE.md`, Git Hooks, and global auto-archive Cron Job. Note: project is excluded from archiving by default). | Run once per new project | ✅ Safe |
+| `init -a` | Perform fully automatic initialization and automatically enable auto-archiving (whitelist/include) for this project. | Run once per new project | ✅ Safe |
 | `init -m` | Perform standard manual initialization (no global Cron registration, requires manually running start/stop). | Run once per new project | ✅ Safe |
 | `full-init` | Legacy alias command to perform `init` (fully automatic initialization). | Legacy use | ✅ Safe |
 | `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |

@@ -27,7 +27,8 @@ def _show_help() -> None:
     print("  ai-brain [指令]\n")
     print(yellow("可用指令:"))
     rows = [
-        ("init", "[一次性] 全自動初始化（✅ Git Hook 背景更新 + 註冊深夜自動歸檔）"),
+        ("init", "[一次性] 全自動初始化（✅ Git Hook 背景更新 + 註冊深夜自動歸檔，⚠️ 預設不啟用歸檔）"),
+        ("init -a", "[一次性] 全自動初始化 + 自動啟用排程歸檔（✅ 推薦）"),
         ("init -m", "[一次性] 標準初始化（❌ 需手動：後續需手動執行 start/stop）"),
         ("mine <target>", "[選擇性歸檔] 歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
         ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
@@ -62,7 +63,8 @@ def _show_help() -> None:
     print(yellow("💡 核心工作流指引 (Core Workflows):"))
     print(f"  {blue('1. 專案初始化 (一次性)')}")
     print("     在新專案根目錄下執行以下指令，以完成大腦空間、規則檔及 Git Hook 配置：")
-    print(f"     ➔ {green('ai-brain init')}         (全自動初始化 ─ ✅ 自動透過 Git Hook 更新地圖 + 註冊深夜自動歸檔)")
+    print(f"     ➔ {green('ai-brain init -a')}      (全自動初始化 + 自動啟用排程歸檔 ─ ✅ 推薦)")
+    print(f"     ➔ {green('ai-brain init')}         (全自動初始化 ─ ⚠️ 預設不啟用自動歸檔)")
     print(f"     ➔ {green('ai-brain init -m')}      (標準初始化 ─ ❌ 後續需手動執行 start/stop)")
     print()
     print(f"  {blue('2. 每日開發上工 (⚠️ 僅在使用 -m 標準初始化時，才需要手動執行)')}")
@@ -94,6 +96,16 @@ def _cmd_verify(_args, _paths) -> int:
         return 0
     print(red(f"⚠️ 驗證未完全通過，共有 {failures} 項錯誤。請參考上述 FAIL 提示進行排查。"))
     return 1
+
+
+def _cmd_init(args, paths) -> int:
+    from . import registry
+    ok = commands.init_brain() if args.manual else commands.full_init(paths)
+    if not ok:
+        return 1
+    if args.auto_archive:
+        registry.enable_archive(registry.current_project_path())
+    return 0
 
 
 def _cmd_full_init(_args, paths) -> int:
@@ -152,7 +164,7 @@ def _cmd_completions(args) -> int:
 # --- Dispatch table: name -> (callable, takes_args_and_paths) ------------------
 # Using a dict + dict of factory functions so the argparse binding stays explicit.
 COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
-    "init": lambda a, p: 0 if (commands.init_brain() if a.manual else commands.full_init(p)) else 1,
+    "init": _cmd_init,
     "full-init": _cmd_full_init,
     "mine": _cmd_mine,
     "install": lambda a, p: 0 if installer.install_or_update() else 1,
@@ -196,6 +208,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init", help="Initialize local AI brain configuration", add_help=False)
     p.add_argument("-m", "--manual", action="store_true", help="Manual (standard) initialization without cron registration")
+    p.add_argument("-a", "--auto-archive", action="store_true", help="Automatically whitelist/enable auto-archiving for this project")
     _add_common("full-init", "Initialize and register global cron + MCP")
     p = sub.add_parser("mine", help="Selectively mine high-value content into L2 memory palace", add_help=False)
     p.add_argument("target", nargs="?", default=".",
@@ -307,6 +320,7 @@ class _Namespace_for:
         self.fast = "--fast" in rest or "--no-cluster" in rest
         self.apply = "--apply" in rest
         self.manual = "-m" in rest or "--manual" in rest
+        self.auto_archive = "-a" in rest or "--auto-archive" in rest
         # `mine` subcommand args
         self.mine_mode = None
         self.wing = None
