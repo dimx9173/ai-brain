@@ -197,7 +197,7 @@ def check_mempalace_connectivity() -> CheckResult:
         if not line:
             return CheckResult(
                 name, FAIL,
-                f"(30 秒內無回應 ({elapsed_ms} ms)；建議執行 ai-brain gc --apply 或 ai-brain doctor --fix)",
+                f"(30 秒內無回應 ({elapsed_ms} ms)；建議執行 ai-brain gc --apply)",
             )
 
         return CheckResult(name, PASS, f"({elapsed_ms} ms)")
@@ -205,7 +205,7 @@ def check_mempalace_connectivity() -> CheckResult:
     except Exception as e:
         return CheckResult(
             name, FAIL,
-            f"(連線失敗: {e}；建議執行 ai-brain gc --apply 或 ai-brain doctor --fix)",
+            f"(連線失敗: {e}；建議執行 ai-brain gc --apply)",
         )
     finally:
         if proc is not None:

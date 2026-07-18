@@ -383,6 +383,76 @@ class TestDoctor(_RegisterSeveralMixin):
         self.assertTrue(ok)
         self.assertEqual(mock_ignores.call_count, 1)
 
+    @unittest.mock.patch("ai_brain.verifier.run_all_checks")
+    @unittest.mock.patch("ai_brain.commands.subprocess.run")
+    def test_doctor_detects_drift_backups(self, mock_run, mock_checks) -> None:
+        """Check 3d: drift dirs in ~/.mempalace/palace/ are detected as FAIL."""
+        from ai_brain.verifier import CheckResult, PASS as V_PASS
+        mock_checks.return_value = [CheckResult("Mock Check", V_PASS)]
+        mock_sync = unittest.mock.MagicMock()
+        mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+        mock_run.return_value = mock_sync
+
+        # Seed gitignore so the unrelated gitignore check passes.
+        global_gi = commands._global_gitignore_path()
+        global_gi.parent.mkdir(parents=True, exist_ok=True)
+        global_gi.write_text(".codebase-memory/\n", encoding="utf-8")
+
+        # Seed two drift directories of known size.
+        palace = Path(self.tmpdir) / ".mempalace" / "palace"
+        (palace / "wing-uuid.drift-20260602-133246").mkdir(parents=True)
+        (palace / "wing-uuid.drift-20260602-133246" / "data_level0.bin").write_bytes(b"x" * 100)
+        (palace / "wing-uuid.drift-20260608-140941").mkdir(parents=True)
+        (palace / "wing-uuid.drift-20260608-140941" / "data_level0.bin").write_bytes(b"y" * 200)
+
+        from unittest.mock import MagicMock
+        paths = MagicMock()
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            ok = commands.run_doctor(paths, fix=False)
+        out = buf.getvalue()
+        # Returns False because drift is detected.
+        self.assertFalse(ok)
+        # Drift message must be in the output (specifically by check 3d).
+        self.assertIn("drift", out.lower())
+        self.assertIn("3d", out)
+        # The drift dirs are still there (no fix).
+        self.assertTrue((palace / "wing-uuid.drift-20260602-133246").is_dir())
+        self.assertTrue((palace / "wing-uuid.drift-20260608-140941").is_dir())
+
+    @unittest.mock.patch("ai_brain.commands.run_gc")
+    @unittest.mock.patch("ai_brain.verifier.run_all_checks")
+    @unittest.mock.patch("ai_brain.commands.subprocess.run")
+    def test_doctor_fix_invokes_run_gc_with_apply(self, mock_run, mock_checks, mock_gc) -> None:
+        """--fix with drift present ⇒ run_gc(apply=True) is called."""
+        from ai_brain.verifier import CheckResult, PASS as V_PASS
+        mock_checks.return_value = [CheckResult("Mock Check", V_PASS)]
+        mock_sync = unittest.mock.MagicMock()
+        mock_sync.stdout = "Gitignored: 0\nMissing: 0"
+        mock_run.return_value = mock_sync
+        mock_gc.return_value = True  # pretend gc succeeded
+
+        # Seed gitignore so the unrelated gitignore check passes.
+        global_gi = commands._global_gitignore_path()
+        global_gi.parent.mkdir(parents=True, exist_ok=True)
+        global_gi.write_text(".codebase-memory/\n", encoding="utf-8")
+
+        palace = Path(self.tmpdir) / ".mempalace" / "palace"
+        (palace / "wing-uuid.drift-20260602-133246").mkdir(parents=True)
+        (palace / "wing-uuid.drift-20260602-133246" / "data_level0.bin").write_bytes(b"x" * 100)
+
+        from unittest.mock import MagicMock
+        paths = MagicMock()
+
+        ok = commands.run_doctor(paths, fix=True)
+        self.assertTrue(ok)
+        # run_gc was called exactly once with apply=True.
+        self.assertEqual(mock_gc.call_count, 1)
+        _, kwargs = mock_gc.call_args
+        self.assertTrue(kwargs.get("apply", False) or
+                        (len(mock_gc.call_args[0]) > 0 and mock_gc.call_args[0][0]))
+
 
 # ============================================================================ #
 # ============================================================================ #

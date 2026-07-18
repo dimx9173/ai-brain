@@ -1268,6 +1268,40 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
+    # 3d. Check drift backups (Global Check - run once).
+    # Drift dirs are HNSW-index snapshots left behind by ``mempalace sync``;
+    # they are not the canonical data, but they accumulate over time and
+    # eventually trip the Palace capacity warnings. ``--fix`` delegates to
+    # ``run_gc(apply=True)`` so a single command cleans drift + runs
+    # sync + compresses ChromaDB.
+    print(blue("3d. 檢查 Palace drift 備份..."))
+    palace_dir = Path.home() / ".mempalace" / "palace"
+    drift_dirs = sorted(palace_dir.glob("*.drift-*")) if palace_dir.is_dir() else []
+    if drift_dirs:
+        total_drift = 0
+        for d in drift_dirs:
+            try:
+                for f in d.rglob("*"):
+                    if f.is_file():
+                        total_drift += f.stat().st_size
+            except Exception:
+                pass
+        drift_mb = total_drift / (1024 ** 2)
+        print(red(f"  [ FAIL ] 發現 {len(drift_dirs)} 個 drift 備份 (共 {drift_mb:.1f} MB)"))
+        if fix:
+            print(yellow("  --> 自動呼叫 run_gc(apply=True)..."))
+            if run_gc(apply=True):
+                print(green("  [ FIXED ] drift 備份已清理 + 記憶庫已同步/壓縮"))
+            else:
+                print(yellow("  [ WARN ] gc 未能完成（可能另一個 ai-brain 正在執行或無 apply 權限）"))
+        else:
+            all_pass = False
+            print(yellow("  💡 執行 `ai-brain doctor --fix` 或 `ai-brain gc --apply` 自動修正"))
+    else:
+        print(green("  [ PASS ] 無 drift 備份"))
+
+    print()
+
     # 4. Check stale drawers in mempalace (sync check)
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
     doctor_lock_fd = _acquire_brain_lock()
