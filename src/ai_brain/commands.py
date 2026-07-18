@@ -313,9 +313,30 @@ def check_status() -> bool:
     try:
         res = subprocess.run(
             ["codebase-memory-mcp", "cli", "list_projects"],
+            stdin=subprocess.DEVNULL,
             capture_output=True, text=True, timeout=30,
         )
-        codebase_memory_ok = proj_name in res.stdout.lower() or "active" in res.stdout.lower()
+        codebase_memory_ok = False
+        try:
+            data = json.loads(res.stdout)
+            current_root = str(Path.cwd().resolve()).lower()
+            for p in data.get("projects", []):
+                p_root = p.get("root_path", "")
+                try:
+                    # Resolve both paths to handle OneDrive/iCloud CloudStorage display names and symlinks
+                    if Path(p_root).resolve().exists() and Path(p_root).resolve() == Path.cwd().resolve():
+                        codebase_memory_ok = True
+                        break
+                except Exception:
+                    pass
+                if p_root.lower() == current_root:
+                    codebase_memory_ok = True
+                    break
+        except Exception:
+            pass
+
+        if not codebase_memory_ok:
+            codebase_memory_ok = proj_name in res.stdout.lower() or "active" in res.stdout.lower()
     except subprocess.TimeoutExpired:
         codebase_memory_ok = False
     except Exception:
