@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.6.7-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.6.8-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -90,8 +90,8 @@ ai-brain init -m
 | `full-init` | Legacy alias command to perform `init` (fully automatic initialization). | Legacy use | ✅ Safe |
 | `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |
 | `update` | Alias for `install` (supports auto Git-pull and copy-updating from the cloned source repo). | Run to update | ✅ Safe |
-| `start` | Generate or update the latest codebase architecture maps. | Runs automatically via Git Hooks | ✅ Safe |
-| `stop` | Safe scan, sweep, and archive of the day's local chat context to the long-term SQLite memory palace. | Run at end of day | ✅ Safe |
+| `start` | Generate or update codebase architecture maps (run manually only if standard manual init `init -m` is used). | Runs automatically via Git Hooks | ✅ Safe |
+| `stop` | Archive local chat context to long-term memory palace (run manually only if standard manual init `init -m` is used). | Run at end of day | ✅ Safe |
 | `status` | Print current project memory status (MemPalace, Codebase-Memory, `.claude/CLAUDE.md`, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
 | `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
 | `doctor` | Perform comprehensive diagnostics (check gitignore, stale locks, CLI paths) across all projects. | Run for deep troubleshooting | 🔍 Read-only |

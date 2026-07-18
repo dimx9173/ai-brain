@@ -135,17 +135,18 @@ ai-brain init
 >
 > **注意**：新專案預設 **不自動歸檔**（安全策略）。若要啟用，請執行 `ai-brain include`。
 
-### 🌅 每日早晨：啟動開發
+### 🌅 每日早晨：啟動開發 (⚠️ 僅在使用 `ai-brain init -m` 時需要手動執行)
 
-- **無感自動**：`git pull` 或 `git checkout` 時，Git Hook 自動重建圖譜
-- **手動更新**：
+- **無感自動**：使用 `ai-brain init` 時，`git pull` 或 `git checkout` 會透過 Git Hook 自動重建圖譜，不需任何手動指令。
+- **手動更新**（使用 `ai-brain init -m` 時）：
   ```bash
   ai-brain start
   ```
 
-### 🌇 下班收尾
+### 🌇 下班收尾 (⚠️ 僅在使用 `ai-brain init -m` 時需要手動執行)
 
-先關閉所有 AI 視窗與終端機，再執行：
+使用 `ai-brain init` 時，定時排程會自動在深夜進行歸檔，不需任何手動指令。
+若使用 `ai-brain init -m`，請在下班關閉所有 AI 視窗與終端機前，手動執行：
 ```bash
 ai-brain stop
 ```
