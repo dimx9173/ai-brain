@@ -1088,6 +1088,11 @@ class TestArchiveSweep(_CmdBase):
 
         claude_dir = Path.home() / ".claude" / "projects" / "proj-a"
         claude_dir.mkdir(parents=True, exist_ok=True)
+        # Need at least one *.jsonl newer than the cutoff for sweep to run.
+        (claude_dir / "session.jsonl").write_text("{}", encoding="utf-8")
+        # No LAST_SWEEP_FILE ⇒ cutoff 0 ⇒ always sweep.
+        if commands.LAST_SWEEP_FILE().is_file():
+            commands.LAST_SWEEP_FILE().unlink()
 
         with patch("ai_brain.commands.find_claude_folder_by_path", return_value=claude_dir):
             commands._run_archive_sweep(silent=False)
@@ -1095,6 +1100,124 @@ class TestArchiveSweep(_CmdBase):
         args = mock_run.call_args[0][0]
         self.assertEqual(args[0], "mempalace")
         self.assertEqual(args[1], "sweep")
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_sweep_skips_when_no_new_transcripts(self, mock_run):
+        """Cutoff newer than every *.jsonl mtime ⇒ skip without calling mempalace."""
+        import time as _time
+
+        proj_dir = Path(self.tmpdir) / "proj-a"
+        proj_dir.mkdir()
+        self._register([str(proj_dir)])
+        registry.enable_archive(str(proj_dir))
+        mock_run.return_value = self._mk_subprocess_result()
+
+        claude_dir = Path.home() / ".claude" / "projects" / "proj-a"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        old_jsonl = claude_dir / "old.jsonl"
+        old_jsonl.write_text("{}", encoding="utf-8")
+        # Set mtime to 1 hour ago.
+        old_mtime = _time.time() - 3600
+        os.utime(old_jsonl, (old_mtime, old_mtime))
+
+        # Cutoff = now, jsonl is older ⇒ skip.
+        commands.LAST_SWEEP_FILE().parent.mkdir(parents=True, exist_ok=True)
+        commands.LAST_SWEEP_FILE().write_text(str(int(_time.time())), encoding="utf-8")
+
+        out = io.StringIO()
+        with redirect_stdout(out), \
+             patch("ai_brain.commands.find_claude_folder_by_path", return_value=claude_dir):
+            commands._run_archive_sweep(silent=False)
+        self.assertFalse(mock_run.called)
+        self.assertIn("略過", out.getvalue())
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_sweep_runs_when_transcript_newer_than_cutoff(self, mock_run):
+        """At least one *.jsonl newer than the cutoff ⇒ invoke mempalace sweep."""
+        import time as _time
+
+        proj_dir = Path(self.tmpdir) / "proj-a"
+        proj_dir.mkdir()
+        self._register([str(proj_dir)])
+        registry.enable_archive(str(proj_dir))
+        mock_run.return_value = self._mk_subprocess_result()
+
+        claude_dir = Path.home() / ".claude" / "projects" / "proj-a"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        new_jsonl = claude_dir / "new.jsonl"
+        new_jsonl.write_text("{}", encoding="utf-8")
+        # mtime = now, cutoff = 1 hour ago ⇒ new.
+        new_mtime = _time.time()
+        os.utime(new_jsonl, (new_mtime, new_mtime))
+
+        commands.LAST_SWEEP_FILE().parent.mkdir(parents=True, exist_ok=True)
+        commands.LAST_SWEEP_FILE().write_text(str(int(_time.time() - 3600)), encoding="utf-8")
+
+        with patch("ai_brain.commands.find_claude_folder_by_path", return_value=claude_dir):
+            commands._run_archive_sweep(silent=False)
+        self.assertTrue(mock_run.called)
+
+    @patch("ai_brain.commands.subprocess.run")
+    def test_sweep_runs_when_no_last_sweep_file(self, mock_run):
+        """No LAST_SWEEP_FILE ⇒ cutoff = 0 ⇒ always sweep."""
+        proj_dir = Path(self.tmpdir) / "proj-a"
+        proj_dir.mkdir()
+        self._register([str(proj_dir)])
+        registry.enable_archive(str(proj_dir))
+        mock_run.return_value = self._mk_subprocess_result()
+
+        claude_dir = Path.home() / ".claude" / "projects" / "proj-a"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        (claude_dir / "anything.jsonl").write_text("{}", encoding="utf-8")
+
+        # Ensure no LAST_SWEEP_FILE.
+        if commands.LAST_SWEEP_FILE().is_file():
+            commands.LAST_SWEEP_FILE().unlink()
+
+        with patch("ai_brain.commands.find_claude_folder_by_path", return_value=claude_dir):
+            commands._run_archive_sweep(silent=False)
+        self.assertTrue(mock_run.called)
+
+
+class TestSweepDirtyHelpers(_CmdBase):
+    """Direct coverage for the mtime-cutoff helpers themselves."""
+
+    def test_read_last_sweep_epoch_returns_zero_when_missing(self):
+        if commands.LAST_SWEEP_FILE().is_file():
+            commands.LAST_SWEEP_FILE().unlink()
+        self.assertEqual(commands._read_last_sweep_epoch(), 0.0)
+
+    def test_read_last_sweep_epoch_returns_zero_when_corrupt(self):
+        commands.LAST_SWEEP_FILE().parent.mkdir(parents=True, exist_ok=True)
+        commands.LAST_SWEEP_FILE().write_text("not-a-number\n", encoding="utf-8")
+        self.assertEqual(commands._read_last_sweep_epoch(), 0.0)
+
+    def test_project_has_new_transcripts_true_for_newer_mtime(self):
+        import time as _time
+        d = Path(self.tmpdir) / "claude-proj"
+        d.mkdir()
+        p = d / "t.jsonl"
+        p.write_text("x", encoding="utf-8")
+        os.utime(p, (_time.time(), _time.time()))
+        self.assertTrue(commands._project_has_new_transcripts(d, _time.time() - 60))
+
+    def test_project_has_new_transcripts_false_when_all_older(self):
+        import time as _time
+        d = Path(self.tmpdir) / "claude-proj"
+        d.mkdir()
+        p = d / "t.jsonl"
+        p.write_text("x", encoding="utf-8")
+        old = _time.time() - 3600
+        os.utime(p, (old, old))
+        self.assertFalse(commands._project_has_new_transcripts(d, _time.time()))
+
+    def test_project_has_new_transcripts_false_when_dir_missing(self):
+        self.assertFalse(commands._project_has_new_transcripts(Path("/nonexistent"), 0.0))
+
+    def test_project_has_new_transcripts_false_when_empty_dir(self):
+        d = Path(self.tmpdir) / "claude-proj"
+        d.mkdir()
+        self.assertFalse(commands._project_has_new_transcripts(d, 0.0))
 
 
 class TestFindClaudeFolder(_CmdBase):

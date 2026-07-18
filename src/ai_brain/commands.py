@@ -2032,6 +2032,43 @@ def _record_sweep_timestamp() -> None:
         pass
 
 
+def _read_last_sweep_epoch() -> float:
+    """Return the epoch stored in LAST_SWEEP_FILE, or 0.0 if missing/corrupt.
+
+    Treats any read/parse failure as "never swept before" so the first sweep
+    still runs against every project (cutoff 0 ⇒ everything is newer).
+    """
+    p = LAST_SWEEP_FILE()
+    if not p.is_file():
+        return 0.0
+    try:
+        return float(p.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return 0.0
+
+
+def _project_has_new_transcripts(target_dir: Path, cutoff_epoch: float) -> bool:
+    """True iff ``target_dir`` contains any ``*.jsonl`` newer than ``cutoff_epoch``.
+
+    Used by ``_run_archive_sweep`` to skip archived projects whose transcripts
+    haven't changed since the last successful sweep. An empty directory returns
+    False (nothing to archive); any stat/glob error returns True to err toward
+    "sweep" rather than silently drop data.
+    """
+    if not target_dir.is_dir():
+        return False
+    try:
+        for jsonl in target_dir.glob("*.jsonl"):
+            try:
+                if jsonl.stat().st_mtime > cutoff_epoch:
+                    return True
+            except OSError:
+                return True
+    except OSError:
+        return True
+    return False
+
+
 def _should_run_gc() -> bool:
     """Return True if more than GC_BACKGROUND_GAP_SECONDS since last GC."""
     if not LAST_GC_FILE().is_file():
@@ -2167,6 +2204,11 @@ def _run_archive_sweep(*, silent: bool) -> None:
                 print("💡 提示: 若要為此專案啟用自動定時歸檔，請執行: ai-brain include")
             return
 
+        # Snapshot the cutoff once: any *.jsonl with mtime > cutoff is "new".
+        # LAST_SWEEP_FILE is updated by _record_sweep_timestamp AFTER this
+        # function returns, so the value here is stable for the whole loop.
+        cutoff_epoch = _read_last_sweep_epoch()
+
         if not silent:
             print(yellow("--> 讀取自動歸檔白名單，僅自動歸檔啟用之專案..."))
 
@@ -2176,6 +2218,10 @@ def _run_archive_sweep(*, silent: bool) -> None:
                 continue
             target = find_claude_folder_by_path(proj_path)
             if not target:
+                continue
+            if not _project_has_new_transcripts(target, cutoff_epoch):
+                if not silent:
+                    print(yellow(f"--> 略過 {target.name}（自上次掃描以來無新對話 transcript）"))
                 continue
             if not silent:
                 print(green(f"--> 掃描歸檔活躍專案: {target.name}"))
