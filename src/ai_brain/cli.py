@@ -27,8 +27,8 @@ def _show_help() -> None:
     print("  ai-brain [指令]\n")
     print(yellow("可用指令:"))
     rows = [
-        ("init", "[一次性] 初始化專案 AI 大腦配置（Palace 結構、代碼圖譜、記憶鉤子）"),
-        ("full-init", "[一次性] 初始化配置，並一併在系統中註冊深夜 23:30 自動記憶歸檔 Cron Job"),
+        ("init", "[一次性] 初始化專案 AI 大腦配置（⚠️ 需手動：後續需手動執行 start/stop）"),
+        ("full-init", "[一次性] 初始化配置 + 註冊定時任務（✅ 全自動：Git Hook 背景更新地圖 + 深夜自動歸檔）"),
         ("mine <target>", "[選擇性歸檔] 歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
         ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
         ("version", "[顯示版本] 顯示目前安裝的 ai-brain 工具版本"),
@@ -62,8 +62,8 @@ def _show_help() -> None:
     print(yellow("💡 核心工作流指引 (Core Workflows):"))
     print(f"  {blue('1. 專案初始化 (一次性)')}")
     print("     在新專案根目錄下執行以下指令，以完成大腦空間、規則檔及 Git Hook 配置：")
-    print(f"     ➔ {green('ai-brain init')}         (標準初始化)")
-    print(f"     ➔ {green('ai-brain full-init')}    (標準初始化 + 註冊深夜 23:30 自動記憶歸檔排程)")
+    print(f"     ➔ {green('ai-brain init')}         (標準初始化 ─ ⚠️ 後續需手動執行 start/stop)")
+    print(f"     ➔ {green('ai-brain full-init')}    (全自動初始化 ─ ✅ 自動透過 Git Hook 更新地圖 + 註冊深夜自動歸檔)")
     print()
     print(f"  {blue('2. 每日開發上工 (平常上工)')}")
     print("     每天早上開始工作時，在專案目錄下執行：")
