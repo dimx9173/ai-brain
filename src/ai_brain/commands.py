@@ -1401,32 +1401,31 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     print(blue("5. 檢查系統相依 CLI 工具與插件可用性..."))
     cli_ok = True
     for tool_name, pkg in (("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")):
-        is_installed = False
-        detail_msg = ""
-        if shutil.which(tool_name):
-            is_installed = True
-            detail_msg = "(CLI 已安裝)"
-        elif tool_name == "claude-mem":
+        if tool_name == "claude-mem":
             from .platforms import get_all_claude_settings_files
-            for label, p in get_all_claude_settings_files():
+            settings_files = get_all_claude_settings_files()
+            missing_files: list[tuple[str, Path]] = []
+            enabled_files: list[str] = []
+
+            for label, p in settings_files:
                 try:
                     raw = json.loads(p.read_text(encoding="utf-8"))
                     plugins = raw.get("enabledPlugins", {})
                     if isinstance(plugins, dict) and (plugins.get("claude-mem@thedotmack") or plugins.get("claude-mem")):
-                        is_installed = True
-                        detail_msg = f"(插件於 {label} 已啟用)"
-                        break
+                        enabled_files.append(label)
+                    else:
+                        missing_files.append((label, p))
                 except Exception:
-                    pass
+                    missing_files.append((label, p))
 
-        if is_installed:
-            print(green(f"  [ PASS ] 工具 {tool_name} 已就緒 {detail_msg}"))
-        else:
-            cli_ok = False
-            print(red(f"  [ FAIL ] 未找到 {tool_name} 指令或插件設定"))
-            if fix:
-                print(yellow(f"    --> 正在嘗試自動安裝 / 配置 {pkg}..."))
-                if pkg == "claude-mem":
+            cli_binary = bool(shutil.which(tool_name))
+
+            if missing_files:
+                cli_ok = False
+                for m_label, _ in missing_files:
+                    print(red(f"  [ FAIL ] {m_label} 尚未啟用 claude-mem 插件"))
+                if fix:
+                    print(yellow(f"    --> 正在嘗試自動修復並啟用所有 Claude Code 設定檔（含遠端 SSH 主機）的 {pkg} 插件..."))
                     try:
                         subprocess.run(
                             ["uv", "tool", "install", pkg, "--force"],
@@ -1438,6 +1437,27 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(green(f"    [ FIXED ] 已自動為 {count} 個 Claude Code 設定檔啟用 {pkg} 插件！"))
                     cli_ok = True
                 else:
+                    all_pass = False
+            elif cli_binary or enabled_files:
+                details = []
+                if cli_binary:
+                    details.append("CLI 已安裝")
+                if enabled_files:
+                    details.append(f"{len(enabled_files)} 個設定檔已啟用")
+                print(green(f"  [ PASS ] 工具 {tool_name} 已就緒 ({' + '.join(details)})"))
+            else:
+                cli_ok = False
+                all_pass = False
+                print(red(f"  [ FAIL ] 未找到 {tool_name} 指令或插件設定"))
+        else:
+            is_installed = bool(shutil.which(tool_name))
+            if is_installed:
+                print(green(f"  [ PASS ] 工具 {tool_name} 已就緒 (CLI 已安裝)"))
+            else:
+                cli_ok = False
+                print(red(f"  [ FAIL ] 未找到 {tool_name} CLI 指令"))
+                if fix:
+                    print(yellow(f"    --> 正在嘗試自動安裝 {pkg}..."))
                     try:
                         subprocess.run(
                             ["uv", "tool", "install", pkg, "--force"],
@@ -1449,8 +1469,8 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         print(yellow(f"    [ TIMEOUT ] uv tool install {pkg} 已逾時 (>300s)"))
                     except Exception as e:
                         print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
-            else:
-                all_pass = False
+                else:
+                    all_pass = False
 
     print()
 

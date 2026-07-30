@@ -249,22 +249,37 @@ def print_results(results: List[CheckResult]) -> int:
 # --- Top-level verification pipeline -------------------------------------------
 
 def check_claude_mem_status() -> CheckResult:
-    """Check if claude-mem is available either via CLI binary or as a Claude Code plugin."""
+    """Check if claude-mem is available via CLI binary and enabled in all Claude Code settings files."""
     name = "檢查 claude-mem CLI / 插件狀態"
-    if shutil.which("claude-mem"):
-        return CheckResult(name, PASS, "(CLI 已安裝)")
+    cli_installed = bool(shutil.which("claude-mem"))
 
     from .platforms import get_all_claude_settings_files
-    for label, path in get_all_claude_settings_files():
+    settings_files = get_all_claude_settings_files()
+    missing_files: list[str] = []
+    enabled_files: list[str] = []
+
+    for label, path in settings_files:
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
             plugins = raw.get("enabledPlugins", {})
             if isinstance(plugins, dict) and (plugins.get("claude-mem@thedotmack") or plugins.get("claude-mem")):
-                return CheckResult(name, PASS, f"(插件於 {label} 已啟用)")
+                enabled_files.append(label)
+            else:
+                missing_files.append(label)
         except Exception:
-            pass
+            missing_files.append(label)
 
-    return CheckResult(name, INFO, "(未安裝 CLI，亦未於 Claude Code 中啟用插件)")
+    if missing_files:
+        return CheckResult(name, FAIL, f"(缺失插件設定: {', '.join(missing_files)})")
+    elif enabled_files or cli_installed:
+        details = []
+        if cli_installed:
+            details.append("CLI已安裝")
+        if enabled_files:
+            details.append(f"{len(enabled_files)} 個設定檔已啟用")
+        return CheckResult(name, PASS, f"({' + '.join(details)})")
+    else:
+        return CheckResult(name, FAIL, "(未安裝 CLI，亦未於 Claude Code 中啟用插件)")
 
 
 def run_all_checks(paths) -> List[CheckResult]:
