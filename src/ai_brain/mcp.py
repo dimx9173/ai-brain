@@ -15,6 +15,7 @@ from typing import Any, Callable
 from .config import modify_json_file
 from .constants import (
     GLOBAL_CODEBASE_MEMORY_MCP,
+    MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
     MEMPALACE_MCP_COMMAND,
@@ -25,6 +26,12 @@ from .ui import print_blue as blue
 # Each descriptor produces the IDE-specific entry for an MCP server. Keeping the
 # logic in one place stops subtle drift between targets (e.g. one having
 # "type":"stdio" and another not).
+
+def _claude_mem_command() -> tuple[str, list[str]]:
+    import shutil
+    cmd = shutil.which("claude-mem") or str(Path.home() / ".local" / "bin" / "claude-mem")
+    return (cmd, ["serve"])
+
 
 def _stdio_server_entry(server: str) -> dict[str, Any]:
     """Default stdio entry: command + args + env."""
@@ -39,6 +46,12 @@ def _stdio_server_entry(server: str) -> dict[str, Any]:
         return {
             "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
+        }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "command": cmd,
+            "args": args,
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -90,6 +103,12 @@ def _claude_desktop_entry(server: str) -> dict[str, Any]:
         return {
             "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
+        }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "command": cmd,
+            "args": args,
         }
     raise ValueError(f"Claude Desktop does not register server: {server}")
 
@@ -200,7 +219,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
         RegistrationTarget("~/.claude.json", paths.claude_json, "mcpServers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_code_entry),
         RegistrationTarget("Claude Desktop", paths.claude_desktop, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_desktop_entry),
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM), _claude_desktop_entry),
         RegistrationTarget("Kilo VS Code", paths.vscode_kilo, "mcpServers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_local_entry),
         RegistrationTarget("Kilo CLI", paths.kilo_cli, "mcp",

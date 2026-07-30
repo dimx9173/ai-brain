@@ -24,6 +24,7 @@ TOOL_CODEBASE_MEMORY = "codebase-memory-mcp"
 # --- MCP server identifiers -----------------------------------------------------
 MCP_MEMPALACE = "mempalace"
 MCP_CODEBASE_MEMORY = "codebase-memory-mcp"
+MCP_CLAUDE_MEM = "claude-mem"
 MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_CODEBASE_MEMORY)
 
 # --- LLM providers --------------------------------------------------------------

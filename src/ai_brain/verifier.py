@@ -17,7 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .constants import HOME, MCP_CODEBASE_MEMORY, MCP_REQUIRED_SERVERS, MEMPALACE_MCP_COMMAND
+from .constants import (
+    HOME,
+    MCP_CLAUDE_MEM,
+    MCP_CODEBASE_MEMORY,
+    MCP_MEMPALACE,
+    MCP_REQUIRED_SERVERS,
+    MEMPALACE_MCP_COMMAND,
+)
 from .ui import green, red, yellow
 
 PASS = "OK"
@@ -322,7 +329,7 @@ def run_all_checks(paths) -> List[CheckResult]:
                                    "(此環境未安裝 Gemini CLI，跳過檢查)"))
 
     # 8. Claude Desktop
-    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop))
+    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop, required_servers=(MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM)))
 
     # 9. Kilo
     kilo_paths: List[Path] = []

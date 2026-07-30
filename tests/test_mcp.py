@@ -10,6 +10,7 @@ from unittest import mock
 from ai_brain._testing import InTempDir
 from ai_brain.constants import (
     MEMPALACE_MCP_COMMAND,
+    MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
 )
@@ -141,6 +142,11 @@ class TestClaudeDesktopEntry(InTempDir):
     def test_codebase_memory(self):
         entry = _claude_desktop_entry(MCP_CODEBASE_MEMORY)
         self.assertIn("codebase-memory-mcp", entry["command"])
+
+    def test_claude_mem(self):
+        entry = _claude_desktop_entry(MCP_CLAUDE_MEM)
+        self.assertIn("claude-mem", entry["command"])
+        self.assertEqual(entry["args"], ["serve"])
 
     def test_unknown_server(self):
         with self.assertRaises(ValueError):

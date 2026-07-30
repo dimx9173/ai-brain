@@ -995,7 +995,16 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
 
 
 def _enable_claude_mem_plugin() -> int:
-    """Ensure `claude-mem@thedotmack` plugin is enabled in all Claude settings files."""
+    """Ensure `claude-mem@thedotmack` plugin is enabled in all Claude settings files and MCP is wired."""
+    if shutil.which("claude-mem"):
+        try:
+            subprocess.run(
+                ["claude-mem", "install-mode", "--setup", "--mcp"],
+                capture_output=True, timeout=30,
+            )
+        except Exception:
+            pass
+
     from .platforms import get_all_claude_settings_files
     enabled_count = 0
     for _, path in get_all_claude_settings_files():
