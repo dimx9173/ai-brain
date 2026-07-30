@@ -58,12 +58,17 @@ if __name__ == "__main__":
 # graphify-mcp-wrapper is no longer used. codebase-memory-mcp runs as a direct binary.
 
 
-def install_or_update() -> bool:
-    """Idempotent global install. Detects whether we're source or installed copy.
-
-    After (re)installing ai-brain itself, also upgrades the three core
-    dependency CLIs and prints a final version table.
+def install_or_update(cli_only: bool = False, tools_only: bool = False) -> bool:
+    """Idempotent global install/update.
+    
+    - cli_only: Only updates ai-brain executable shim and code without upgrading dependency CLIs.
+    - tools_only: Only upgrades dependency CLIs (mempalace / claude-mem / codebase-memory-mcp).
+    - Default (neither): Updates both ai-brain CLI and dependency CLIs.
     """
+    if tools_only:
+        _upgrade_and_summarise()
+        return True
+
     invoked_script = Path(sys.argv[0]).resolve()
 
     # If we're already running as the installed copy, try to update from source.
@@ -73,8 +78,10 @@ def install_or_update() -> bool:
         script_path = Path(__file__).resolve()
         ok = _install_from_source(script_path)
 
-    if ok:
+    if ok and not cli_only:
         _upgrade_and_summarise()
+    elif ok and cli_only:
+        green(f"✅ ai-brain CLI 已成功獨立更新至 v{VERSION} (跳過依賴套件更新)")
     return ok
 
 

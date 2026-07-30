@@ -175,8 +175,8 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "init": _cmd_init,
     "full-init": _cmd_full_init,
     "mine": _cmd_mine,
-    "install": lambda a, p: 0 if installer.install_or_update() else 1,
-    "update": lambda a, p: 0 if installer.install_or_update() else 1,
+    "install": lambda a, p: 0 if installer.install_or_update(cli_only=a.cli_only, tools_only=a.tools_only) else 1,
+    "update": lambda a, p: 0 if installer.install_or_update(cli_only=a.cli_only, tools_only=a.tools_only) else 1,
     "version": lambda a, p: (_show_version(), 0)[1],
     "-v": lambda a, p: (_show_version(), 0)[1],
     "--version": lambda a, p: (_show_version(), 0)[1],
@@ -220,8 +220,8 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
 
     "system doctor": _cmd_doctor,
     "system verify": _cmd_verify,
-    "system install": lambda a, p: 0 if installer.install_or_update() else 1,
-    "system update": lambda a, p: 0 if installer.install_or_update() else 1,
+    "system install": lambda a, p: 0 if installer.install_or_update(cli_only=a.cli_only, tools_only=a.tools_only) else 1,
+    "system update": lambda a, p: 0 if installer.install_or_update(cli_only=a.cli_only, tools_only=a.tools_only) else 1,
     "system uninstall": _cmd_uninstall,
     "system config": _cmd_config,
 }
@@ -359,6 +359,8 @@ class _Namespace_for:
         self.apply = "--apply" in rest
         self.manual = "-m" in rest or "--manual" in rest
         self.auto_archive = "-a" in rest or "--auto-archive" in rest
+        self.cli_only = "--cli" in rest
+        self.tools_only = "--tools" in rest
         # `mine` subcommand args
         self.mine_mode = None
         self.wing = None
