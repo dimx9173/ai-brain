@@ -84,40 +84,39 @@ ai-brain init -m
 
 ---
 
-## 📋 Commands Reference
+## 📋 Commands Reference (GitHub Standard CLI Format)
 
-| Command | Description | Recommended Usage | Safety |
+`ai-brain` uses GitHub CLI (`gh`) standard conventions: **`ai-brain <noun> <verb> [flags]`**, while maintaining 100% backward compatibility for top-level shortcuts.
+
+### 📦 Project Management (`project`)
+| Command | Alias | Description | Safety |
 | :--- | :--- | :--- | :--- |
-| `init` | Perform fully automatic initialization (registers local wing configurations, codebase index, `.claude/CLAUDE.md`, Git Hooks, and global auto-archive Cron Job. Note: project is excluded from archiving by default). | Run once per new project | ✅ Safe |
-| `init -a` | Perform fully automatic initialization and automatically enable auto-archiving (whitelist/include) for this project. | Run once per new project | ✅ Safe |
-| `init -m` | Perform standard manual initialization (no global Cron registration, requires manually running start/stop). | Run once per new project | ✅ Safe |
-| `full-init` | Legacy alias command to perform `init` (fully automatic initialization). | Legacy use | ✅ Safe |
-| `install` | Install/update the executable shims to `~/.local/bin/` and verify PATH. | Run on setup/update | ✅ Safe |
-| `update` | Alias for `install` (supports auto Git-pull and copy-updating from the cloned source repo). | Run to update | ✅ Safe |
-| `start` | Generate or update codebase architecture maps (run manually only if standard manual init `init -m` is used). | Runs automatically via Git Hooks | ✅ Safe |
-| `stop` | Archive local chat context to long-term memory palace (run manually only if standard manual init `init -m` is used). | Run at end of day | ✅ Safe |
-| `status` | Print current project memory status (MemPalace, Codebase-Memory, `.claude/CLAUDE.md`, Auto-Archive). | Run for diagnostics | 🔍 Read-only |
-| `verify` | Perform a comprehensive 9-point system check of all memory tools and IDE bindings. | Run to troubleshoot | 🔍 Read-only |
-| `doctor` | Perform comprehensive diagnostics (check gitignore, stale locks, CLI paths) across all projects. | Run for deep troubleshooting | 🔍 Read-only |
-| `doctor --fix` | Diagnoses and auto-fixes configuration errors, updating obsolete cognitive rules in `.claude/CLAUDE.md` files. | Run to auto-heal system | 🔧 Modifying |
-| `list` | Show auto-archive status of all registered active projects in the system. | Run to see project list | 🔍 Read-only |
-| `remove [key]` | Remove/deregister a project (by index or keyword) from the active registry list. | Run to clean active list | 🗑️ Destructive |
-| `version` | Display the installed version of `ai-brain`. | Run to check version | 🔍 Read-only |
-| `clean` | Remove all local `ai-brain` configuration directories, map directories, and Git hooks. | Run to strip configuration | 🗑️ Destructive |
-| `uninstall` | Global removal of all local configurations, registered Cron Jobs, global executables, and MCP server listings. | Run to completely uninstall | 🗑️ Destructive |
+| `ai-brain project init [-a\|-m]` | `ai-brain init` | Initialize project brain, memory wing, `.claude/CLAUDE.md`, and Git Hooks. (`-a` enables auto-archiving). | ✅ Safe |
+| `ai-brain project list` | `ai-brain list` | List all registered active projects and auto-archive status. | 🔍 Read-only |
+| `ai-brain project include [key]` | `ai-brain include` | Enable auto-archiving for a specific project or current directory. | ✅ Safe |
+| `ai-brain project exclude [key]` | `ai-brain exclude` | Disable auto-archiving for a specific project or current directory. | ✅ Safe |
+| `ai-brain project remove [key]` | `ai-brain remove` | Deregister a project from the active registry list. | 🗑️ Destructive |
+| `ai-brain project status` | `ai-brain status` | Show current workspace brain health and ChromaDB capacity status. | 🔍 Read-only |
+| `ai-brain project clean` | `ai-brain clean` | Remove local `.ai-brain` configuration, maps, and Git hooks. | 🗑️ Destructive |
 
-### 🗂️ Auto-Archive Whitelisting
-To prevent memory conflicts, projects are **excluded** from auto-archiving by default. Manage your whitelisted projects using:
+### 🧠 Memory Operations (`memory`)
+| Command | Alias | Description | Safety |
+| :--- | :--- | :--- | :--- |
+| `ai-brain memory start` | `ai-brain start` | Refresh codebase architecture map and L1 graph topology. | ✅ Safe |
+| `ai-brain memory stop` | `ai-brain stop` | Safely package and archive session conversations into L2 memory palace. | ✅ Safe |
+| `ai-brain memory mine [target]` | `ai-brain mine` | Selectively mine high-value content (chats, ADRs, docs) into L2 palace. | ✅ Safe |
+| `ai-brain memory sync [--fix]` | `ai-brain mcp-sync` | Check and auto-sync MCP server binary paths across all IDE configs. | 🔧 Modifying |
+| `ai-brain memory gc [--apply]` | `ai-brain gc` | Garbage-collect drift backups and compress ChromaDB database. | 🔧 Modifying |
 
-```bash
-ai-brain include           # Enable auto-archiving for the current project
-ai-brain exclude           # List all registered active projects and whitelisting status
-ai-brain exclude current   # Disable auto-archiving for the current project
-ai-brain include-all       # Enable auto-archiving for all registered active projects
-ai-brain exclude-all       # Disable auto-archiving for all registered active projects
-ai-brain list              # List all registered projects with their auto-archive status
-ai-brain remove [key]      # Deregister a project from the system (accepts index, keyword, or all)
-```
+### 🛠️ System & Diagnostics (`system`)
+| Command | Alias | Description | Safety |
+| :--- | :--- | :--- | :--- |
+| `ai-brain system doctor [--fix]` | `ai-brain doctor` | Comprehensive health check across all projects, database locks, and rules. | 🔧 Modifying |
+| `ai-brain system verify` | `ai-brain verify` | One-click 14-point diagnostic of memory tools, plugins, and daemons. | 🔍 Read-only |
+| `ai-brain system install` | `ai-brain install` | Install or update executable shims in `~/.local/bin` and verify PATH. | ✅ Safe |
+| `ai-brain system update` | `ai-brain update` | Git-pull latest source repo and update global `ai-brain` installation. | ✅ Safe |
+| `ai-brain system config global` | `ai-brain config` | View or configure global AI brain preferences and override rules. | ✅ Safe |
+| `ai-brain system uninstall` | `ai-brain uninstall` | Complete global removal of configurations, Cron jobs, and MCP bindings. | 🗑️ Destructive |
 
 ---
 

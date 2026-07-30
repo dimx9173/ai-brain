@@ -23,62 +23,69 @@ from .verifier import print_results, run_all_checks
 def _show_help() -> None:
     print(blue(f"{APP_EMOJI} {APP_NAME} v{VERSION}"))
     print("這款工具幫您一鍵搞定 Claude Code / Cowork / OpenClaw / OpenCode / Pi Agent 與 Gemini/Antigravity IDE 的架構地圖與記憶同步。\n")
-    print(yellow("用法:"))
-    print("  ai-brain [指令]\n")
-    print(yellow("可用指令:"))
-    rows = [
-        ("init", "[一次性] 全自動初始化（✅ Git Hook 背景更新 + 註冊深夜自動歸檔，⚠️ 預設不啟用歸檔）"),
-        ("init -a", "[一次性] 全自動初始化 + 自動啟用排程歸檔（✅ 推薦）"),
-        ("init -m", "[一次性] 標準初始化（❌ 需手動：後續需手動執行 start/stop）"),
-        ("mine <target>", "[選擇性歸檔] 歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
-        ("install / update", "[全域安裝] 複製/更新 ai-brain 指令至全域路徑並驗證 PATH"),
-        ("version", "[顯示版本] 顯示目前安裝的 ai-brain 工具版本"),
-        ("start", "[每日晨間] 更新最新的代碼地圖圖譜（讓 AI 開發時不迷路且省 Token）"),
-        ("stop", "[下班收尾] 安全掃描並歸檔一整天的對話到長期記憶中樞（防死鎖）"),
-        ("status", "[狀態檢查] 查看目前專案的大腦配置狀態（含 Palace 容量）"),
-        ("verify", "[一鍵驗證] 檢測所有 AI 記憶套件與守護行程是否正確配置且運行正常"),
-        ("clean", "[專案清理] 移除目前專案的 AI 大腦與記憶配置"),
-        ("uninstall", "[全域移除] 清理目前的專案配置、全域排程、MCP 註冊與全域軟連結"),
-        ("stop-cron", "[停止排程] 僅移除定時自動歸檔的 Cron Job"),
-        ("exclude [key]", "[停用歸檔] 停用指定專案自動歸檔，或查看歸檔狀態清單"),
-        ("include [key]", "[啟用歸檔] 啟用指定專案定時自動歸檔"),
-        ("exclude-all", "[全部停用] 一鍵停用所有專案的自動歸檔"),
-        ("include-all", "[全部啟用] 一鍵啟用所有註冊專案的自動歸檔"),
-        ("list", "[查詢狀態] 顯示所有已註冊專案的自動歸檔狀態列表"),
-        ("remove [key]", "[註銷專案] 自大腦活躍專案清單中移除指定專案的註冊"),
-        ("doctor", "[全面診斷] 檢查專案配置、資料庫鎖定、MCP 路徑與垃圾清理"),
-        ("doctor --fix", "[診斷修復] 全面檢查並自動修正所有配置問題"),
-        ("gc", "[垃圾回收] 清理 drift 備份、同步記憶庫、壓縮 ChromaDB"),
-        ("gc --apply", "[實際執行] 執行垃圾回收並實際修改資料庫"),
-        ("gc --purge-wing <name>", "[清除 wing] 直接刪除指定 wing 的所有 embeddings（快速釋放空間）"),
-        ("mcp-sync", "[MCP 同步] 檢查所有 IDE 的 MCP 指令路徑是否為最新"),
-        ("mcp-sync --fix", "[MCP 修復] 自動同步所有 MCP 指令路徑至最快可用版本"),
-        ("completions <action>", "[Tab 補完] 安裝/移除 bash|zsh|fish 的指令補完腳本"),
-        ("config global", "[全域配置] 顯示或設定 AI 大腦全域偏好與衝突覆寫規則"),
+    print(yellow("可用指令 (GitHub Standard CLI Format):"))
+    print("  ai-brain <command> <subcommand> [flags]\n")
+    
+    print(yellow("📦 專案管理 (project):"))
+    proj_rows = [
+        ("project init [-a|-m]", "初始化專案大腦配置（-a 自動啟用歸檔, -m 標準手動）"),
+        ("project list", "顯示所有已註冊專案的自動歸檔狀態列表"),
+        ("project include [key]", "啟用指定專案（或當前專案）的定時自動歸檔"),
+        ("project exclude [key]", "停用指定專案（或當前專案）的定時自動歸檔"),
+        ("project remove [key]", "自活躍專案清單中移除指定專案的註冊"),
+        ("project status", "查看目前專案的大腦配置與 Palace 容量狀態"),
+        ("project clean", "清理目前專案的 AI 大腦與記憶配置檔案"),
     ]
-    for name, desc in rows:
-        print(f"  {green(name):<24} - {desc}")
+    for name, desc in proj_rows:
+        print(f"  {green(name):<26} - {desc}")
+
+    print()
+    print(yellow("🧠 記憶中樞 (memory):"))
+    mem_rows = [
+        ("memory start [--fast]", "更新最新代碼地圖圖譜（讓 AI 開發不迷路且省 Token）"),
+        ("memory stop", "安全掃描並歸檔今日對話與調試經驗至長效記憶宮殿"),
+        ("memory mine [target]", "歸檔高價值內容至 L2 記憶宮殿（對話、文件、重要檔案）"),
+        ("memory sync [--fix]", "檢查並自動同步所有 IDE 的 MCP 指令路徑"),
+        ("memory gc [--apply]", "清理 drift 備份、同步記憶庫、壓縮 ChromaDB 資料庫"),
+    ]
+    for name, desc in mem_rows:
+        print(f"  {green(name):<26} - {desc}")
+
+    print()
+    print(yellow("🛠️ 系統診斷與維護 (system):"))
+    sys_rows = [
+        ("system doctor [--fix]", "全面健康診斷專案配置、資料庫鎖與 MCP 路徑（--fix 自動修復）"),
+        ("system verify", "一鍵檢測所有 14 項 AI 記憶套件與守護行程狀態"),
+        ("system install / update", "複製或更新 ai-brain 指令至全域路徑並驗證 PATH"),
+        ("system config global", "顯示或設定 AI 大腦全域偏好與衝突覆寫規則"),
+        ("system uninstall", "全域清理專案配置、排程 Cron、MCP 註冊與軟連結"),
+    ]
+    for name, desc in sys_rows:
+        print(f"  {green(name):<26} - {desc}")
+
+    print()
+    print(yellow("⚡ 頂層快捷指令 (Top-level Aliases - 100% Backward Compatible):"))
+    print("  init, mine, start, stop, status, verify, doctor, list, include, exclude, remove, gc, mcp-sync, install, update, clean, uninstall")
 
     print()
     print(yellow("💡 核心工作流指引 (Core Workflows):"))
     print(f"  {blue('1. 專案初始化 (一次性)')}")
     print("     在新專案根目錄下執行以下指令，以完成大腦空間、規則檔及 Git Hook 配置：")
-    print(f"     ➔ {green('ai-brain init -a')}      (全自動初始化 + 自動啟用排程歸檔 ─ ✅ 推薦)")
-    print(f"     ➔ {green('ai-brain init')}         (全自動初始化 ─ ⚠️ 預設不啟用自動歸檔)")
-    print(f"     ➔ {green('ai-brain init -m')}      (標準初始化 ─ ❌ 後續需手動執行 start/stop)")
+    print(f"     ➔ {green('ai-brain project init -a')} (全自動初始化 + 自動啟用排程歸檔 ─ ✅ 推薦)")
+    print(f"     ➔ {green('ai-brain init -a')}         (頂層快捷指令)")
     print()
     print(f"  {blue('2. 每日開發上工 (⚠️ 僅在使用 -m 標準初始化時，才需要手動執行)')}")
     print("     每天早上開始工作時，在專案目錄下執行：")
-    print(f"     ➔ {green('ai-brain start')}        (自動掃描 docs/ 文件，並建立/更新最新代碼地圖)")
+    print(f"     ➔ {green('ai-brain memory start')}    (自動掃描 docs/ 文件，並建立/更新最新代碼地圖)")
     print()
     print(f"  {blue('3. 每日下班收尾 (⚠️ 僅在使用 -m 標準初始化時，才需要手動執行)')}")
     print("     工作結束要關閉終端機前，在專案目錄下執行：")
-    print(f"     ➔ {green('ai-brain stop')}         (安全將今日對話與調試經驗打包歸檔至長期記憶宮殿)")
+    print(f"     ➔ {green('ai-brain memory stop')}     (安全將今日對話與調試經驗打包歸檔至長期記憶宮殿)")
     print()
     print(f"  {blue('4. 當大腦異常或發生錯誤時 (排查修復)')}")
     print("     當代理程式出現怪異行為、遺失規則檔、連線逾時或檔案被鎖定時：")
-    print(f"     ➔ {green('ai-brain status')}       (查看專案大腦健康狀態與 Palace 容量)")
-    print(f"     ➔ {green('ai-brain doctor --fix')} (全面健康診斷，並自動修正所有配置與衝突問題)")
+    print(f"     ➔ {green('ai-brain system doctor --fix')} (全面健康診斷，並自動修正所有配置與衝突問題)")
+    print(f"     ➔ {green('ai-brain doctor --fix')}        (頂層快捷指令)")
     print()
 
 
@@ -162,8 +169,8 @@ def _cmd_completions(args) -> int:
 
 
 # --- Dispatch table: name -> (callable, takes_args_and_paths) ------------------
-# Using a dict + dict of factory functions so the argparse binding stays explicit.
 COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
+    # Top-level aliases & shortcuts
     "init": _cmd_init,
     "full-init": _cmd_full_init,
     "mine": _cmd_mine,
@@ -178,7 +185,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "verify": _cmd_verify,
     "clean": lambda a, p: (commands.clean_brain(), 0)[1],
     "uninstall": _cmd_uninstall,
-    "stop-cron": lambda a, p: 0,  # cron-only command — handled in main() since we lazy-import
+    "stop-cron": lambda a, p: 0,
     "exclude": _cmd_exclude,
     "include": _cmd_include,
     "remove": _cmd_remove,
@@ -191,6 +198,31 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "mcp-sync": _cmd_mcp_sync,
     "completions": lambda a, p: _cmd_completions(a),
     "config": _cmd_config,
+
+    # GitHub (gh) standard noun-verb subcommands
+    "project init": _cmd_init,
+    "project list": lambda a, p: (commands.manage_list(), 0)[1],
+    "project include": _cmd_include,
+    "project exclude": _cmd_exclude,
+    "project remove": _cmd_remove,
+    "project deregister": _cmd_remove,
+    "project include-all": lambda a, p: (commands.include_all(), 0)[1],
+    "project exclude-all": lambda a, p: (commands.exclude_all(), 0)[1],
+    "project status": lambda a, p: (commands.check_status(), 0)[1],
+    "project clean": lambda a, p: (commands.clean_brain(), 0)[1],
+
+    "memory start": lambda a, p: 0 if commands.start_day(fast=a.fast) else 1,
+    "memory stop": lambda a, p: 0 if commands.stop_day() else 1,
+    "memory mine": _cmd_mine,
+    "memory sync": _cmd_mcp_sync,
+    "memory gc": _cmd_gc,
+
+    "system doctor": _cmd_doctor,
+    "system verify": _cmd_verify,
+    "system install": lambda a, p: 0 if installer.install_or_update() else 1,
+    "system update": lambda a, p: 0 if installer.install_or_update() else 1,
+    "system uninstall": _cmd_uninstall,
+    "system config": _cmd_config,
 }
 
 
@@ -290,10 +322,15 @@ def main(argv: list[str] | None = None) -> int:
         _show_help()
         return 0
 
-    # Resolve alias forms before argparse (version flags, update alias).
+    # 1. Resolve 2-word GitHub CLI style noun-verb commands (e.g. "project init", "system doctor")
+    if len(argv) >= 2:
+        two_word_cmd = f"{argv[0]} {argv[1]}"
+        if two_word_cmd in COMMANDS:
+            return COMMANDS[two_word_cmd](_Namespace_for(two_word_cmd, argv[2:]), paths)
+
+    # 2. Resolve single-word command or alias
     cmd = argv[0]
     if cmd in COMMANDS:
-        # Lazy cron import keeps `stop-cron` and other sub-modules self-contained.
         if cmd == "stop-cron":
             from . import cron
             return 0 if cron.uninstall() else 1
@@ -341,3 +378,4 @@ class _Namespace_for:
 
 if __name__ == "__main__":
     sys.exit(main())
+
