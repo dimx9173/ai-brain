@@ -126,16 +126,16 @@ ai-brain init -m
 
 | Agent / IDE Tool | Config Location(s) | Target Key | Auto-Configured Services | Context Files (`AGENTS.md` / `CLAUDE.md`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Claude Code / Rufus** | `~/.claude.json`<br>`~/.claude/settings.json`<br>`~/.claude/*_settings.json` (SSH Remote) | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` (plugin) | ✅ Natively supported |
-| **Gemini / Antigravity IDE** | `~/.gemini/config/mcp_config.json`<br>`~/.gemini/antigravity/mcp_config.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **Pi Agent (`pi`)** | `~/.pi/agent/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **OpenCode** | `~/.config/opencode/opencode.json` | `mcp` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **OpenClaw** | `~/.openclaw/openclaw.json` | `mcp.servers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **Codex Agent** | `~/.codex/config.toml` | `mcp_servers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **Cursor** | `~/.cursor/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **Kilo Code (VS Code & CLI)** | `~/.config/kilo/kilo.json`<br>`kilocode.kilo-code/settings/mcp_settings.json` | `mcp` / `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | ✅ Natively supported |
-| **Claude Desktop App** | `claude_desktop_config.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | N/A |
-| **Generic MCP Clients** | `~/.mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp` | N/A |
+| **Claude Code / Rufus** | `~/.claude.json`<br>`~/.claude/settings.json`<br>`~/.claude/*_settings.json` (SSH Remote) | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Gemini / Antigravity IDE** | `~/.gemini/config/mcp_config.json`<br>`~/.gemini/antigravity/mcp_config.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Pi Agent (`pi`)** | `~/.pi/agent/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **OpenCode** | `~/.config/opencode/opencode.json` | `mcp` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **OpenClaw** | `~/.openclaw/openclaw.json` | `mcp.servers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Codex Agent** | `~/.codex/config.toml` | `mcp_servers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Cursor** | `~/.cursor/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Kilo Code (VS Code & CLI)** | `~/.config/kilo/kilo.json`<br>`kilocode.kilo-code/settings/mcp_settings.json` | `mcp` / `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **Claude Desktop App** | `claude_desktop_config.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | N/A |
+| **Generic MCP Clients** | `~/.mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | N/A |
 
 ---
 

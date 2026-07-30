@@ -18,6 +18,7 @@ from .constants import (
     MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
+    MCP_REQUIRED_SERVERS,
     MEMPALACE_MCP_COMMAND,
 )
 from .ui import print_blue as blue
@@ -72,6 +73,14 @@ def _kilo_local_entry(server: str) -> dict[str, Any]:
             "args": [],
             "enabled": True,
         }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "type": "local",
+            "command": cmd,
+            "args": args,
+            "enabled": True,
+        }
     raise ValueError(f"Unknown MCP server: {server}")
 
 
@@ -86,6 +95,12 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
         return {
             "type": "local",
             "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
+        }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "type": "local",
+            "command": [cmd] + args,
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -130,6 +145,14 @@ def _claude_code_entry(server: str) -> dict[str, Any]:
             "args": [],
             "env": {},
         }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "type": "stdio",
+            "command": cmd,
+            "args": args,
+            "env": {},
+        }
     raise ValueError(f"Unknown MCP server: {server}")
 
 
@@ -145,6 +168,13 @@ def _opencode_entry(server: str) -> dict[str, Any]:
         return {
             "type": "local",
             "command": [str(GLOBAL_CODEBASE_MEMORY_MCP())],
+            "enabled": True,
+        }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "type": "local",
+            "command": [cmd] + args,
             "enabled": True,
         }
     raise ValueError(f"Unknown MCP server: {server}")
@@ -165,19 +195,18 @@ def _codex_entry(server: str) -> dict[str, Any]:
             "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
         }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "type": "stdio",
+            "command": cmd,
+            "args": args,
+        }
     raise ValueError(f"Unknown MCP server: {server}")
 
 
 def _openclaw_entry(server: str) -> dict[str, Any]:
-    """OpenClaw canonical stdio MCP server shape.
-
-    Schema reference (OpenClaw 2026.6+ ``openclaw.json`` ``mcp.servers`` block):
-    ``command`` is validated by Zod as a single executable string, ``args`` is an
-    optional string array. The ``type`` field is reserved for HTTP transports
-    (``sse`` / ``http`` / ``streamable-http``) and is not valid on stdio entries;
-    including ``type: "local"`` triggers
-    ``mcp.servers.<name>.command: Invalid input`` and stops the Gateway.
-    """
+    """OpenClaw canonical stdio MCP server shape."""
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -188,6 +217,12 @@ def _openclaw_entry(server: str) -> dict[str, Any]:
         return {
             "command": str(GLOBAL_CODEBASE_MEMORY_MCP()),
             "args": [],
+        }
+    if server == MCP_CLAUDE_MEM:
+        cmd, args = _claude_mem_command()
+        return {
+            "command": cmd,
+            "args": args,
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
@@ -209,29 +244,29 @@ def _all_targets(paths) -> list[RegistrationTarget]:
     """List every IDE target relevant to the current platform."""
     targets = [
         RegistrationTarget("Gemini", paths.gemini_config, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
+                           MCP_REQUIRED_SERVERS, _stdio_server_entry),
         RegistrationTarget("Gemini/Antigravity", paths.gemini_antigravity, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
+                           MCP_REQUIRED_SERVERS, _stdio_server_entry),
         RegistrationTarget("OpenCode", paths.opencode_json, "mcp",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _opencode_entry),
+                           MCP_REQUIRED_SERVERS, _opencode_entry),
         RegistrationTarget("~/.mcp.json", paths.mcp_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
+                           MCP_REQUIRED_SERVERS, _stdio_server_entry),
         RegistrationTarget("~/.claude.json", paths.claude_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_code_entry),
+                           MCP_REQUIRED_SERVERS, _claude_code_entry),
         RegistrationTarget("Claude Desktop", paths.claude_desktop, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM), _claude_desktop_entry),
+                           MCP_REQUIRED_SERVERS, _claude_desktop_entry),
         RegistrationTarget("Kilo VS Code", paths.vscode_kilo, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_local_entry),
+                           MCP_REQUIRED_SERVERS, _kilo_local_entry),
         RegistrationTarget("Kilo CLI", paths.kilo_cli, "mcp",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _kilo_cli_entry),
+                           MCP_REQUIRED_SERVERS, _kilo_cli_entry),
         RegistrationTarget("Cursor", paths.cursor_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
+                           MCP_REQUIRED_SERVERS, _stdio_server_entry),
         RegistrationTarget("Codex", paths.codex_toml, "mcp_servers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _codex_entry),
+                           MCP_REQUIRED_SERVERS, _codex_entry),
         RegistrationTarget("OpenClaw", paths.openclaw_config, "mcp.servers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _openclaw_entry),
+                           MCP_REQUIRED_SERVERS, _openclaw_entry),
         RegistrationTarget("Pi Agent", paths.pi_json, "mcpServers",
-                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
+                           MCP_REQUIRED_SERVERS, _stdio_server_entry),
     ]
 
     from .platforms import get_all_claude_settings_files

@@ -25,7 +25,7 @@ TOOL_CODEBASE_MEMORY = "codebase-memory-mcp"
 MCP_MEMPALACE = "mempalace"
 MCP_CODEBASE_MEMORY = "codebase-memory-mcp"
 MCP_CLAUDE_MEM = "claude-mem"
-MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_CODEBASE_MEMORY)
+MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM)
 
 # --- LLM providers --------------------------------------------------------------
 PROVIDER_MINIMAX = "minimax"
