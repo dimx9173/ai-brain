@@ -124,10 +124,11 @@ def _another_stop_running() -> bool:
 
 # --- init / clean / full-init ---------------------------------------------------
 
-def init_brain() -> bool:
+def init_brain(create_project_rules: bool = False) -> bool:
     print(blue(f"====== {APP_EMOJI} 開始初始化專案 AI 大腦配置 ======"))
 
     _ensure_codebase_memory_ignored()
+    _maybe_append_global_claude_md()
 
     if not _run_mempalace_init():
         return False
@@ -138,8 +139,10 @@ def init_brain() -> bool:
     if not _write_project_hooks_config():
         return False
 
-    if not _write_project_claude_md():
-        return False
+    # Default to User-level memory rules; only write project-level rule files if explicitly requested or if already present
+    if create_project_rules or Path(PROJECT_CLAUDE_MD).is_file():
+        if not _write_project_claude_md():
+            return False
 
     git_hooks.install()
 
@@ -2125,25 +2128,29 @@ def _remove_global_cognitive_principles() -> None:
 
 
 def _maybe_append_global_claude_md() -> None:
-    """Append the cognitive principles block to ~/.claude/CLAUDE.md if absent."""
+    """Ensure cognitive principles block is present in user-level global rule files."""
     from .constants import COGNITIVE_PRINCIPLES_BLOCK, COGNITIVE_PRINCIPLES_MARKER
-    claude_dir = Path.home() / ".claude"
-    if not claude_dir.is_dir():
-        return
-    print_yellow("---> 自動設定 ~/.claude/CLAUDE.md 全域大腦引導指南...")
-    global_md = claude_dir / "CLAUDE.md"
-    existing = global_md.read_text(encoding="utf-8") if global_md.exists() else ""
-    if COGNITIVE_PRINCIPLES_MARKER in existing:
-        print("Global cognitive rules already present in ~/.claude/CLAUDE.md, skipped")
-        return
-    try:
-        with open(global_md, "a", encoding="utf-8") as f:
-            if existing and not existing.endswith("\n"):
-                f.write("\n")
-            f.write(COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n")
-        print("Successfully appended global cognitive rules to ~/.claude/CLAUDE.md")
-    except Exception as e:
-        print(red(f"警告：寫入全域引導失敗 ({e})"))
+
+    global_targets = [
+        ("~/.claude/CLAUDE.md", Path.home() / ".claude" / "CLAUDE.md"),
+        ("~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
+    ]
+
+    for label, target_file in global_targets:
+        try:
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
+            if COGNITIVE_PRINCIPLES_MARKER in existing:
+                continue
+
+            print_yellow(f"---> 自動設定 {label} 全域大腦引導指南...")
+            with open(target_file, "a", encoding="utf-8") as f:
+                if existing and not existing.endswith("\n"):
+                    f.write("\n")
+                f.write(COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n")
+            print(f"Successfully appended global cognitive rules to {label}")
+        except Exception as e:
+            print(red(f"警告：寫入全域引導 {label} 失敗 ({e})"))
 
 
 def _should_run_background_sweep() -> bool:
