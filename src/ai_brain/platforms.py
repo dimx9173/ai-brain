@@ -28,6 +28,7 @@ class ToolPaths:
     cursor_json: Path
     codex_toml: Path
     openclaw_config: Path
+    pi_json: Path
     global_config: Path
 
 
@@ -65,6 +66,7 @@ def get_paths() -> ToolPaths:
         cursor_json=HOME() / ".cursor" / "mcp.json",
         codex_toml=HOME() / ".codex" / "config.toml",
         openclaw_config=HOME() / ".openclaw" / "openclaw.json",
+        pi_json=HOME() / ".pi" / "agent" / "mcp.json",
         global_config=HOME() / ".config" / "ai-brain" / "config.toml",
     )
 
@@ -90,4 +92,30 @@ def ensure_path_has_local_bin() -> None:
         if p not in path_env.split(os.path.pathsep):
             path_env = p + os.path.pathsep + path_env
     os.environ["PATH"] = path_env
+
+
+def get_all_claude_settings_files() -> list[tuple[str, Path]]:
+    """Return all Claude Code configuration files (local and remote SSH host settings).
+
+    Returns list of (label, path) tuples.
+    """
+    files: list[tuple[str, Path]] = []
+
+    c_json = HOME() / ".claude.json"
+    if c_json.is_file():
+        files.append(("~/.claude.json", c_json))
+
+    claude_dir = HOME() / ".claude"
+    if claude_dir.is_dir():
+        settings_file = claude_dir / "settings.json"
+        if settings_file.is_file():
+            files.append(("Claude Settings (settings.json)", settings_file))
+
+        for p in claude_dir.glob("*_settings.json"):
+            if p.is_file() and p.name != "settings.json":
+                tag = p.name.replace("_settings.json", "")
+                files.append((f"Claude Remote ({tag})", p))
+
+    return files
+
 

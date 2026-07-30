@@ -67,6 +67,7 @@ def _minimal_paths() -> ToolPaths:
         cursor_json=base / ".cursor" / "mcp.json",
         codex_toml=base / ".codex" / "config.toml",
         openclaw_config=base / ".openclaw" / "openclaw.json",
+        pi_json=base / ".pi" / "agent" / "mcp.json",
     )
 
 
@@ -230,10 +231,10 @@ class TestOpenClawEntry(InTempDir):
 # ---------------------------------------------------------------------------
 
 class TestAllTargets(InTempDir):
-    def test_returns_eleven_targets(self):
+    def test_returns_twelve_targets(self):
         paths = _minimal_paths()
         targets = _all_targets(paths)
-        self.assertEqual(len(targets), 11)
+        self.assertEqual(len(targets), 12)
 
     def test_all_are_registration_target(self):
         paths = _minimal_paths()

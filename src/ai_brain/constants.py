@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.6.9"
+VERSION = "2.7.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -116,7 +116,7 @@ def GLOBAL_CODEBASE_MEMORY_MCP() -> Path:
 
 
 # --- Tools supported by full-init -----------------------------------------------
-CODEBASE_MEMORY_TOOLS = ("antigravity", "gemini", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw")
+CODEBASE_MEMORY_TOOLS = ("antigravity", "gemini", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw", "pi")
 
 # The `uv tool install` package names ai-brain orchestrates. Keep this in sync
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.
@@ -144,7 +144,7 @@ COGNITIVE_PRINCIPLES_BLOCK = """
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
 1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, Pi Agent), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 
@@ -166,6 +166,7 @@ You must actively traverse and respect the three cognitive memory layers before 
      - `mempalace_kg_query` — structured knowledge graph query
      - `mempalace_traverse` — traverse connected entities
      - `mempalace_get_drawer` — retrieve a specific memory by ID
+   - **Project Boundary Isolation**: Always restrict or prioritize memory searches to the active project's specific wing (or filter by workspace keyword). Do NOT bleed architectural decisions or debug context from unrelated projects into the current workspace.
    - **Purpose**: High-value persistent knowledge — conversations, architecture decisions, debug war stories, environment configs, lessons learned.
    - **Lifecycle**: Cross-project, permanent.
    - **⚠️ IMPORTANT**: Do NOT mine entire codebases into mempalace. L2 is for curated, high-value memories only. Code indexing belongs in L1 (codebase-memory-mcp). Use `ai-brain mine` to selectively add specific content."""
@@ -176,7 +177,7 @@ LOCAL_CLAUDE_MD_TEMPLATE = """# AI Agent Cognitive Workflow and Memory Guide
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
 1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, Pi Agent), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 
@@ -198,6 +199,7 @@ You must actively traverse and respect the three cognitive memory layers before 
      - `mempalace_kg_query` — structured knowledge graph query
      - `mempalace_traverse` — traverse connected entities
      - `mempalace_get_drawer` — retrieve a specific memory by ID
+   - **Project Boundary Isolation**: Always restrict or prioritize memory searches to the active project's specific wing (or filter by workspace keyword). Do NOT bleed architectural decisions or debug context from unrelated projects into the current workspace.
    - **Purpose**: High-value persistent knowledge — conversations, architecture decisions, debug war stories, environment configs, lessons learned.
    - **Lifecycle**: Cross-project, permanent.
    - **⚠️ IMPORTANT**: Do NOT mine entire codebases into mempalace. L2 is for curated, high-value memories only. Code indexing belongs in L1 (codebase-memory-mcp). Use `ai-brain mine` to selectively add specific content.

@@ -188,7 +188,7 @@ class RegistrationTarget:
 
 def _all_targets(paths) -> list[RegistrationTarget]:
     """List every IDE target relevant to the current platform."""
-    return [
+    targets = [
         RegistrationTarget("Gemini", paths.gemini_config, "mcpServers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
         RegistrationTarget("Gemini/Antigravity", paths.gemini_antigravity, "mcpServers",
@@ -211,7 +211,21 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _codex_entry),
         RegistrationTarget("OpenClaw", paths.openclaw_config, "mcp.servers",
                            (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _openclaw_entry),
+        RegistrationTarget("Pi Agent", paths.pi_json, "mcpServers",
+                           (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _stdio_server_entry),
     ]
+
+    from .platforms import get_all_claude_settings_files
+    known_paths = {t.path for t in targets if t.path}
+    for label, p in get_all_claude_settings_files():
+        if p not in known_paths:
+            targets.append(
+                RegistrationTarget(label, p, "mcpServers",
+                                   (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_code_entry)
+            )
+            known_paths.add(p)
+
+    return targets
 
 
 # --- Public API -----------------------------------------------------------------

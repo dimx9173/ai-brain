@@ -357,6 +357,7 @@ class _FakeToolPaths:
         self.cursor_json = base / ".cursor" / "mcp.json"
         self.codex_toml = base / ".codex" / "config.toml"
         self.openclaw_config = base / ".openclaw" / "config.json"
+        self.pi_json = base / ".pi" / "agent" / "mcp.json"
 
 
 class TestRunAllChecks(InTempDir):
@@ -370,15 +371,15 @@ class TestRunAllChecks(InTempDir):
                            return_value=CheckResult("x", INFO)):
                     with patch("ai_brain.verifier.shutil.which", return_value=None):
                         results = run_all_checks(paths)
-        # 3 CLI + OpenClaw daemon + Claude + OpenCode + mcp.json + Gemini + Desktop + Kilo + Cursor + Codex + OpenClaw MCP = 13
-        self.assertEqual(len(results), 13)
+        # 3 CLI + OpenClaw daemon + Claude + OpenCode + mcp.json + Gemini + Desktop + Kilo + Cursor + Codex + OpenClaw MCP + Pi Agent MCP = 14
+        self.assertEqual(len(results), 14)
 
     def test_with_real_functions_and_no_configs_present(self) -> None:
         paths = _FakeToolPaths(Path(self.tmpdir))
         with patch("ai_brain.verifier.shutil.which", return_value=None):
             with patch("ai_brain.verifier.subprocess.run"):
                 results = run_all_checks(paths)
-        self.assertEqual(len(results), 13)
+        self.assertEqual(len(results), 14)
         # Most will be INFO since nothing is installed and no configs exist
         statuses = {r.status for r in results}
         self.assertTrue(statuses <= {INFO, FAIL, PASS, WARN})
@@ -399,7 +400,7 @@ class TestRunAllChecks(InTempDir):
                     with patch("ai_brain.verifier.check_openclaw_daemon"):
                         with patch("ai_brain.verifier.subprocess.run"):
                             results = run_all_checks(paths)
-        self.assertEqual(len(results), 13)
+        self.assertEqual(len(results), 14)
 
     def test_openclaw_mcp_check_when_cli_missing(self) -> None:
         paths = _FakeToolPaths(Path(self.tmpdir))
@@ -409,7 +410,7 @@ class TestRunAllChecks(InTempDir):
                     with patch("ai_brain.verifier.check_openclaw_daemon"):
                         with patch("ai_brain.verifier.subprocess.run"):
                             results = run_all_checks(paths)
-        self.assertEqual(len(results), 13)
+        self.assertEqual(len(results), 14)
 
 
 # --------------------------------------------------------------------------- #

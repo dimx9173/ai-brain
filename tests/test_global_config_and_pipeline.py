@@ -36,6 +36,7 @@ class TestGlobalConfigAndPipeline(InTempDir):
             cursor_json=self.tmpdir_path / "cursor.json",
             codex_toml=self.tmpdir_path / "codex.toml",
             openclaw_config=self.tmpdir_path / "openclaw.json",
+            pi_json=self.tmpdir_path / "pi.json",
             global_config=self.global_config_path,
         )
 

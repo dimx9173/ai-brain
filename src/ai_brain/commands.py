@@ -994,6 +994,41 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
     return True
 
 
+def _enable_claude_mem_plugin() -> int:
+    """Ensure `claude-mem@thedotmack` plugin is enabled in all Claude settings files."""
+    from .platforms import get_all_claude_settings_files
+    enabled_count = 0
+    for _, path in get_all_claude_settings_files():
+        if not path.is_file():
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict):
+                continue
+            plugins = raw.setdefault("enabledPlugins", {})
+            changed = False
+            if not plugins.get("claude-mem@thedotmack"):
+                plugins["claude-mem@thedotmack"] = True
+                changed = True
+
+            marketplaces = raw.setdefault("extraKnownMarketplaces", {})
+            if "thedotmack" not in marketplaces:
+                marketplaces["thedotmack"] = {
+                    "source": {
+                        "source": "github",
+                        "repo": "thedotmack/claude-mem"
+                    }
+                }
+                changed = True
+
+            if changed:
+                path.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                enabled_count += 1
+        except Exception:
+            pass
+    return enabled_count
+
+
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
@@ -1362,28 +1397,58 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
-    # 5. Check System CLIs (Global Check - run once)
-    print(blue("5. 檢查系統相依 CLI 工具可用性..."))
+    # 5. Check System CLIs & Plugins (Global Check - run once)
+    print(blue("5. 檢查系統相依 CLI 工具與插件可用性..."))
     cli_ok = True
     for tool_name, pkg in (("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")):
+        is_installed = False
+        detail_msg = ""
         if shutil.which(tool_name):
-            print(green(f"  [ PASS ] 工具 {tool_name} 已安裝"))
+            is_installed = True
+            detail_msg = "(CLI 已安裝)"
+        elif tool_name == "claude-mem":
+            from .platforms import get_all_claude_settings_files
+            for label, p in get_all_claude_settings_files():
+                try:
+                    raw = json.loads(p.read_text(encoding="utf-8"))
+                    plugins = raw.get("enabledPlugins", {})
+                    if isinstance(plugins, dict) and (plugins.get("claude-mem@thedotmack") or plugins.get("claude-mem")):
+                        is_installed = True
+                        detail_msg = f"(插件於 {label} 已啟用)"
+                        break
+                except Exception:
+                    pass
+
+        if is_installed:
+            print(green(f"  [ PASS ] 工具 {tool_name} 已就緒 {detail_msg}"))
         else:
             cli_ok = False
-            print(red(f"  [ FAIL ] 未找到 {tool_name} 指令"))
+            print(red(f"  [ FAIL ] 未找到 {tool_name} 指令或插件設定"))
             if fix:
-                print(yellow(f"    --> 正在嘗試自動安裝 {pkg}..."))
-                try:
-                    subprocess.run(
-                        ["uv", "tool", "install", pkg, "--force"],
-                        check=True, timeout=300,
-                    )
-                    print(green(f"    [ FIXED ] 已自動安裝 {pkg}！"))
+                print(yellow(f"    --> 正在嘗試自動安裝 / 配置 {pkg}..."))
+                if pkg == "claude-mem":
+                    try:
+                        subprocess.run(
+                            ["uv", "tool", "install", pkg, "--force"],
+                            capture_output=True, timeout=300,
+                        )
+                    except Exception:
+                        pass
+                    count = _enable_claude_mem_plugin()
+                    print(green(f"    [ FIXED ] 已自動為 {count} 個 Claude Code 設定檔啟用 {pkg} 插件！"))
                     cli_ok = True
-                except subprocess.TimeoutExpired:
-                    print(yellow(f"    [ TIMEOUT ] uv tool install {pkg} 已逾時 (>300s)"))
-                except Exception as e:
-                    print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
+                else:
+                    try:
+                        subprocess.run(
+                            ["uv", "tool", "install", pkg, "--force"],
+                            check=True, timeout=300,
+                        )
+                        print(green(f"    [ FIXED ] 已自動安裝 {pkg}！"))
+                        cli_ok = True
+                    except subprocess.TimeoutExpired:
+                        print(yellow(f"    [ TIMEOUT ] uv tool install {pkg} 已逾時 (>300s)"))
+                    except Exception as e:
+                        print(red(f"    [ ERROR ] 自動安裝 {pkg} 失敗 ({e})，請手動執行: uv tool install {pkg} --force"))
             else:
                 all_pass = False
 

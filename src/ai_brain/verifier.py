@@ -248,18 +248,36 @@ def print_results(results: List[CheckResult]) -> int:
 
 # --- Top-level verification pipeline -------------------------------------------
 
+def check_claude_mem_status() -> CheckResult:
+    """Check if claude-mem is available either via CLI binary or as a Claude Code plugin."""
+    name = "檢查 claude-mem CLI / 插件狀態"
+    if shutil.which("claude-mem"):
+        return CheckResult(name, PASS, "(CLI 已安裝)")
+
+    from .platforms import get_all_claude_settings_files
+    for label, path in get_all_claude_settings_files():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            plugins = raw.get("enabledPlugins", {})
+            if isinstance(plugins, dict) and (plugins.get("claude-mem@thedotmack") or plugins.get("claude-mem")):
+                return CheckResult(name, PASS, f"(插件於 {label} 已啟用)")
+        except Exception:
+            pass
+
+    return CheckResult(name, INFO, "(未安裝 CLI，亦未於 Claude Code 中啟用插件)")
+
+
 def run_all_checks(paths) -> List[CheckResult]:
     """Run the full 9-point health check and return all results."""
     results: List[CheckResult] = []
 
     # 1. mempalace CLI
     results.append(check_cli_available("MemPalace", "mempalace"))
-    # 2. claude-mem CLI
-    results.append(check_cli_available("claude-mem", "claude-mem",
-                                       info_message="(未安裝，僅 Claude Code 需要)"))
+    # 2. claude-mem CLI / Plugin
+    results.append(check_claude_mem_status())
     # 3. codebase-memory-mcp CLI
     results.append(check_cli_available("codebase-memory-mcp", "codebase-memory-mcp"))
-    # 4. Claude Code ~/.claude.json
+    # 4. Claude Code settings
     claude_json = HOME() / ".claude.json"
     if not claude_json.is_file() and Path(".claude.json").is_file():
         claude_json = Path(".claude.json")
@@ -339,5 +357,8 @@ def run_all_checks(paths) -> List[CheckResult]:
     else:
         results.append(CheckResult("檢查 OpenClaw MCP 記憶載入與內容正確性", INFO,
                                    "(此環境未安裝 OpenClaw CLI，跳過檢查)"))
+
+    # 13. Pi Agent
+    results.append(check_mcp_config("Pi Agent", paths.pi_json))
 
     return results
