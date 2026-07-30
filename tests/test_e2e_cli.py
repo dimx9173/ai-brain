@@ -214,13 +214,13 @@ class TestCliDispatch(_IsolatedHome):
         r = self.cli("--version")
         self.assertEqual(r.returncode, 0)
         self.assertIn("v", r.stdout)
-        # The version constant is "2.7.1".
-        self.assertIn("2.7.1", r.stdout)
+        # The version constant is "2.7.2".
+        self.assertIn("2.7.2", r.stdout)
 
     def test_short_version_flag(self) -> None:
         r = self.cli("-v")
         self.assertEqual(r.returncode, 0)
-        self.assertIn("2.7.1", r.stdout)
+        self.assertIn("2.7.2", r.stdout)
 
     def test_help_flag(self) -> None:
         r = self.cli("--help")
