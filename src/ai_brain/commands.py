@@ -1675,20 +1675,25 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
-    # 8. Check CLAUDE.md AI 工具使用規則版本
-    print(blue("8. 檢查 CLAUDE.md AI 工具使用規則版本..."))
+    # 8. Check CLAUDE.md / AGENTS.md AI 工具使用與記憶隔離規則版本
+    print(blue("8. 檢查 CLAUDE.md / AGENTS.md AI 工具使用與記憶隔離規則版本..."))
     rules_ok = True
 
-    global_md = Path.home() / ".claude" / "CLAUDE.md"
-    if not target and global_md.is_file():
-        if not _fix_claude_md("全域 ~/.claude/CLAUDE.md", global_md, paths, fix=fix):
-            rules_ok = False
-            if not fix:
-                all_pass = False
+    global_files = [
+        ("全域 ~/.claude/CLAUDE.md", Path.home() / ".claude" / "CLAUDE.md"),
+        ("全域 ~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
+    ]
+    if not target:
+        for g_label, g_file in global_files:
+            if g_file.is_file():
+                if not _fix_claude_md(g_label, g_file, paths, fix=fix):
+                    rules_ok = False
+                    if not fix:
+                        all_pass = False
 
     for proj in projects_to_check:
         short = proj.name
-        for rel in (".claude/CLAUDE.md",):
+        for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md"):
             md_path = proj / rel
             if md_path.is_file():
                 if not _fix_claude_md(f"[{short}] {rel}", md_path, paths, fix=fix):

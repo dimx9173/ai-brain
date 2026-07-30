@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from ai_brain._testing import InTempDir
-from ai_brain.constants import MCP_CODEBASE_MEMORY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
+from ai_brain.constants import MCP_CLAUDE_MEM, MCP_CODEBASE_MEMORY, MCP_MEMPALACE, MCP_REQUIRED_SERVERS
 from ai_brain.verifier import (
     FAIL,
     INFO,
@@ -99,6 +99,7 @@ class TestCheckMcpConfigCommandVariants(InTempDir):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": ["mempalace-mcp"], "args": []},
                 MCP_CODEBASE_MEMORY: {"command": "codebase-memory-mcp", "args": []},
+                MCP_CLAUDE_MEM: {"command": "claude-mem", "args": ["serve"]},
             }
         })
         with patch("ai_brain.verifier.shutil.which", return_value="/bin/mock"):
@@ -111,6 +112,7 @@ class TestCheckMcpConfigCommandVariants(InTempDir):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": ["mempalace-mcp"]},
                 MCP_CODEBASE_MEMORY: {"command": "codebase-memory-mcp"},
+                MCP_CLAUDE_MEM: {"command": ["claude-mem", "serve"]},
             }
         })
         with patch("ai_brain.verifier.shutil.which", return_value="/bin/mock"):
@@ -125,6 +127,7 @@ class TestCheckMcpConfigCodebaseMemorySpecific(InTempDir):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
                 MCP_CODEBASE_MEMORY: {"command": "totally-wrong-cmd", "args": []},
+                MCP_CLAUDE_MEM: {"command": "claude-mem", "args": ["serve"]},
             }
         })
         with patch("ai_brain.verifier.shutil.which", return_value="/bin/mock"):
@@ -143,11 +146,12 @@ class TestCheckMcpConfigCodebaseMemorySpecific(InTempDir):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
                 MCP_CODEBASE_MEMORY: {"command": str(exe), "args": []},
+                MCP_CLAUDE_MEM: {"command": "claude-mem", "args": ["serve"]},
             }
         })
 
         def _which(cmd):
-            if cmd == "mempalace-mcp":
+            if cmd in ("mempalace-mcp", "claude-mem"):
                 return "/bin/mock"
             return None
 
@@ -161,6 +165,7 @@ class TestCheckMcpConfigCodebaseMemorySpecific(InTempDir):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
                 MCP_CODEBASE_MEMORY: {"command": "codebase-memory-mcp", "args": []},
+                MCP_CLAUDE_MEM: {"command": "claude-mem", "args": ["serve"]},
             }
         })
         with patch("ai_brain.verifier.shutil.which", return_value=None):
@@ -177,6 +182,7 @@ class TestCheckMcpConfigToml(InTempDir):
             "mcp_servers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
                 MCP_CODEBASE_MEMORY: {"command": "/usr/local/mock/codebase-memory-mcp", "args": []},
+                MCP_CLAUDE_MEM: {"command": "/usr/local/bin/claude-mem", "args": ["serve"]},
             }
         }
         cfg.write_text(serialize_toml(payload), encoding="utf-8")
@@ -426,6 +432,7 @@ class TestMcpConfigCheckerCompat(unittest.TestCase):
             "mcpServers": {
                 MCP_MEMPALACE: {"command": "mempalace-mcp", "args": []},
                 MCP_CODEBASE_MEMORY: {"command": "/usr/local/bin/codebase-memory-mcp", "args": []},
+                MCP_CLAUDE_MEM: {"command": "/usr/local/bin/claude-mem", "args": ["serve"]},
             }
         })
         try:
