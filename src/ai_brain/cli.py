@@ -264,13 +264,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("doctor", help="Run comprehensive diagnostics on AI brain", add_help=False)
     p.add_argument("target", nargs="?", default=None,
                    help="project keyword, 1-based index, '.', 'current', or omitted to check all registered projects")
-    p.add_argument("--fix", action="store_true", help="Automatically fix detected issues")
+    p.add_argument("--fix", "--fx", "-f", action="store_true", help="Automatically fix detected issues")
     p = sub.add_parser("gc", help="Garbage-collect palace drift backups and compress ChromaDB", add_help=False)
     p.add_argument("--apply", action="store_true", help="Actually perform changes (default is dry-run)")
     p.add_argument("--purge-wing", default=None,
                    help="Delete all embeddings for a specific wing (bypasses slow sync/compress)")
     p = sub.add_parser("mcp-sync", help="Sync all MCP server command paths to fastest binary", add_help=False)
-    p.add_argument("--fix", action="store_true", help="Actually update stale paths")
+    p.add_argument("--fix", "--fx", "-f", action="store_true", help="Actually update stale paths")
     p = sub.add_parser("config", help="Manage global configuration settings", add_help=False)
     p.add_argument("action", choices=["global"], help="scope: global")
     p.add_argument("--set", dest="config_set", help="set parameter (key=value or section.key=value)")
@@ -348,13 +348,13 @@ def main(argv: list[str] | None = None) -> int:
 class _Namespace_for:
     def __init__(self, cmd: str, rest: list[str]) -> None:
         self.cmd = cmd
-        self.target = rest[0] if rest and not rest[0].startswith("-") else None
+        self.target = next((arg for arg in rest if not arg.startswith("-")), None)
         self.pattern = rest[0] if rest else None
         # `completions` subcommand uses action + optional shell positional.
         # We only populate these when relevant; other commands ignore them.
         self.action = rest[0] if rest else None
         self.shell = rest[1] if len(rest) > 1 else None
-        self.fix = "--fix" in rest
+        self.fix = "--fix" in rest or "--fx" in rest or "-f" in rest
         self.fast = "--fast" in rest or "--no-cluster" in rest
         self.apply = "--apply" in rest
         self.manual = "-m" in rest or "--manual" in rest

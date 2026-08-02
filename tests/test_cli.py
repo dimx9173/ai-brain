@@ -138,6 +138,18 @@ class TestCli(unittest.TestCase):
     @patch("ai_brain.cli.commands.run_doctor", return_value=True)
     def test_doctor_dispatch_returns_zero(self, mock_fn) -> None:
         self.assertEqual(cli.main(["doctor"]), 0)
+        mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=False)
+
+    @patch("ai_brain.cli.commands.run_doctor", return_value=True)
+    def test_doctor_dispatch_with_fix_and_fx_flags(self, mock_fn) -> None:
+        self.assertEqual(cli.main(["doctor", "--fix"]), 0)
+        mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=True)
+
+        self.assertEqual(cli.main(["doctor", "--fx"]), 0)
+        mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=True)
+
+        self.assertEqual(cli.main(["doctor", "-f"]), 0)
+        mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=True)
 
     @patch("ai_brain.cli.commands.run_doctor", return_value=False)
     def test_doctor_dispatch_returns_one_on_fail(self, mock_fn) -> None:
