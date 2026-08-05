@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.7.4"
+VERSION = "2.7.5"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -222,11 +222,27 @@ HOOK_MARKER_BODY = "# (auto-managed by ai-brain; do not edit between markers)"
 POST_MERGE_TEMPLATE = """#!/bin/bash
 {begin}
 {marker_body}
-# Serialize concurrent `git pull` invocations: flock auto-releases on exit.
-exec 9>.git/ai-brain-post-merge.lock
-if ! flock -n 9; then
-    echo "[ai-brain] skipping: another post-merge hook instance running"
-    exit 0
+# Serialize concurrent `git pull` invocations: portable lock (flock -> shlock -> mkdir).
+LOCKFILE=".git/ai-brain-post-merge.lock"
+if command -v flock &> /dev/null; then
+    exec 9>"$LOCKFILE"
+    if ! flock -n 9; then
+        echo "[ai-brain] skipping: another post-merge hook instance running"
+        exit 0
+    fi
+elif command -v shlock &> /dev/null; then
+    if ! shlock -p $$ -f "$LOCKFILE" 2>/dev/null; then
+        echo "[ai-brain] skipping: another post-merge hook instance running"
+        exit 0
+    fi
+    trap 'rm -f "$LOCKFILE"' EXIT
+else
+    LOCKDIR="$LOCKFILE.dir"
+    if ! mkdir "$LOCKDIR" 2>/dev/null; then
+        echo "[ai-brain] skipping: another post-merge hook instance running"
+        exit 0
+    fi
+    trap 'rmdir "$LOCKDIR"' EXIT
 fi
 echo -e "\\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜 ======\\033[0m"
 {chain}
@@ -234,7 +250,7 @@ echo -e "\\033[0;34m====== 🌅 Git Pull 偵測：自動更新代碼架構圖譜
 """
 
 # post-checkout runs on every branch switch; keep it non-blocking by running
-# the heavy graph rebuild in a subshell in the background.  flock(1) provides
+# the heavy graph rebuild in a subshell in the background.  flock/shlock provides
 # an atomic, TOCTOU-free lock — no PID files, no mkdir races, no trap cleanup.
 POST_CHECKOUT_TEMPLATE = """#!/bin/bash
 {begin}
@@ -242,11 +258,26 @@ POST_CHECKOUT_TEMPLATE = """#!/bin/bash
 # 只在切換分支時觸發（引數 $3 為 1 代表切換分支，0 代表檢出單一檔案）
 if [ "$3" -eq 1 ]; then
     (
-        LOCK_FILE=".git/ai-brain-checkout.lock"
-        exec 8>"$LOCK_FILE"
-        if ! flock -n 8; then
-            echo "[ai-brain] skipping: another post-checkout running"
-            exit 0
+        LOCKFILE=".git/ai-brain-checkout.lock"
+        if command -v flock &> /dev/null; then
+            exec 8>"$LOCKFILE"
+            if ! flock -n 8; then
+                echo "[ai-brain] skipping: another post-checkout running"
+                exit 0
+            fi
+        elif command -v shlock &> /dev/null; then
+            if ! shlock -p $$ -f "$LOCKFILE" 2>/dev/null; then
+                echo "[ai-brain] skipping: another post-checkout running"
+                exit 0
+            fi
+            trap 'rm -f "$LOCKFILE"' EXIT
+        else
+            LOCKDIR="$LOCKFILE.dir"
+            if ! mkdir "$LOCKDIR" 2>/dev/null; then
+                echo "[ai-brain] skipping: another post-checkout running"
+                exit 0
+            fi
+            trap 'rmdir "$LOCKDIR"' EXIT
         fi
 
         echo -e "\\033[0;34m====== 🌅 Git Branch 切換偵測：背景更新代碼架構圖譜 ======\\033[0m"

@@ -117,20 +117,21 @@ class TestHookTemplates(unittest.TestCase):
             chain=HOOK_CHAIN,
         )
 
-    def test_post_checkout_uses_flock_instead_of_mkdir(self) -> None:
+    def test_post_checkout_uses_portable_lock(self) -> None:
         content = self._format(POST_CHECKOUT_TEMPLATE, "post-checkout")
         self.assertIn(">/dev/null 2>&1 &", content)
         self.assertIn('if [ "$3" -eq 1 ]; then', content)
         self.assertIn("ai-brain-checkout.lock", content)
         self.assertIn("flock -n 8", content)
-        self.assertNotIn("mkdir", content)
+        self.assertIn("shlock -p $$", content)
         self.assertNotIn("kill -0", content)
         self.assertNotIn("trap 'rm -rf", content)
 
-    def test_post_merge_uses_flock(self) -> None:
+    def test_post_merge_uses_portable_lock(self) -> None:
         content = self._format(POST_MERGE_TEMPLATE, "post-merge")
         self.assertIn("ai-brain-post-merge.lock", content)
         self.assertIn("flock -n 9", content)
+        self.assertIn("shlock -p $$", content)
         self.assertIn(HOOK_CHAIN, content)
         self.assertIn("Git Pull 偵測", content)
 
