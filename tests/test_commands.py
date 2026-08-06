@@ -12,7 +12,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ai_brain import commands, registry
+from ai_brain import commands, constants, registry
 from ai_brain._testing import InTempDir
 from ai_brain.verifier import PASS as VERIFY_PASS, CheckResult
 
@@ -73,7 +73,7 @@ class _CmdBase(InTempDir):
             hook = Path(".git/hooks") / name
             hook.write_text(
                 f"#!/bin/bash\n# >>> ai-brain {name} hook begin\n"
-                f"# ai-brain start --fast\n"
+                f"# ai-brain start --fast\n# shlock\n"
                 f"# <<< ai-brain {name} hook end\n",
                 encoding="utf-8",
             )
@@ -270,6 +270,9 @@ class TestDoctor(_RegisterSeveralMixin):
         global_gi = commands._global_gitignore_path()
         global_gi.parent.mkdir(parents=True, exist_ok=True)
         global_gi.write_text(".codebase-memory/\n", encoding="utf-8")
+
+        for p in registry.list_active():
+            git_hooks.install(Path(p))
 
         paths = MagicMock()
         with patch("ai_brain.verifier.run_all_checks") as mock_checks, \
@@ -1354,13 +1357,18 @@ class TestGlobalClaudeMd(_CmdBase):
         claude_dir = Path.home() / ".claude"
         md = claude_dir / "CLAUDE.md"
         md.parent.mkdir(parents=True, exist_ok=True)
-        existing = "# Header\n## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)\nalready here\n"
+        existing = f"# Header\n{constants.COGNITIVE_PRINCIPLES_BLOCK}\n"
         md.write_text(existing, encoding="utf-8")
+
+        opencode_dir = Path.home() / ".config" / "opencode"
+        opencode_md = opencode_dir / "AGENTS.md"
+        opencode_md.parent.mkdir(parents=True, exist_ok=True)
+        opencode_md.write_text(existing, encoding="utf-8")
 
         out = io.StringIO()
         with redirect_stdout(out):
             commands._maybe_append_global_claude_md()
-        self.assertIn("already present", out.getvalue())
+        self.assertEqual(out.getvalue(), "")
 
 
 class TestInitFailures(_CmdBase):

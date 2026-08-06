@@ -1651,7 +1651,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         begin_marker = HOOK_BEGIN_MARKER.format(name=name)
                         if begin_marker in content:
                             installed = True
-                            if "--fast" in content:
+                            if "--fast" in content and "shlock" in content:
                                 up_to_date = True
                     except Exception:
                         pass
@@ -1661,7 +1661,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(red(f"{prefix}[ FAIL ] Git Hook '{name}' 未安裝"))
                 elif not up_to_date:
                     hooks_ok = False
-                    print(yellow(f"{prefix}[ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未啟用速度優化 --fast)"))
+                    print(yellow(f"{prefix}[ FAIL ] Git Hook '{name}' 已安裝但版本過舊 (未升級跨平台鎖定版本)"))
                 else:
                     print(green(f"{prefix}[ PASS ] Git Hook '{name}' 已安裝且啟用速度優化"))
 
@@ -1669,7 +1669,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                 if fix:
                     print(yellow(f"{prefix}  --> 正在重新安裝/更新 Git Hooks..."))
                     if git_hooks.install(proj):
-                        print(green(f"{prefix}  [ FIXED ] 已成功更新 Git Hooks 至最新速度優化版本！"))
+                        print(green(f"{prefix}  [ FIXED ] 已成功更新 Git Hooks 至最新跨平台相容版本！"))
                     else:
                         print(red(f"{prefix}  [ ERROR ] 自動更新 Git Hooks 失敗，請手動執行 `ai-brain init` 重試。"))
                         all_pass = False
