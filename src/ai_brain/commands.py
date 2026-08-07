@@ -1474,7 +1474,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(yellow(f"    --> 正在嘗試自動修復並啟用所有 Claude Code 設定檔（含遠端 SSH 主機）的 {pkg} 插件..."))
                     try:
                         subprocess.run(
-                            ["uv", "tool", "install", "claude-mem[mcp]", "--force"],
+                            ["uv", "tool", "install", "claude-mem[mcp]", "--with", "mcp<2.0.0", "--force"],
                             capture_output=True, timeout=300,
                         )
                     except Exception:
@@ -1492,7 +1492,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(yellow("    --> 正在自動安裝帶有 [mcp] 支援之 claude-mem[mcp] 套件..."))
                     try:
                         subprocess.run(
-                            ["uv", "tool", "install", "claude-mem[mcp]", "--force"],
+                            ["uv", "tool", "install", "claude-mem[mcp]", "--with", "mcp<2.0.0", "--force"],
                             capture_output=True, timeout=300,
                         )
                         print(green("    [ FIXED ] 已成功安裝帶有 [mcp] 支援之 claude-mem 套件！"))
@@ -1609,74 +1609,103 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
 
     print()
 
-    # 6c. MCP connectivity probe (slow — up to 30s, run after path fix)
-    print(blue("6c. 檢查 MemPalace MCP 連線可用性..."))
+    # 6c. MCP connectivity probe for all core servers (MemPalace / claude-mem / codebase-memory-mcp)
+    print(blue("6c. 檢查核心 MCP 伺服器實時連線可用性..."))
     from .constants import MEMPALACE_MCP_COMMAND
-    mcp_probe_ok = False
-    mcp_probe_time = 0.0
-    mcp_proc = None
-    try:
-        mcp_cmd = MEMPALACE_MCP_COMMAND()
-        mcp_proc = subprocess.Popen(
-            mcp_cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        init_msg = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "ai-brain-doctor", "version": "1.0.0"},
-            },
-        }) + "\n"
-        probe_start = time.monotonic()
-        assert mcp_proc.stdin is not None
-        mcp_proc.stdin.write(init_msg)
-        mcp_proc.stdin.flush()
+    mcp_servers_to_probe = [
+        ("MemPalace", MEMPALACE_MCP_COMMAND()),
+        ("claude-mem", ["claude-mem", "serve"] if shutil.which("claude-mem") else []),
+        ("codebase-memory-mcp", ["codebase-memory-mcp"] if shutil.which("codebase-memory-mcp") else []),
+    ]
 
-        # Read response with timeout
-        import select as _select
-        ready = _select.select([mcp_proc.stdout], [], [], 30)
-        if ready[0]:
-            response_line = mcp_proc.stdout.readline()
-            probe_elapsed = time.monotonic() - probe_start
-            if response_line.strip():
-                resp = json.loads(response_line)
-                if "result" in resp or "id" in resp:
-                    mcp_probe_ok = True
-                    mcp_probe_time = probe_elapsed
-        else:
-            probe_elapsed = time.monotonic() - probe_start
-    except json.JSONDecodeError:
-        pass
-    except Exception as e:
-        print(yellow(f"  [ WARN ] MCP 連線探測異常 ({e})"))
-    finally:
-        if mcp_proc is not None:
-            for pipe in (mcp_proc.stdin, mcp_proc.stdout, mcp_proc.stderr):
-                if pipe is not None:
+    for s_name, s_cmd in mcp_servers_to_probe:
+        if not s_cmd:
+            continue
+        probe_ok = False
+        probe_time = 0.0
+        probe_err = ""
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                s_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            init_msg = json.dumps({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "ai-brain-doctor", "version": "1.0.0"},
+                },
+            }) + "\n"
+            start_t = time.monotonic()
+            assert proc.stdin is not None
+            proc.stdin.write(init_msg)
+            proc.stdin.flush()
+
+            try:
+                import select as _select
+                ready = _select.select([proc.stdout], [], [], 10)
+            except Exception:
+                ready = ([proc.stdout], [], [])
+
+            elapsed = time.monotonic() - start_t
+            if ready[0] and proc.stdout is not None:
+                line = proc.stdout.readline()
+                if line.strip():
                     try:
-                        pipe.close()
+                        resp = json.loads(line)
+                        if "result" in resp or "id" in resp or "jsonrpc" in resp:
+                            probe_ok = True
+                            probe_time = elapsed
                     except Exception:
                         pass
-            try:
-                mcp_proc.terminate()
-                mcp_proc.wait(timeout=5)
-            except Exception:
+            if not probe_ok:
+                poll = proc.poll()
+                if poll is not None and proc.stderr is not None:
+                    err_lines = proc.stderr.read().strip().splitlines()
+                    if err_lines:
+                        probe_err = err_lines[0]
+        except Exception as e:
+            probe_err = str(e)
+        finally:
+            if proc is not None:
+                for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                    if pipe is not None:
+                        try:
+                            pipe.close()
+                        except Exception:
+                            pass
                 try:
-                    mcp_proc.kill()
+                    proc.terminate()
+                    proc.wait(timeout=2)
                 except Exception:
-                    pass
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
 
-    if mcp_probe_ok:
-        print(green(f"  [ PASS ] MemPalace MCP 連線正常 (回應時間: {mcp_probe_time:.2f}s)"))
-    else:
-        print(yellow("  [ WARN ] MemPalace MCP 連線探測未通過（無回應或逾時 30s），可稍後手動驗證"))
+        if probe_ok:
+            print(green(f"  [ PASS ] {s_name} MCP 連線正常 (回應時間: {probe_time:.2f}s)"))
+        else:
+            all_pass = False
+            err_msg = f": {probe_err}" if probe_err else " (無回應或連線逾時)"
+            print(red(f"  [ FAIL ] {s_name} MCP 連線探測失敗{err_msg}"))
+            if fix and s_name == "claude-mem":
+                print(yellow("    --> 正在自動為 claude-mem 升級並補全 [mcp] 與 mcp<2.0.0 支援..."))
+                try:
+                    subprocess.run(
+                        ["uv", "tool", "install", "claude-mem[mcp]", "--with", "mcp<2.0.0", "--force"],
+                        capture_output=True, timeout=300,
+                    )
+                    print(green("    [ FIXED ] 已成功修正 claude-mem MCP 連線！"))
+                except Exception as e:
+                    print(red(f"    [ ERROR ] 自動修正失敗 ({e})"))
 
     print()
 

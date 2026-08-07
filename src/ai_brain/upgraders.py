@@ -284,9 +284,12 @@ def upgrade(tool: UpgradableTool) -> tuple[bool, str]:
     # the in-process cache would otherwise serve stale versions.
     global _UV_TOOL_LIST_CACHE
     _UV_TOOL_LIST_CACHE = None
+    cmd = ["uv", "tool", "install", tool.package, "--force", "--reinstall"]
+    if tool.binary == "claude-mem":
+        cmd = ["uv", "tool", "install", tool.package, "--with", "mcp<2.0.0", "--force", "--reinstall"]
     try:
         result = subprocess.run(
-            ["uv", "tool", "install", tool.package, "--force", "--reinstall"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=300,
