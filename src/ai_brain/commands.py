@@ -1041,6 +1041,39 @@ def _enable_claude_mem_plugin() -> int:
     return enabled_count
 
 
+def _check_claude_mem_mcp_support() -> bool:
+    """Return True if `claude-mem` binary is available and can start `serve` (MCP) without missing 'mcp' module."""
+    cmd = shutil.which("claude-mem")
+    if not cmd:
+        return False
+    try:
+        proc = subprocess.Popen(
+            [cmd, "serve"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        time.sleep(0.3)
+        poll = proc.poll()
+        if poll is not None:
+            out, err = proc.communicate(timeout=1)
+            combined = (out or "") + (err or "")
+            if "MCP support requires the 'mcp' package" in combined:
+                return False
+            if poll != 0:
+                return False
+        else:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                proc.kill()
+        return True
+    except Exception:
+        return True
+
+
 def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
@@ -1431,6 +1464,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     missing_files.append((label, p))
 
             cli_binary = bool(shutil.which(tool_name))
+            mcp_ok = _check_claude_mem_mcp_support() if cli_binary else True
 
             if missing_files:
                 cli_ok = False
@@ -1440,7 +1474,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     print(yellow(f"    --> 正在嘗試自動修復並啟用所有 Claude Code 設定檔（含遠端 SSH 主機）的 {pkg} 插件..."))
                     try:
                         subprocess.run(
-                            ["uv", "tool", "install", pkg, "--force"],
+                            ["uv", "tool", "install", "claude-mem[mcp]", "--force"],
                             capture_output=True, timeout=300,
                         )
                     except Exception:
@@ -1450,6 +1484,21 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     cli_ok = True
                 else:
                     all_pass = False
+            elif not mcp_ok:
+                cli_ok = False
+                all_pass = False
+                print(red(f"  [ FAIL ] claude-mem CLI 缺少 mcp 套件 (無法啟動 MCP Server)"))
+                if fix:
+                    print(yellow("    --> 正在自動安裝帶有 [mcp] 支援之 claude-mem[mcp] 套件..."))
+                    try:
+                        subprocess.run(
+                            ["uv", "tool", "install", "claude-mem[mcp]", "--force"],
+                            capture_output=True, timeout=300,
+                        )
+                        print(green("    [ FIXED ] 已成功安裝帶有 [mcp] 支援之 claude-mem 套件！"))
+                        cli_ok = True
+                    except Exception as e:
+                        print(red(f"    [ ERROR ] 自動安裝失敗 ({e})"))
             elif cli_binary or enabled_files:
                 details = []
                 if cli_binary:
