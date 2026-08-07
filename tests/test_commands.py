@@ -1446,7 +1446,7 @@ class TestDoctorErrorPaths(_CmdBase):
                 return self._mk_subprocess_result(returncode=1, stdout="")
             return self._mk_subprocess_result()
 
-        mock_which.side_effect = [None, None, None]
+        mock_which.return_value = None
         mock_run.side_effect = run_side_effect
         mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
 
