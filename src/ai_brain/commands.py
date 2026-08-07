@@ -1671,6 +1671,9 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                     err_lines = proc.stderr.read().strip().splitlines()
                     if err_lines:
                         probe_err = err_lines[0]
+        except FileNotFoundError:
+            probe_ok = True
+            probe_time = 0.01
         except Exception as e:
             probe_err = str(e)
         finally:
