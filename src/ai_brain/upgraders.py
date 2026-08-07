@@ -44,7 +44,7 @@ class UpgradableTool:
 # picked "不列其他工具" (no OpenClaw / GitHub Action etc.) in the design Q&A.
 CORE_TOOLS: tuple[UpgradableTool, ...] = (
     UpgradableTool("MemPalace", "mempalace", "mempalace"),
-    UpgradableTool("claude-mem", "claude-mem", "claude-mem"),
+    UpgradableTool("claude-mem", "claude-mem", "claude-mem[mcp]"),
     UpgradableTool("codebase-memory-mcp", "codebase-memory-mcp", "codebase-memory-mcp"),
 )
 
