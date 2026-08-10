@@ -137,7 +137,14 @@ def _cmd_remove(args, _paths) -> int:
 
 
 def _cmd_doctor(args, paths) -> int:
-    return 0 if commands.run_doctor(paths, target=args.target, fix=args.fix) else 1
+    agent = getattr(args, "agent", None)
+    select = getattr(args, "select", False)
+    kwargs = {"target": args.target, "fix": args.fix}
+    if select:
+        kwargs["select_menu"] = True
+    if agent is not None:
+        kwargs["target_agent"] = agent
+    return 0 if commands.run_doctor(paths, **kwargs) else 1
 
 
 def _cmd_gc(args, _paths) -> int:
@@ -153,7 +160,18 @@ def _cmd_mine(args, _paths) -> int:
 
 
 def _cmd_mcp_sync(args, paths) -> int:
-    return 0 if commands.sync_mcp_paths(paths, fix=args.fix) else 1
+    agent = getattr(args, "agent", None)
+    kwargs = {"fix": args.fix}
+    if agent is not None:
+        kwargs["target_agent"] = agent
+    fixed, msgs = mcp.sync_all_mcp_commands(paths, **kwargs)
+    for m in msgs:
+        print(m)
+    if fixed > 0:
+        print(green(f"✅ 已成功為 {fixed} 個 MCP 設定路徑進行最新校準！"))
+    elif not msgs:
+        print(green("✅ 所有 IDE 的 MCP 指令路徑均已是最新且最快的執行檔。"))
+    return 0
 
 
 def _cmd_config(args, paths) -> int:
@@ -265,12 +283,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("target", nargs="?", default=None,
                    help="project keyword, 1-based index, '.', 'current', or omitted to check all registered projects")
     p.add_argument("--fix", "--fx", "-f", action="store_true", help="Automatically fix detected issues")
+    p.add_argument("--agent", "--target-agent", "-a", default=None, help="Specify agent target (e.g. omp, claude, gemini, cursor, opencode, kilo)")
+    p.add_argument("--select", "-s", "--interactive", action="store_true", help="Interactive menu to choose target agent")
     p = sub.add_parser("gc", help="Garbage-collect palace drift backups and compress ChromaDB", add_help=False)
     p.add_argument("--apply", action="store_true", help="Actually perform changes (default is dry-run)")
     p.add_argument("--purge-wing", default=None,
                    help="Delete all embeddings for a specific wing (bypasses slow sync/compress)")
     p = sub.add_parser("mcp-sync", help="Sync all MCP server command paths to fastest binary", add_help=False)
     p.add_argument("--fix", "--fx", "-f", action="store_true", help="Actually update stale paths")
+    p.add_argument("--agent", "--target-agent", "-a", default=None, help="Specify agent target (e.g. omp, claude, gemini, cursor)")
+    p.add_argument("--select", "-s", "--interactive", action="store_true", help="Interactive menu to choose target agent")
     p = sub.add_parser("config", help="Manage global configuration settings", add_help=False)
     p.add_argument("action", choices=["global"], help="scope: global")
     p.add_argument("--set", dest="config_set", help="set parameter (key=value or section.key=value)")
@@ -348,35 +370,52 @@ def main(argv: list[str] | None = None) -> int:
 class _Namespace_for:
     def __init__(self, cmd: str, rest: list[str]) -> None:
         self.cmd = cmd
-        self.target = next((arg for arg in rest if not arg.startswith("-")), None)
         self.pattern = rest[0] if rest else None
         # `completions` subcommand uses action + optional shell positional.
         # We only populate these when relevant; other commands ignore them.
         self.action = rest[0] if rest else None
         self.shell = rest[1] if len(rest) > 1 else None
         self.fix = "--fix" in rest or "--fx" in rest or "-f" in rest
+        self.select = "--select" in rest or "-s" in rest or "--interactive" in rest
         self.fast = "--fast" in rest or "--no-cluster" in rest
         self.apply = "--apply" in rest
         self.manual = "-m" in rest or "--manual" in rest
         self.auto_archive = "-a" in rest or "--auto-archive" in rest
         self.cli_only = "--cli" in rest
         self.tools_only = "--tools" in rest
-        # `mine` subcommand args
+
+        self.agent = None
         self.mine_mode = None
         self.wing = None
         self.purge_wing = None
-        # `config` subcommand args
         self.config_list = "--list" in rest
         self.config_set = None
+
+        skip = set()
         for i, arg in enumerate(rest):
-            if arg == "--mode" and i + 1 < len(rest):
+            if arg in ("--agent", "--target-agent", "-a") and i + 1 < len(rest):
+                self.agent = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
+            elif arg == "--mode" and i + 1 < len(rest):
                 self.mine_mode = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
             elif arg == "--wing" and i + 1 < len(rest):
                 self.wing = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
             elif arg == "--purge-wing" and i + 1 < len(rest):
                 self.purge_wing = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
             elif arg == "--set" and i + 1 < len(rest):
                 self.config_set = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
+
+        positionals = [arg for i, arg in enumerate(rest) if i not in skip and not arg.startswith("-")]
+        self.target = positionals[0] if positionals else None
 
 
 if __name__ == "__main__":

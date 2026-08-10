@@ -1074,7 +1074,36 @@ def _check_claude_mem_mcp_support() -> bool:
         return True
 
 
-def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
+def _prompt_select_agent() -> str | None:
+    agents = [
+        ("omp", "OMP / Oh My Pi", "~/.omp/agent/mcp.json"),
+        ("claude", "Claude Code / Rufus", "~/.claude.json"),
+        ("gemini", "Gemini / Antigravity IDE", "~/.gemini/config/mcp_config.json"),
+        ("cursor", "Cursor", "~/.cursor/mcp.json"),
+        ("opencode", "OpenCode", "~/.config/opencode/opencode.json"),
+        ("openclaw", "OpenClaw", "~/.openclaw/openclaw.json"),
+        ("codex", "Codex Agent", "~/.codex/config.toml"),
+        ("kilo", "Kilo Code (VS Code & CLI)", "~/.config/kilo/kilo.json"),
+        ("all", "所有 Agent 全部強制作成配置 (All)", "全域自動寫入"),
+    ]
+    print(blue("====== 🎯 AI Agent 指定安裝與修復選單 ======"))
+    for idx, (code, name, path) in enumerate(agents, 1):
+        print(f"  [{idx}] {name:<30} (配置路徑: {path})")
+    print()
+    try:
+        choice = input(yellow("請輸入欲指定的 Agent 編號 (1-9) [直接按 Enter 為全選/自動偵測]: ")).strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(agents):
+            code = agents[int(choice) - 1][0]
+            return None if code == "all" else code
+    except (KeyboardInterrupt, EOFError):
+        print()
+    return None
+
+
+def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent: str | None = None, select_menu: bool = False) -> bool:
+    if select_menu or target_agent in ("select", "interactive", "menu", "list", "choice"):
+        target_agent = _prompt_select_agent()
+
     # 1. Resolve which projects to check
     projects_to_check: list[Path] = []
     if target:
@@ -1099,6 +1128,8 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         print(yellow(f"🎯 目標模式：檢查單一專案 \"{projects_to_check[0].name}\" ({projects_to_check[0]})"))
     else:
         print(yellow(f"🎯 全域模式：檢查所有註冊活躍專案 (共 {len(projects_to_check)} 個專案)"))
+    if target_agent:
+        print(yellow(f"🤖 指定 Agent 模式：指定對象 \"{target_agent}\""))
     if fix:
         print(yellow("💡 診斷修復模式已啟用，將會自動修正可修復之問題。"))
     print()
@@ -1569,17 +1600,24 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
                         print(yellow(f"    --> 偵測到 OpenClaw 已安裝，建立配置目錄: {_oc_dir}"))
             except Exception:
                 pass
-            print(yellow("    --> 正在重新註冊所有 MCP 服務..."))
+            print(yellow(f"    --> 正在重新註冊 MCP 服務 (Agent 篩選: {target_agent or '全部'})..."))
             try:
                 from .mcp import register_all
-                register_all(paths)
-                print(green("    [ FIXED ] 已成功重新配置所有 IDE 的 MCP 大腦！"))
+                register_all(paths, target_agent=target_agent, force_create=bool(target_agent))
+                print(green("    [ FIXED ] 已成功重新配置 MCP 大腦！"))
             except Exception as e:
                 print(red(f"    [ ERROR ] 重新註冊 MCP 服務失敗 ({e})"))
                 all_pass = False
         else:
             all_pass = False
     else:
+        if fix and target_agent:
+            try:
+                from .mcp import register_all
+                register_all(paths, target_agent=target_agent, force_create=True)
+                print(green(f"  [ FIXED ] 已強制為指定 Agent ({target_agent}) 建立與寫入 MCP 配置！"))
+            except Exception as e:
+                print(red(f"  [ ERROR ] 為指定 Agent ({target_agent}) 建立配置失敗 ({e})"))
         print(green("  [ PASS ] MCP 大腦配置與伺服器載入完全正常"))
 
     print()
@@ -1587,7 +1625,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
     # 6b. Check MCP command path consistency (fast — run first)
     print(blue("6b. 檢查 MCP 指令路徑一致性..."))
     from .mcp import sync_all_mcp_commands
-    stale_count, stale_msgs = sync_all_mcp_commands(paths, fix=False)
+    stale_count, stale_msgs = sync_all_mcp_commands(paths, fix=False, target_agent=target_agent)
     if stale_msgs:
         for msg in stale_msgs:
             print(msg)
@@ -1595,7 +1633,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False) -> bool:
         print(red(f"  [ FAIL ] 發現 {stale_count} 個過時 MCP 指令路徑"))
         if fix:
             from .mcp import sync_all_mcp_commands as _sync
-            fixed, fix_msgs = _sync(paths, fix=True)
+            fixed, fix_msgs = _sync(paths, fix=True, target_agent=target_agent)
             for msg in fix_msgs:
                 print(msg)
             if fixed > 0:

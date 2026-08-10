@@ -282,27 +282,67 @@ def _all_targets(paths) -> list[RegistrationTarget]:
     return targets
 
 
+def _filter_targets(targets: list[RegistrationTarget], target_agent: str | None) -> list[RegistrationTarget]:
+    if not target_agent:
+        return targets
+    query = target_agent.lower().strip()
+    alias_map = {
+        "omp": ["omp", "oh my pi"],
+        "oh-my-pi": ["omp", "oh my pi"],
+        "pi": ["omp", "oh my pi"],
+        "claude": ["claude"],
+        "gemini": ["gemini"],
+        "antigravity": ["antigravity", "gemini"],
+        "opencode": ["opencode"],
+        "openclaw": ["openclaw"],
+        "cursor": ["cursor"],
+        "codex": ["codex"],
+        "kilo": ["kilo"],
+        "mcp": ["mcp"],
+    }
+    keywords = alias_map.get(query, [query])
+    matched = []
+    for t in targets:
+        lbl = t.label.lower()
+        if any(kw in lbl for kw in keywords):
+            matched.append(t)
+    return matched
+
+
 # --- Public API -----------------------------------------------------------------
 
-def register_all(paths) -> int:
-    """Register mempalace + codebase-memory-mcp across every relevant IDE config.
+def register_all(paths, target_agent: str | None = None, force_create: bool = False) -> int:
+    """Register mempalace + codebase-memory-mcp across relevant IDE configs.
 
-    Returns the number of files we successfully touched.
+    If target_agent is specified or force_create is True, parent directories are created automatically.
+    Returns the number of files successfully touched.
     """
     touched = 0
-    for target in _all_targets(paths):
-        if not target.path or not target.path.parent.is_dir():
+    targets = _filter_targets(_all_targets(paths), target_agent)
+    should_force = force_create or bool(target_agent)
+    for target in targets:
+        if not target.path:
             continue
-        blue(f"---> 偵測到 {target.label} 環境，自動寫入 MCP 設定: {target.path.name}")
+        if not target.path.parent.is_dir():
+            if should_force:
+                try:
+                    target.path.parent.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    print(red(f"  [ ERROR ] 無法建立 {target.label} 設定目錄 ({e})"))
+                    continue
+            else:
+                continue
+        blue(f"---> 寫入 {target.label} MCP 設定: {target.path.name}")
         _register_in_file(target)
         touched += 1
     return touched
 
 
-def deregister_all(paths) -> int:
-    """Remove mempalace + codebase-memory-mcp from every relevant IDE config."""
+def deregister_all(paths, target_agent: str | None = None) -> int:
+    """Remove mempalace + codebase-memory-mcp from relevant IDE configs."""
     touched = 0
-    for target in _all_targets(paths):
+    targets = _filter_targets(_all_targets(paths), target_agent)
+    for target in targets:
         if not target.path or not target.path.is_file():
             continue
         blue(f"---> 自 {target.label} 註銷 MemPalace / Codebase-Memory MCP 伺服器...")
@@ -339,7 +379,7 @@ def _register_in_file(target: RegistrationTarget) -> bool:
     return modify_json_file(target.path, _modifier)
 
 
-def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
+def sync_all_mcp_commands(paths, fix: bool = False, target_agent: str | None = None) -> tuple[int, list[str]]:
     """Scan all MCP configs and fix stale ``mempalace-mcp`` binary references.
 
     Covers both top-level ``mcpServers`` and per-project entries inside
@@ -362,7 +402,7 @@ def sync_all_mcp_commands(paths, fix: bool = False) -> tuple[int, list[str]]:
     # in ``codebase-memory-mcp`` (e.g. leftover OpenClaw shape from before the
     # canonical Zod-compliant format) is reported and fixed, not just
     # ``mempalace``.
-    for target in _all_targets(paths):
+    for target in _filter_targets(_all_targets(paths), target_agent):
         if not target.path or not target.path.is_file():
             continue
         try:

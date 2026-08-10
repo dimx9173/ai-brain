@@ -151,6 +151,11 @@ class TestCli(unittest.TestCase):
         self.assertEqual(cli.main(["doctor", "-f"]), 0)
         mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=True)
 
+    @patch("ai_brain.cli.commands.run_doctor", return_value=True)
+    def test_doctor_dispatch_with_agent_flag(self, mock_fn) -> None:
+        self.assertEqual(cli.main(["doctor", "--fix", "--agent", "omp"]), 0)
+        mock_fn.assert_called_with(unittest.mock.ANY, target=None, fix=True, target_agent="omp")
+
     @patch("ai_brain.cli.commands.run_doctor", return_value=False)
     def test_doctor_dispatch_returns_one_on_fail(self, mock_fn) -> None:
         self.assertEqual(cli.main(["doctor"]), 1)

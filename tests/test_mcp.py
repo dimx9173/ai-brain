@@ -642,3 +642,25 @@ class TestSyncAllMcpCommands(InTempDir):
         joined = "\n".join(msgs)
         self.assertIn("StubSvr", joined)
         self.assertIn("StubPath", joined)
+
+    def test_target_agent_filtering_and_force_create(self):
+        tmp_base = Path(self.tmpdir)
+        omp_dir = tmp_base / "omp_test" / "agent"
+        omp_json = omp_dir / "mcp.json"
+        
+        # Parent directory does not exist initially
+        self.assertFalse(omp_dir.is_dir())
+        
+        mock_paths = mock.MagicMock()
+        mock_paths.omp_json = omp_json
+
+        from ai_brain.mcp import register_all
+        # Force create omp config
+        touched = register_all(mock_paths, target_agent="omp", force_create=True)
+        self.assertGreaterEqual(touched, 1)
+        self.assertTrue(omp_json.is_file())
+        
+        content = json.loads(omp_json.read_text(encoding="utf-8"))
+        self.assertIn("mcpServers", content)
+        self.assertIn(MCP_MEMPALACE, content["mcpServers"])
+
