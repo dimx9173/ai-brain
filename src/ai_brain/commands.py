@@ -1806,6 +1806,8 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
         ("全域 ~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
     ]
     if not target:
+        if fix:
+            _maybe_append_global_claude_md(target_agent=target_agent, force_create=bool(target_agent))
         for g_label, g_file in global_files:
             if g_file.is_file():
                 if not _fix_claude_md(g_label, g_file, paths, fix=fix):
@@ -2246,19 +2248,50 @@ def _remove_global_cognitive_principles() -> None:
         print(red(f"警告：更新 ~/.claude/CLAUDE.md 失敗 ({e})"))
 
 
-def _maybe_append_global_claude_md() -> None:
-    """Ensure cognitive principles block is present in user-level global rule files."""
+def _maybe_append_global_claude_md(target_agent: str | None = None, force_create: bool = False) -> None:
+    """Ensure cognitive principles block is present in user-level global rule files for agents."""
     from .constants import COGNITIVE_PRINCIPLES_BLOCK, COGNITIVE_PRINCIPLES_MARKER
 
     global_targets = [
-        ("~/.claude/CLAUDE.md", Path.home() / ".claude" / "CLAUDE.md"),
-        ("~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
+        ("OMP", "全域 ~/.omp/agent/APPEND_SYSTEM.md", Path.home() / ".omp" / "agent" / "APPEND_SYSTEM.md"),
+        ("Claude", "全域 ~/.claude/CLAUDE.md", Path.home() / ".claude" / "CLAUDE.md"),
+        ("OpenCode", "全域 ~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
+        ("Gemini", "全域 ~/.gemini/config/AGENTS.md", Path.home() / ".gemini" / "config" / "AGENTS.md"),
+        ("Cursor", "全域 ~/.cursor/AGENTS.md", Path.home() / ".cursor" / "AGENTS.md"),
+        ("Codex", "全域 ~/.codex/AGENTS.md", Path.home() / ".codex" / "AGENTS.md"),
+        ("Kilo", "全域 ~/.config/kilo/AGENTS.md", Path.home() / ".config" / "kilo" / "AGENTS.md"),
+        ("OpenClaw", "全域 ~/.openclaw/AGENTS.md", Path.home() / ".openclaw" / "AGENTS.md"),
     ]
 
-    for label, target_file in global_targets:
+    if target_agent:
+        query = target_agent.lower().strip()
+        alias_map = {
+            "omp": ["omp", "pi"],
+            "oh-my-pi": ["omp", "pi"],
+            "pi": ["omp", "pi"],
+            "claude": ["claude"],
+            "gemini": ["gemini", "antigravity"],
+            "antigravity": ["antigravity", "gemini"],
+            "opencode": ["opencode"],
+            "openclaw": ["openclaw"],
+            "cursor": ["cursor"],
+            "codex": ["codex"],
+            "kilo": ["kilo"],
+        }
+        keywords = alias_map.get(query, [query])
+        global_targets = [t for t in global_targets if any(kw in t[0].lower() for kw in keywords)]
+
+    should_force = force_create or bool(target_agent)
+
+    for agent_tag, label, target_file in global_targets:
         try:
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            existing = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
+            if not target_file.parent.is_dir():
+                if should_force:
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    continue
+
+            existing = target_file.read_text(encoding="utf-8") if target_file.is_file() else ""
             if COGNITIVE_PRINCIPLES_MARKER in existing:
                 continue
 
@@ -2267,7 +2300,7 @@ def _maybe_append_global_claude_md() -> None:
                 if existing and not existing.endswith("\n"):
                     f.write("\n")
                 f.write(COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n")
-            print(f"Successfully appended global cognitive rules to {label}")
+            print(green(f"Successfully appended global cognitive rules to {label}"))
         except Exception as e:
             print(red(f"警告：寫入全域引導 {label} 失敗 ({e})"))
 
