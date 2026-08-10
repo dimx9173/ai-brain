@@ -517,10 +517,9 @@ class TestFullInit(_CmdBase):
 
         out, ok = self._capture(commands.full_init, MagicMock())
         self.assertTrue(ok)
-        self.assertIn("終極全自動", out)
+        self.assertIn("全自動配置完成", out)
         self.assertTrue(mock_hooks.called)
         self.assertTrue(mock_cron.called)
-        self.assertTrue(mock_reg.called)
         self.assertTrue(mock_oc.called)
         self.assertTrue(mock_kilo.called)
 
@@ -1387,7 +1386,7 @@ class TestInitFailures(_CmdBase):
     @patch("ai_brain.commands._run_mempalace_init", return_value=True)
     @patch("ai_brain.commands._ensure_codebase_memory_ignored")
     def test_claude_md_failed(self, mock_ign, mock_memp, mock_cb, mock_hooks, mock_md):
-        out, ok = self._capture(commands.init_brain)
+        out, ok = self._capture(commands.init_brain, create_project_rules=True)
         self.assertFalse(ok)
 
     @patch("ai_brain.commands._run_codebase_memory_init", return_value=False)

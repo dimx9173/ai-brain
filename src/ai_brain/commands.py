@@ -128,7 +128,6 @@ def init_brain(create_project_rules: bool = False) -> bool:
     print(blue(f"====== {APP_EMOJI} 開始初始化專案 AI 大腦配置 ======"))
 
     _ensure_codebase_memory_ignored()
-    _maybe_append_global_claude_md()
 
     if not _run_mempalace_init():
         return False
@@ -161,14 +160,11 @@ def full_init(paths) -> bool:
     from . import cron
     cron.install()
 
-    register_all(paths)
-
     from . import plugins
     plugins.install_opencode_plugins()
     plugins.install_kilo_skill_stub()
 
-    _maybe_append_global_claude_md()
-    print(green("====== 🎉 終極全自動大腦配置完成！ ======"))
+    print(green("====== 🎉 專案 AI 大腦全自動配置完成！ ======"))
     return True
 
 

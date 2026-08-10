@@ -82,6 +82,17 @@ def install_or_update(cli_only: bool = False, tools_only: bool = False) -> bool:
         _upgrade_and_summarise()
     elif ok and cli_only:
         green(f"✅ ai-brain CLI 已成功獨立更新至 v{VERSION} (跳過依賴套件更新)")
+
+    if ok:
+        try:
+            from .mcp import register_all
+            from .commands import _maybe_append_global_claude_md
+            paths = get_paths()
+            register_all(paths)
+            _maybe_append_global_claude_md()
+        except Exception:
+            pass
+
     return ok
 
 

@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.8.2-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.8.3-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -45,9 +45,15 @@ uv tool install codebase-memory-mcp --force
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Workflow Boundaries
 
-### 1️⃣ Installation
+### 🎯 職責邊界與分工原則 (Clear Boundary Principles)
+- **專案級初始化 (`ai-brain init`)**: 專注於目前專案目錄的大腦化（`mempalace.yaml`、`.codebase-memory/`、Git Hooks、專案註冊），**絕對不侵入/不寫入** 全域 Agent 的設定檔。
+- **全域 Agent 與 MCP / 記憶規則管理 (`ai-brain install` / `ai-brain doctor --fix`)**: 負責管理全域層級的 Agent MCP 配置與記憶引導規則（`APPEND_SYSTEM.md`, `AGENTS.md`, `CLAUDE.md`）。
+
+---
+
+### 1️⃣ Installation & Global Agent Setup
 
 Clone the repository and run the native installer to copy and configure `ai-brain` globally:
 
@@ -67,7 +73,24 @@ cd ~/cwork/ai-brain
 > source ~/.zshenv
 > ```
 
-### 2️⃣ Initialize a Project
+#### 🤖 指定 Agent 或互動式選單安裝 / 修復 (Agent Selection & Interactive Menu)
+您可以使用互動選單或是指定 `--agent` 選項，一次為特定的 AI Agent 同步安裝 **MCP 設定檔** 與 **Memory Rules 認知引導規則**：
+
+```bash
+# 方式 A：互動式數字選單（彈出 1-9 選項，免背指令）
+ai-brain doctor --fix -s
+# 或
+ai-brain doctor --fix --select
+
+# 方式 B：指定特定 Agent（例如 OMP / Oh My Pi）
+ai-brain doctor --fix --agent omp
+
+# 支援的 Agent 關鍵字：omp, claude, gemini, cursor, opencode, openclaw, codex, kilo
+```
+
+---
+
+### 2️⃣ Initialize a Project WorkSpace
 
 In any project workspace root, run the initialization command:
 
@@ -75,7 +98,7 @@ In any project workspace root, run the initialization command:
 # Fully automatic initialization + enable auto-archiving (recommended)
 ai-brain init -a
 
-# Fully automatic initialization (registers background Git Hooks and auto-archive Cron, but project excluded from archiving by default)
+# Fully automatic initialization (registers background Git Hooks and auto-archive Cron)
 ai-brain init
 
 # OR standard manual initialization (requires manually running start/stop)
@@ -91,7 +114,7 @@ ai-brain init -m
 ### 📦 Project Management (`project`)
 | Command | Alias | Description | Safety |
 | :--- | :--- | :--- | :--- |
-| `ai-brain project init [-a\|-m]` | `ai-brain init` | Initialize project brain, memory wing, `.claude/CLAUDE.md`, and Git Hooks. (`-a` enables auto-archiving). | ✅ Safe |
+| `ai-brain project init [-a\|-m]` | `ai-brain init` | Initialize project brain, memory wing, and Git Hooks (does NOT modify global Agent configs). | ✅ Safe |
 | `ai-brain project list` | `ai-brain list` | List all registered active projects and auto-archive status. | 🔍 Read-only |
 | `ai-brain project include [key]` | `ai-brain include` | Enable auto-archiving for a specific project or current directory. | ✅ Safe |
 | `ai-brain project exclude [key]` | `ai-brain exclude` | Disable auto-archiving for a specific project or current directory. | ✅ Safe |
@@ -105,13 +128,13 @@ ai-brain init -m
 | `ai-brain memory start` | `ai-brain start` | Refresh codebase architecture map and L1 graph topology. | ✅ Safe |
 | `ai-brain memory stop` | `ai-brain stop` | Safely package and archive session conversations into L2 memory palace. | ✅ Safe |
 | `ai-brain memory mine [target]` | `ai-brain mine` | Selectively mine high-value content (chats, ADRs, docs) into L2 palace. | ✅ Safe |
-| `ai-brain memory sync [--fix]` | `ai-brain mcp-sync` | Check and auto-sync MCP server binary paths across all IDE configs. | 🔧 Modifying |
+| `ai-brain memory sync [--fix] [-s\|--agent AGENT]` | `ai-brain mcp-sync` | Check and auto-sync MCP server binary paths across IDE configs. | 🔧 Modifying |
 | `ai-brain memory gc [--apply]` | `ai-brain gc` | Garbage-collect drift backups and compress ChromaDB database. | 🔧 Modifying |
 
 ### 🛠️ System & Diagnostics (`system`)
 | Command | Alias | Description | Safety |
 | :--- | :--- | :--- | :--- |
-| `ai-brain system doctor [--fix]` | `ai-brain doctor` | Comprehensive health check across all projects, database locks, and rules. | 🔧 Modifying |
+| `ai-brain system doctor [--fix] [-s\|--agent AGENT]` | `ai-brain doctor` | Comprehensive health check and auto-repair across all projects, database locks, and rules. | 🔧 Modifying |
 | `ai-brain system verify` | `ai-brain verify` | One-click 14-point diagnostic of memory tools, plugins, and daemons. | 🔍 Read-only |
 | `ai-brain system install` | `ai-brain install` | Install or update executable shims in `~/.local/bin` and verify PATH. | ✅ Safe |
 | `ai-brain system update` | `ai-brain update` | Git-pull latest source repo and update global `ai-brain` installation. | ✅ Safe |
