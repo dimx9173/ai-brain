@@ -265,7 +265,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
                            MCP_REQUIRED_SERVERS, _codex_entry),
         RegistrationTarget("OpenClaw", paths.openclaw_config, "mcp.servers",
                            MCP_REQUIRED_SERVERS, _openclaw_entry),
-        RegistrationTarget("Pi Agent", paths.pi_json, "mcpServers",
+        RegistrationTarget("OMP", paths.omp_json, "mcpServers",
                            MCP_REQUIRED_SERVERS, _stdio_server_entry),
     ]
 

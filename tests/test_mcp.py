@@ -68,7 +68,7 @@ def _minimal_paths() -> ToolPaths:
         cursor_json=base / ".cursor" / "mcp.json",
         codex_toml=base / ".codex" / "config.toml",
         openclaw_config=base / ".openclaw" / "openclaw.json",
-        pi_json=base / ".pi" / "agent" / "mcp.json",
+        omp_json=base / ".omp" / "agent" / "mcp.json",
     )
 
 

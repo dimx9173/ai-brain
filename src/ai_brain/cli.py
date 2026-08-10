@@ -22,7 +22,7 @@ from .verifier import print_results, run_all_checks
 
 def _show_help() -> None:
     print(blue(f"{APP_EMOJI} {APP_NAME} v{VERSION}"))
-    print("這款工具幫您一鍵搞定 Claude Code / Cowork / OpenClaw / OpenCode / Pi Agent 與 Gemini/Antigravity IDE 的架構地圖與記憶同步。\n")
+    print("這款工具幫您一鍵搞定 Claude Code / Cowork / OpenClaw / OpenCode / OMP (Oh My Pi) 與 Gemini/Antigravity IDE 的架構地圖與記憶同步。\n")
     print(yellow("用法 (GitHub Standard CLI Format):"))
     print("  ai-brain <command> <subcommand> [flags]\n")
     print(yellow("可用指令:"))

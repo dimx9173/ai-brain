@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.7.7-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.8.0-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -128,7 +128,7 @@ ai-brain init -m
 | :--- | :--- | :--- | :--- | :--- |
 | **Claude Code / Rufus** | `~/.claude.json`<br>`~/.claude/settings.json`<br>`~/.claude/*_settings.json` (SSH Remote) | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
 | **Gemini / Antigravity IDE** | `~/.gemini/config/mcp_config.json`<br>`~/.gemini/antigravity/mcp_config.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
-| **Pi Agent (`pi`)** | `~/.pi/agent/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
+| **OMP / Oh My Pi (`omp`)** | `~/.omp/agent/mcp.json` | `mcpServers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
 | **OpenCode** | `~/.config/opencode/opencode.json` | `mcp` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
 | **OpenClaw** | `~/.openclaw/openclaw.json` | `mcp.servers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |
 | **Codex Agent** | `~/.codex/config.toml` | `mcp_servers` | `mempalace`<br>`codebase-memory-mcp`<br>`claude-mem` | ✅ Natively supported |

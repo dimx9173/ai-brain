@@ -33,6 +33,8 @@ import time
 import unittest
 from pathlib import Path
 
+from ai_brain.constants import VERSION
+
 
 # --------------------------------------------------------------------------- #
 # Test fixture: isolated HOME + fake shim bin + subprocess CLI runner         #
@@ -214,13 +216,13 @@ class TestCliDispatch(_IsolatedHome):
         r = self.cli("--version")
         self.assertEqual(r.returncode, 0)
         self.assertIn("v", r.stdout)
-        # The version constant is "2.7.7".
-        self.assertIn("2.7.7", r.stdout)
+        # The version constant is VERSION.
+        self.assertIn(VERSION, r.stdout)
 
     def test_short_version_flag(self) -> None:
         r = self.cli("-v")
         self.assertEqual(r.returncode, 0)
-        self.assertIn("2.7.7", r.stdout)
+        self.assertIn(VERSION, r.stdout)
 
     def test_help_flag(self) -> None:
         r = self.cli("--help")

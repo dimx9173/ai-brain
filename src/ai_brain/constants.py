@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.7.7"
+VERSION = "2.8.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
@@ -117,7 +117,7 @@ def GLOBAL_CODEBASE_MEMORY_MCP() -> Path:
 
 
 # --- Tools supported by full-init -----------------------------------------------
-CODEBASE_MEMORY_TOOLS = ("antigravity", "gemini", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw", "pi")
+CODEBASE_MEMORY_TOOLS = ("antigravity", "gemini", "kilo", "cursor", "claude", "opencode", "codex", "aider", "trae", "claw", "omp")
 
 # The `uv tool install` package names ai-brain orchestrates. Keep this in sync
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.
@@ -145,7 +145,7 @@ COGNITIVE_PRINCIPLES_BLOCK = """
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
 1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, Pi Agent), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, OMP), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 
@@ -178,7 +178,7 @@ LOCAL_CLAUDE_MD_TEMPLATE = """# AI Agent Cognitive Workflow and Memory Guide
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
 1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, Pi Agent), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, OMP), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 

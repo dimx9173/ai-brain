@@ -380,7 +380,7 @@ def run_all_checks(paths) -> List[CheckResult]:
         results.append(CheckResult("檢查 OpenClaw MCP 記憶載入與內容正確性", INFO,
                                    "(此環境未安裝 OpenClaw CLI，跳過檢查)"))
 
-    # 13. Pi Agent
-    results.append(check_mcp_config("Pi Agent", paths.pi_json))
+    # 13. OMP
+    results.append(check_mcp_config("OMP", paths.omp_json))
 
     return results
