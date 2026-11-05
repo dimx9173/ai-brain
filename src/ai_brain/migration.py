@@ -355,7 +355,7 @@ def migrate_drawers_to_ai_memory(
                 content,
                 tags_json,
                 meta_json,
-                0,
+                5,
                 1.0,
                 "mempalace_migration",
                 filed_at,

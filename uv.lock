@@ -4,5 +4,5 @@ requires-python = ">=3.8"
 
 [[package]]
 name = "ai-brain"
-version = "2.9.0"
+version = "2.9.1"
 source = { editable = "." }
