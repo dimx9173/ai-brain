@@ -525,6 +525,14 @@ def cutover_mcp_servers(
 
     modified_files.append(claude_json)
 
+    # Cutover across all supported IDE targets (Cursor, OpenCode, Codex, Gemini, Kilo, etc.)
+    try:
+        from .platforms import get_paths
+        from .mcp import register_all
+        register_all(get_paths())
+    except Exception:
+        pass
+
     # Update manifest if migration_dir provided
     if migration_dir:
         manifest_file = migration_dir / "manifest.json"
