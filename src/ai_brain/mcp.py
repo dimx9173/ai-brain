@@ -15,6 +15,7 @@ from typing import Any, Callable
 from .config import modify_json_file
 from .constants import (
     GLOBAL_CODEBASE_MEMORY_MCP,
+    MCP_AI_MEMORY,
     MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
@@ -22,11 +23,19 @@ from .constants import (
     MEMPALACE_MCP_COMMAND,
 )
 from .ui import print_blue as blue
+from .ui import print_red as red
 
 # --- Server descriptors ---------------------------------------------------------
 # Each descriptor produces the IDE-specific entry for an MCP server. Keeping the
 # logic in one place stops subtle drift between targets (e.g. one having
 # "type":"stdio" and another not).
+
+def _ai_memory_command() -> tuple[str, list[str]]:
+    import shutil
+    cmd = shutil.which("ai-memory") or str(Path.home() / ".local" / "bin" / "ai-memory")
+    db_path = str(Path.home() / ".ai-memory" / "memory.db")
+    return (cmd, ["--db", db_path, "mcp"])
+
 
 def _claude_mem_command() -> tuple[str, list[str]]:
     import shutil
@@ -36,6 +45,13 @@ def _claude_mem_command() -> tuple[str, list[str]]:
 
 def _stdio_server_entry(server: str) -> dict[str, Any]:
     """Default stdio entry: command + args + env."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "command": cmd,
+            "args": args,
+            "env": {},
+        }
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -59,6 +75,14 @@ def _stdio_server_entry(server: str) -> dict[str, Any]:
 
 def _kilo_local_entry(server: str) -> dict[str, Any]:
     """Kilo uses 'type':'local' and absolute path for mempalace."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "type": "local",
+            "command": cmd,
+            "args": args,
+            "enabled": True,
+        }
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
@@ -86,6 +110,12 @@ def _kilo_local_entry(server: str) -> dict[str, Any]:
 
 def _kilo_cli_entry(server: str) -> dict[str, Any]:
     """~/.config/kilo/kilo.json nests under `mcp` and uses a list command."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "type": "local",
+            "command": [cmd, *args],
+        }
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
@@ -100,13 +130,20 @@ def _kilo_cli_entry(server: str) -> dict[str, Any]:
         cmd, args = _claude_mem_command()
         return {
             "type": "local",
-            "command": [cmd] + args,
+            "command": [cmd, *args],
         }
     raise ValueError(f"Unknown MCP server: {server}")
 
 
 def _claude_desktop_entry(server: str) -> dict[str, Any]:
     """Claude Desktop app on macOS uses absolute path (no `type` field)."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "command": cmd,
+            "args": args,
+            "env": {},
+        }
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -130,6 +167,14 @@ def _claude_desktop_entry(server: str) -> dict[str, Any]:
 
 def _claude_code_entry(server: str) -> dict[str, Any]:
     """~/.claude.json uses the modern stdio shape with a `type` field."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "type": "stdio",
+            "command": cmd,
+            "args": args,
+            "env": {},
+        }
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -158,6 +203,13 @@ def _claude_code_entry(server: str) -> dict[str, Any]:
 
 def _opencode_entry(server: str) -> dict[str, Any]:
     """~/.config/opencode/opencode.json uses local type and array command."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "type": "local",
+            "command": [cmd, *args],
+            "enabled": True,
+        }
     if server == MCP_MEMPALACE:
         return {
             "type": "local",
@@ -174,7 +226,7 @@ def _opencode_entry(server: str) -> dict[str, Any]:
         cmd, args = _claude_mem_command()
         return {
             "type": "local",
-            "command": [cmd] + args,
+            "command": [cmd, *args],
             "enabled": True,
         }
     raise ValueError(f"Unknown MCP server: {server}")
@@ -182,6 +234,13 @@ def _opencode_entry(server: str) -> dict[str, Any]:
 
 def _codex_entry(server: str) -> dict[str, Any]:
     """Codex config.toml uses stdio type with string command."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "type": "stdio",
+            "command": cmd,
+            "args": args,
+        }
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -207,6 +266,12 @@ def _codex_entry(server: str) -> dict[str, Any]:
 
 def _openclaw_entry(server: str) -> dict[str, Any]:
     """OpenClaw canonical stdio MCP server shape."""
+    if server == MCP_AI_MEMORY:
+        cmd, args = _ai_memory_command()
+        return {
+            "command": cmd,
+            "args": args,
+        }
     if server == MCP_MEMPALACE:
         cmd = MEMPALACE_MCP_COMMAND()
         return {
@@ -275,7 +340,7 @@ def _all_targets(paths) -> list[RegistrationTarget]:
         if p not in known_paths:
             targets.append(
                 RegistrationTarget(label, p, "mcpServers",
-                                   (MCP_MEMPALACE, MCP_CODEBASE_MEMORY), _claude_code_entry)
+                                   MCP_REQUIRED_SERVERS, _claude_code_entry)
             )
             known_paths.add(p)
 
@@ -363,11 +428,16 @@ def _register_in_file(target: RegistrationTarget) -> bool:
         if "graphify" in servers:
             del servers["graphify"]
             print(f"Successfully cleaned up obsolete server graphify from {target.label}")
+        # Prune legacy servers if present
+        for legacy in (MCP_MEMPALACE, MCP_CLAUDE_MEM):
+            if legacy in servers and legacy not in target.servers:
+                servers.pop(legacy, None)
+
         for server in target.servers:
             if server in servers:
                 current_entry = servers[server]
                 expected_entry = target.entry_builder(server)
-                if current_entry.get("command") == expected_entry.get("command"):
+                if current_entry.get("command") == expected_entry.get("command") and current_entry.get("args") == expected_entry.get("args"):
                     continue
             servers[server] = target.entry_builder(server)
             print(f"Successfully registered {server} in {target.label}")
@@ -547,7 +617,8 @@ def _deregister_in_file(target: RegistrationTarget) -> bool:
             servers = curr[parts[-1]]
             if "graphify" in servers:
                 del servers["graphify"]
-            for server in target.servers:
+            from .constants import MCP_LEGACY_SERVERS
+            for server in set(target.servers + MCP_LEGACY_SERVERS):
                 if server in servers:
                     del servers[server]
             print(f"Successfully deregistered servers from {target.label}")

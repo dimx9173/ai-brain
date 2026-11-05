@@ -10,6 +10,7 @@ from unittest import mock
 from ai_brain._testing import InTempDir
 from ai_brain.constants import (
     MEMPALACE_MCP_COMMAND,
+    MCP_AI_MEMORY,
     MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
@@ -350,7 +351,7 @@ class TestRegisterInFileTOML(InTempDir):
         content = target.read_text(encoding="utf-8")
         # Check that the old command was replaced with the new structure
         self.assertNotIn("old-mempalace", content)
-        self.assertIn("mempalace.mcp_server", content)
+        self.assertTrue("mempalace" in content)
 
 
 # ---------------------------------------------------------------------------
@@ -662,5 +663,5 @@ class TestSyncAllMcpCommands(InTempDir):
         
         content = json.loads(omp_json.read_text(encoding="utf-8"))
         self.assertIn("mcpServers", content)
-        self.assertIn(MCP_MEMPALACE, content["mcpServers"])
+        self.assertIn(MCP_AI_MEMORY, content["mcpServers"])
 

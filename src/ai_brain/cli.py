@@ -13,7 +13,7 @@ import argparse
 import sys
 from typing import Callable
 
-from . import commands, installer
+from . import commands, installer, mcp
 from .constants import APP_EMOJI, APP_NAME, VERSION
 from .platforms import ensure_path_has_local_bin, get_paths
 from .ui import blue, green, red, yellow
@@ -26,7 +26,7 @@ def _show_help() -> None:
     print(yellow("用法 (GitHub Standard CLI Format):"))
     print("  ai-brain <command> <subcommand> [flags]\n")
     print(yellow("可用指令:"))
-    
+
     print(yellow("📦 專案管理 (project):"))
     proj_rows = [
         ("project init [-a|-m]", "初始化專案大腦配置（-a 自動啟用歸檔, -m 標準手動）"),
@@ -178,6 +178,19 @@ def _cmd_config(args, paths) -> int:
     return 0 if commands.run_config(paths, args) else 1
 
 
+def _cmd_memory_migrate(args, _paths) -> int:
+    return 0 if commands.memory_migrate(force=getattr(args, "force", False)) else 1
+
+
+def _cmd_memory_rollback(args, _paths) -> int:
+    mig_id = getattr(args, "migration_id", None) or getattr(args, "pattern", None)
+    return 0 if commands.memory_rollback(migration_id=mig_id) else 1
+
+
+def _cmd_memory_status(_args, _paths) -> int:
+    return 0 if commands.memory_status() else 1
+
+
 def _cmd_completions(args) -> int:
     """Dispatch to ai_brain.completions.main for the completions subcommand."""
     from . import completions as _completions
@@ -217,6 +230,8 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "mcp-sync": _cmd_mcp_sync,
     "completions": lambda a, p: _cmd_completions(a),
     "config": _cmd_config,
+    "migrate": _cmd_memory_migrate,
+    "rollback": _cmd_memory_rollback,
 
     # GitHub (gh) standard noun-verb subcommands
     "project init": _cmd_init,
@@ -230,11 +245,15 @@ COMMANDS: dict[str, Callable[[argparse.Namespace, object], int]] = {
     "project status": lambda a, p: (commands.check_status(), 0)[1],
     "project clean": lambda a, p: (commands.clean_brain(), 0)[1],
 
+    "memory": _cmd_memory_status,
     "memory start": lambda a, p: 0 if commands.start_day(fast=a.fast) else 1,
     "memory stop": lambda a, p: 0 if commands.stop_day() else 1,
     "memory mine": _cmd_mine,
     "memory sync": _cmd_mcp_sync,
     "memory gc": _cmd_gc,
+    "memory migrate": _cmd_memory_migrate,
+    "memory rollback": _cmd_memory_rollback,
+    "memory status": _cmd_memory_status,
 
     "system doctor": _cmd_doctor,
     "system verify": _cmd_verify,
@@ -297,6 +316,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["global"], help="scope: global")
     p.add_argument("--set", dest="config_set", help="set parameter (key=value or section.key=value)")
     p.add_argument("--list", dest="config_list", action="store_true", help="list all configurations")
+
+    p = sub.add_parser("memory", help="Manage ai-memory standalone engine", add_help=False)
+    p.add_argument("action", nargs="?", choices=["migrate", "rollback", "status", "start", "stop", "mine", "sync", "gc"], default="status", help="action to perform")
+    p.add_argument("--force", "-f", action="store_true", help="Force migration")
+    p.add_argument("--id", dest="migration_id", default=None, help="Specific migration ID")
+
+    p = sub.add_parser("migrate", help="Migrate legacy MemPalace/Claude-Mem to standalone ai-memory", add_help=False)
+    p.add_argument("--force", "-f", action="store_true", help="Force migration")
+
+    p = sub.add_parser("rollback", help="Rollback ai-memory migration", add_help=False)
+    p.add_argument("migration_id", nargs="?", default=None, help="Specific migration ID")
+    p.add_argument("--id", dest="migration_id", default=None, help="Specific migration ID")
+
     _add_common("clean", "Remove local brain configuration")
     _add_common("uninstall", "Global removal of all configs and crons")
     _add_common("stop-cron", "Remove the daily auto-archive cron job")
@@ -383,6 +415,7 @@ class _Namespace_for:
         self.auto_archive = "-a" in rest or "--auto-archive" in rest
         self.cli_only = "--cli" in rest
         self.tools_only = "--tools" in rest
+        self.force = "--force" in rest or "-f" in rest
 
         self.agent = None
         self.mine_mode = None
@@ -390,11 +423,16 @@ class _Namespace_for:
         self.purge_wing = None
         self.config_list = "--list" in rest
         self.config_set = None
+        self.migration_id = None
 
         skip = set()
         for i, arg in enumerate(rest):
             if arg in ("--agent", "--target-agent", "-a") and i + 1 < len(rest):
                 self.agent = rest[i + 1]
+                skip.add(i)
+                skip.add(i + 1)
+            elif arg in ("--id", "--migration-id") and i + 1 < len(rest):
+                self.migration_id = rest[i + 1]
                 skip.add(i)
                 skip.add(i + 1)
             elif arg == "--mode" and i + 1 < len(rest):
@@ -416,6 +454,8 @@ class _Namespace_for:
 
         positionals = [arg for i, arg in enumerate(rest) if i not in skip and not arg.startswith("-")]
         self.target = positionals[0] if positionals else None
+        if self.migration_id is None and self.target:
+            self.migration_id = self.target
 
 
 if __name__ == "__main__":

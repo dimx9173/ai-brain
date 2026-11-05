@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/version-2.8.3-blue.svg" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.0-blue.svg" alt="Version" />
   <img src="https://img.shields.io/badge/shell-bash-4EAA25.svg" alt="Shell" />
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB.svg?logo=python&logoColor=white" alt="Python" />
 </p>
@@ -38,9 +38,11 @@
 Before installing `ai-brain`, make sure you have installed the core dependency tools via [uv](https://github.com/astral-sh/uv):
 
 ```bash
-uv tool install mempalace --force
-uv tool install claude-mem --force
+uv tool install ai-memory --force
 uv tool install codebase-memory-mcp --force
+# (Legacy compatibility tools)
+# uv tool install mempalace --force
+# uv tool install claude-mem --force
 ```
 
 ---
@@ -125,6 +127,9 @@ ai-brain init -m
 ### 🧠 Memory Operations (`memory`)
 | Command | Alias | Description | Safety |
 | :--- | :--- | :--- | :--- |
+| `ai-brain memory status` | `ai-brain memory` | Show current ai-memory database, migration state, and IDE MCP registrations. | 🔍 Read-only |
+| `ai-brain memory migrate [--force]` | `ai-brain migrate` | Migrate legacy MemPalace/Claude-Mem to standalone ai-memory (SQLite+FTS5). | 🔧 Modifying |
+| `ai-brain memory rollback [id]` | `ai-brain rollback` | Safely rollback memory migration with conflict drift detection. | 🔧 Modifying |
 | `ai-brain memory start` | `ai-brain start` | Refresh codebase architecture map and L1 graph topology. | ✅ Safe |
 | `ai-brain memory stop` | `ai-brain stop` | Safely package and archive session conversations into L2 memory palace. | ✅ Safe |
 | `ai-brain memory mine [target]` | `ai-brain mine` | Selectively mine high-value content (chats, ADRs, docs) into L2 palace. | ✅ Safe |

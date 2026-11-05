@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from . import git_hooks, registry
 from .constants import (
@@ -2002,6 +2003,44 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
         print(green("  [ PASS ] 無 graphify 遺留物"))
 
     print()
+
+    # 10. Check ai-memory migration & architecture status
+    print(blue("10. 檢查記憶系統架構 (ai-memory 獨立本機模式)..."))
+    from . import migration
+    mem_state = migration.detect_environment_state()
+    if mem_state == migration.MigrationState.READY:
+        print(green("  [ PASS ] ai-memory 獨立記憶庫架構就緒 (SQLite+FTS5)"))
+    elif mem_state == migration.MigrationState.CLEAN_INSTALL:
+        print(green("  [ PASS ] 全新環境 (尚未建立記憶庫，首次使用自動初始化)"))
+    elif mem_state == migration.MigrationState.MIGRATE_NEEDED:
+        print(yellow("  [ WARN ] 偵測到舊版 MemPalace/Claude-Mem 記憶庫，建議執行 'ai-brain memory migrate' 進行遷移"))
+        if fix:
+            print(yellow("    --> 正在自動執行記憶庫遷移至 ai-memory..."))
+            m_ok, m_msg = migration.run_migration(force=False)
+            if m_ok:
+                print(green(f"    [ FIXED ] {m_msg}"))
+            else:
+                print(red(f"    [ ERROR ] 自動遷移失敗 ({m_msg})"))
+                all_pass = False
+        else:
+            all_pass = False
+    elif mem_state == migration.MigrationState.REPAIR_ONLY:
+        print(yellow("  [ WARN ] ai-memory 資料庫存在但 MCP 配置未對齊，建議執行 'ai-brain memory migrate'"))
+        if fix:
+            print(yellow("    --> 正在自動修復 ai-memory MCP 配置..."))
+            m_ok, m_msg = migration.run_migration(force=True)
+            if m_ok:
+                print(green(f"    [ FIXED ] {m_msg}"))
+            else:
+                print(red(f"    [ ERROR ] 修復失敗 ({m_msg})"))
+    elif mem_state == migration.MigrationState.MIGRATION_IN_PROGRESS:
+        print(red("  [ FAIL ] 前次遷移中斷或進行中，建議執行 'ai-brain memory rollback' 或 'ai-brain memory migrate --force'"))
+        all_pass = False
+    elif mem_state == migration.MigrationState.CONFLICT_DETECTED:
+        print(red("  [ FAIL ] 偵測到舊版 MemPalace 與新版 ai-memory 同時存在衝突，請執行 'ai-brain memory migrate --force'"))
+        all_pass = False
+
+    print()
     print(blue("====== 🏁 診斷結束 ======"))
 
     if all_pass:
@@ -2735,4 +2774,136 @@ def run_config(paths, args) -> bool:
             return True
         else:
             return False
+
+
+def memory_migrate(force: bool = False) -> bool:
+    """CLI handler for 'ai-brain memory migrate'.
+
+    Acquires global lock and executes migration.run_migration().
+    """
+    from . import migration
+
+    print(blue(f"====== {APP_EMOJI} 啟動 ai-memory 本機記憶系統遷移 ======"))
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(red("無法取得全域鎖檔 (~/.claude/ai_brain.lock)，另一個 ai-brain 程序正在運行。"))
+        return False
+
+    try:
+        success, msg = migration.run_migration(force=force)
+        if success:
+            print(green(f"✅ {msg}"))
+        else:
+            print(red(f"❌ {msg}"))
+        return success
+    finally:
+        _release_brain_lock(lock_fd)
+
+
+def memory_rollback(migration_id: str | None = None) -> bool:
+    """CLI handler for 'ai-brain memory rollback'.
+
+    Acquires global lock and executes migration.run_rollback().
+    """
+    from . import migration
+
+    print(blue(f"====== {APP_EMOJI} 執行 ai-memory 遷移回滾 ======"))
+    lock_fd = _acquire_brain_lock()
+    if lock_fd is None:
+        print(red("無法取得全域鎖檔 (~/.claude/ai_brain.lock)，另一個 ai-brain 程序正在運行。"))
+        return False
+
+    try:
+        success, msg = migration.run_rollback(migration_id=migration_id)
+        if success:
+            print(green(f"✅ {msg}"))
+        else:
+            print(red(f"❌ {msg}"))
+        return success
+    finally:
+        _release_brain_lock(lock_fd)
+
+
+def memory_status() -> bool:
+    """CLI handler for 'ai-brain memory status'."""
+    import sqlite3
+
+    from . import migration
+
+    print(blue(f"====== {APP_EMOJI} 記憶系統架構與狀態檢測 (ai-memory) ======"))
+    state = migration.detect_environment_state()
+
+    state_desc = {
+        migration.MigrationState.READY: ("正常運行中 (Ready)", GREEN),
+        migration.MigrationState.CLEAN_INSTALL: ("全新安裝 (尚未建立記憶庫)", GREEN),
+        migration.MigrationState.MIGRATE_NEEDED: ("需要遷移 (偵測到舊版 MemPalace 資料庫)", YELLOW),
+        migration.MigrationState.REPAIR_ONLY: ("需要修復 (資料庫存在但 MCP 配置未完成)", YELLOW),
+        migration.MigrationState.CONFLICT_DETECTED: ("衝突 (舊版與新版資料庫同時存在)", RED),
+        migration.MigrationState.MIGRATION_IN_PROGRESS: ("遷移中斷或進行中", YELLOW),
+        migration.MigrationState.BLOCKED: ("被阻擋 (權限或目錄異常)", RED),
+    }.get(state, (state.name, YELLOW))
+
+    print(f"環境架構狀態: {state_desc[1]}{state_desc[0]}{NC}")
+
+    # Check ai-memory database
+    target_db = Path.home() / ".ai-memory" / "memory.db"
+    if target_db.is_file():
+        try:
+            conn = sqlite3.connect(f"file:{target_db}?mode=ro", uri=True)
+            tbl = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='memories'").fetchone()
+            count = conn.execute("SELECT count(*) FROM memories").fetchone()[0] if tbl else 0
+            conn.close()
+            size_kb = target_db.stat().st_size / 1024
+            print(f"ai-memory 資料庫: {GREEN}{target_db}{NC} ({count} 筆記憶, {size_kb:.1f} KB)")
+        except Exception as e:
+            print(f"ai-memory 資料庫: {RED}損壞或無法讀取 ({e}){NC}")
+    else:
+        print(f"ai-memory 資料庫: {YELLOW}尚未建立 ({target_db}){NC}")
+
+    # Check legacy mempalace
+    chroma_file = Path.home() / ".mempalace" / "palace" / "chroma.sqlite3"
+    if chroma_file.is_file():
+        try:
+            conn = sqlite3.connect(f"file:{chroma_file}?mode=ro", uri=True)
+            count = conn.execute("SELECT count(*) FROM embeddings").fetchone()[0]
+            conn.close()
+            print(f"舊版 MemPalace: {YELLOW}{chroma_file.parent.parent}{NC} ({count} 個抽屜 - 待遷移)")
+        except Exception:
+            print(f"舊版 MemPalace: {YELLOW}存在{NC}")
+    else:
+        backups = list(Path.home().glob(".mempalace.backup.*"))
+        if backups:
+            print(f"舊版 MemPalace: {GREEN}已封存 ({backups[-1].name}){NC}")
+        else:
+            print(f"舊版 MemPalace: {NC}未安裝 / 無資料{NC}")
+
+    # Check MCP registrations
+    claude_json = Path.home() / ".claude.json"
+    if claude_json.is_file():
+        try:
+            cfg = json.loads(claude_json.read_text(encoding="utf-8"))
+            has_aimem = "ai-memory" in cfg.get("mcpServers", {})
+            has_palace = "mempalace" in cfg.get("mcpServers", {})
+            mcp_status = f"{GREEN}已註冊 (ai-memory){NC}" if has_aimem else f"{YELLOW}未註冊{NC}"
+            if has_palace:
+                mcp_status += f" {RED}(仍殘留 mempalace){NC}"
+            print(f"MCP 伺服器配置: {mcp_status}")
+        except Exception:
+            pass
+
+    # Check recent migrations
+    migrations_dir = Path.home() / ".ai-brain" / "migrations"
+    if migrations_dir.is_dir():
+        records = [d for d in migrations_dir.iterdir() if d.is_dir() and (d / "manifest.json").is_file()]
+        if records:
+            records.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+            latest = records[0]
+            try:
+                m_info = json.loads((latest / "manifest.json").read_text(encoding="utf-8"))
+                print(f"最近遷移紀錄: {latest.name} (狀態: {m_info.get('state')}, 時間: {m_info.get('created_at')})")
+            except Exception:
+                pass
+
+    return state in (migration.MigrationState.READY, migration.MigrationState.CLEAN_INSTALL)
+
 

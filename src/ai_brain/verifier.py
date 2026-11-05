@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from .constants import (
     HOME,
+    MCP_AI_MEMORY,
     MCP_CLAUDE_MEM,
     MCP_CODEBASE_MEMORY,
     MCP_MEMPALACE,
@@ -76,10 +77,22 @@ def check_mcp_config(
             mcp_servers = {}
             break
     for server in required_servers:
-        if server not in mcp_servers:
+        actual_server = server
+        if server in (MCP_AI_MEMORY, MCP_MEMPALACE):
+            if server not in mcp_servers:
+                if MCP_AI_MEMORY in mcp_servers:
+                    actual_server = MCP_AI_MEMORY
+                elif MCP_MEMPALACE in mcp_servers:
+                    actual_server = MCP_MEMPALACE
+
+        # claude-mem is retired when ai-memory is present
+        if server == MCP_CLAUDE_MEM and server not in mcp_servers and MCP_AI_MEMORY in mcp_servers:
+            continue
+
+        if actual_server not in mcp_servers:
             return CheckResult(name, FAIL, f"(未註冊 {server})")
 
-        info = mcp_servers[server]
+        info = mcp_servers[actual_server]
         cmd = info.get("command")
         if not cmd:
             return CheckResult(name, FAIL, f"({server} command 缺失)")
@@ -329,7 +342,7 @@ def run_all_checks(paths) -> List[CheckResult]:
                                    "(此環境未安裝 Gemini CLI，跳過檢查)"))
 
     # 8. Claude Desktop
-    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop, required_servers=(MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM)))
+    results.append(check_mcp_config("Claude Desktop App", paths.claude_desktop, required_servers=MCP_REQUIRED_SERVERS))
 
     # 9. Kilo
     kilo_paths: List[Path] = []

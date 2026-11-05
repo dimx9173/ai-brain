@@ -43,8 +43,8 @@ class UpgradableTool:
 # The canonical list — keep this short. We do not auto-discover; the user
 # picked "不列其他工具" (no OpenClaw / GitHub Action etc.) in the design Q&A.
 CORE_TOOLS: tuple[UpgradableTool, ...] = (
+    UpgradableTool("ai-memory", "ai-memory", "ai-memory"),
     UpgradableTool("MemPalace", "mempalace", "mempalace"),
-    UpgradableTool("claude-mem", "claude-mem", "claude-mem[mcp]"),
     UpgradableTool("codebase-memory-mcp", "codebase-memory-mcp", "codebase-memory-mcp"),
 )
 

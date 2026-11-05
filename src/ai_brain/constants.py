@@ -11,21 +11,25 @@ factories lazily.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.8.3"
+VERSION = "2.9.0"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 
 # --- CLI tool identifiers -------------------------------------------------------
+TOOL_AI_MEMORY = "ai-memory"
 TOOL_MEMPALACE = "mempalace"
 TOOL_CODEBASE_MEMORY = "codebase-memory-mcp"
 
 # --- MCP server identifiers -----------------------------------------------------
+MCP_AI_MEMORY = "ai-memory"
 MCP_MEMPALACE = "mempalace"
 MCP_CODEBASE_MEMORY = "codebase-memory-mcp"
 MCP_CLAUDE_MEM = "claude-mem"
-MCP_REQUIRED_SERVERS = (MCP_MEMPALACE, MCP_CODEBASE_MEMORY, MCP_CLAUDE_MEM)
+MCP_REQUIRED_SERVERS = (MCP_AI_MEMORY, MCP_CODEBASE_MEMORY)
+MCP_LEGACY_SERVERS = (MCP_MEMPALACE, MCP_CLAUDE_MEM)
 
 # --- LLM providers --------------------------------------------------------------
 PROVIDER_MINIMAX = "minimax"
@@ -45,6 +49,18 @@ def HOME() -> Path:
 
 def CLAUDE_HOME() -> Path:
     return Path.home() / ".claude"
+
+
+def AI_MEMORY_DIR() -> Path:
+    return Path.home() / ".ai-memory"
+
+
+def AI_MEMORY_DB() -> Path:
+    return Path.home() / ".ai-memory" / "memory.db"
+
+
+def MIGRATION_DIR() -> Path:
+    return Path.home() / ".ai-brain" / "migrations"
 
 
 def REGISTRY_PATH() -> Path:
@@ -123,7 +139,7 @@ CODEBASE_MEMORY_TOOLS = ("antigravity", "gemini", "kilo", "cursor", "claude", "o
 # with `upgraders.CORE_TOOLS` — both are the source of truth for the same set.
 # (Belt-and-braces: `upgraders` carries binary ↔ package mapping, this list
 # is used by the install / uninstall messaging.)
-UV_TOOL_PACKAGES = ("mempalace", "claude-mem", "codebase-memory-mcp")
+UV_TOOL_PACKAGES = ("ai-memory", "codebase-memory-mcp")
 
 # --- Time & thresholds ----------------------------------------------------------
 SWEEP_BACKGROUND_GAP_SECONDS = 12 * 60 * 60
@@ -144,8 +160,8 @@ COGNITIVE_PRINCIPLES_BLOCK = """
 ## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
-1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, OMP), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+1. **L0: Working Memory (Session & Developer Context)**
+   - **Action**: Always respect developer habits and active session checkpoints. Maintain short-term context using chat history and local scratchpads (e.g. active notes or current working document).
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 
@@ -161,24 +177,22 @@ You must actively traverse and respect the three cognitive memory layers before 
    - **Purpose**: Full code indexing — functions, classes, call graphs, dependencies.
    - **Lifecycle**: Project-bound, rebuilt on `git pull`/`checkout`. **This is where code lives.**
 
-3. **L2: Long-Term Memory (Historical Memory Palace)** — `mempalace`
+3. **L2: Long-Term Memory (Persistent Multi-Agent Storage)** — `ai-memory`
    - **Action**: Before answering queries about system design, past debugging history, environment setups, or business logic, proactively query the memory database using:
-     - `mempalace_search` — semantic full-text search across all memories
-     - `mempalace_kg_query` — structured knowledge graph query
-     - `mempalace_traverse` — traverse connected entities
-     - `mempalace_get_drawer` — retrieve a specific memory by ID
-   - **Project Boundary Isolation**: Always restrict or prioritize memory searches to the active project's specific wing (or filter by workspace keyword). Do NOT bleed architectural decisions or debug context from unrelated projects into the current workspace.
+     - `memory_search` — semantic & keyword full-text search across all memories
+     - `memory_recall` — recall memories by key or topic
+     - `memory_store` — persist high-value curated insights
    - **Purpose**: High-value persistent knowledge — conversations, architecture decisions, debug war stories, environment configs, lessons learned.
    - **Lifecycle**: Cross-project, permanent.
-   - **⚠️ IMPORTANT**: Do NOT mine entire codebases into mempalace. L2 is for curated, high-value memories only. Code indexing belongs in L1 (codebase-memory-mcp). Use `ai-brain mine` to selectively add specific content."""
+   - **⚠️ IMPORTANT**: Do NOT mine entire codebases into ai-memory. L2 is for curated, high-value memories only. Code indexing belongs in L1 (codebase-memory-mcp)."""
 
 LOCAL_CLAUDE_MD_TEMPLATE = """# AI Agent Cognitive Workflow and Memory Guide
 
 ## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)
 You must actively traverse and respect the three cognitive memory layers before reasoning or executing commands:
 
-1. **L0: Working Memory (Session & Developer Context)** — `claude-mem`
-   - **Action**: Always respect developer habits and session checkpoints injected via `claude-mem`. If `claude-mem` is unavailable (e.g. in Kilo, OpenClaw, OpenCode, Claude Desktop, OMP), fall back to active chat session history and local scratchpads (e.g. active notes or current document) to maintain short-term state.
+1. **L0: Working Memory (Session & Developer Context)**
+   - **Action**: Always respect developer habits and active session context. Maintain short-term context using chat history and local scratchpads.
    - **Purpose**: Maintain task continuity and follow local guidelines for the active coding session.
    - **Lifecycle**: Session-bound, auto-compacted.
 
@@ -194,23 +208,17 @@ You must actively traverse and respect the three cognitive memory layers before 
    - **Purpose**: Full code indexing — functions, classes, call graphs, dependencies.
    - **Lifecycle**: Project-bound, rebuilt on `git pull`/`checkout`. **This is where code lives.**
 
-3. **L2: Long-Term Memory (Historical Memory Palace)** — `mempalace`
+3. **L2: Long-Term Memory (Persistent Multi-Agent Storage)** — `ai-memory`
    - **Action**: Before answering queries about system design, past debugging history, environment setups, or business logic, proactively query the memory database using:
-     - `mempalace_search` — semantic full-text search across all memories
-     - `mempalace_kg_query` — structured knowledge graph query
-     - `mempalace_traverse` — traverse connected entities
-     - `mempalace_get_drawer` — retrieve a specific memory by ID
-   - **Project Boundary Isolation**: Always restrict or prioritize memory searches to the active project's specific wing (or filter by workspace keyword). Do NOT bleed architectural decisions or debug context from unrelated projects into the current workspace.
-   - **Purpose**: High-value persistent knowledge — conversations, architecture decisions, debug war stories, environment configs, lessons learned.
+     - `memory_search` — semantic & keyword full-text search across all memories
+     - `memory_recall` — recall memories by key or topic
+     - `memory_store` — persist high-value curated insights
+   - **Purpose**: High-value persistent knowledge across all sessions and projects.
    - **Lifecycle**: Cross-project, permanent.
-   - **⚠️ IMPORTANT**: Do NOT mine entire codebases into mempalace. L2 is for curated, high-value memories only. Code indexing belongs in L1 (codebase-memory-mcp). Use `ai-brain mine` to selectively add specific content.
 """
 
-HOOKS_CONFIG = {
-    "hooks": {
-        "preCompact": "claude-mem compress --target local",
-        "onStop": "claude-mem checkpoint",
-    }
+HOOKS_CONFIG: dict[str, Any] = {
+    "hooks": {}
 }
 
 # --- Git hook templates ---------------------------------------------------------
