@@ -125,3 +125,29 @@ class TestGlobalConfigAndPipeline(InTempDir):
         self.assertIn("## 🎨 Global Developer Preferences", content)
         self.assertIn("Rule A", content)
         self.assertIn("Rule B", content)
+
+    def test_fix_claude_md_updates_legacy_mempalace_block(self):
+        claude_md = self.tmpdir_path / "CLAUDE_LEGACY.md"
+        legacy_content = (
+            "## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)\n"
+            "ALWAYS prefer `codebase-memory-mcp` graph tools\n"
+            "3. **L2: Long-Term Memory (Historical Memory Palace)**\n"
+            "     - `mempalace_search` — semantic full-text search across all memories\n"
+            "\n"
+            "## 🎨 Global Developer Preferences\n"
+            "- **Coding Style**: PEP 8\n"
+        )
+        claude_md.write_text(legacy_content, encoding="utf-8")
+
+        # Without fix, returns False (detected stale)
+        res_warn = commands._fix_claude_md("Test Legacy", claude_md, self.mock_paths, fix=False)
+        self.assertFalse(res_warn)
+
+        # With fix, updates to ai-memory
+        res_fix = commands._fix_claude_md("Test Legacy", claude_md, self.mock_paths, fix=True)
+        self.assertTrue(res_fix)
+
+        updated = claude_md.read_text(encoding="utf-8")
+        self.assertIn("ai-memory", updated)
+        self.assertIn("memory_search", updated)
+        self.assertNotIn("mempalace_search", updated)

@@ -533,6 +533,14 @@ def cutover_mcp_servers(
     except Exception:
         pass
 
+    # Synchronize all agent and project rule files to ai-memory
+    try:
+        from .platforms import get_paths
+        from .commands import sync_all_rule_files
+        sync_all_rule_files(get_paths(), fix=True)
+    except Exception:
+        pass
+
     # Update manifest if migration_dir provided
     if migration_dir:
         manifest_file = migration_dir / "manifest.json"

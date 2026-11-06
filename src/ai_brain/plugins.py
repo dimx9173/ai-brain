@@ -160,11 +160,11 @@ def install_kilo_skill_stub() -> bool:
     target = cmd_dir / "ai-brain.md"
     content = (
         "---\n"
-        "description: Reminders for using the ai-brain toolchain (mempalace + codebase-memory-mcp)\n"
+        "description: Reminders for using the ai-brain toolchain (ai-memory + codebase-memory-mcp)\n"
         "---\n\n"
         "When answering questions in this workspace:\n"
         "1. If the request is about past decisions, prior bugs, or environment config,\n"
-        "   call the `mempalace` MCP tool (mempalace_search) before reading files.\n"
+        "   call the `ai-memory` MCP tool (memory_search / memory_recall) before reading files.\n"
         "2. If the request is about code architecture or cross-file relationships,\n"
         "   prefer codebase-memory-mcp MCP tools (search_graph, trace_path, etc.) over grep / find.\n"
     )

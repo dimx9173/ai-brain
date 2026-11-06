@@ -921,7 +921,12 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
     
     # 2. Check and insert/update cognitive principles
     has_marker = COGNITIVE_PRINCIPLES_MARKER in content
-    has_freshness = freshness_marker in content
+    has_freshness = (
+        freshness_marker in content
+        and ("ai-memory" in content)
+        and ("memory_search" in content)
+        and ("mempalace_search" not in content)
+    )
     
     updated_content = content
     was_updated = False
@@ -935,11 +940,12 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
             for line in lines:
                 if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
                     skip = True
-                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.splitlines())
+                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.strip().splitlines())
                     continue
                 if skip:
                     if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
                         skip = False
+                        new_lines.append("")
                         new_lines.append(line)
                 else:
                     new_lines.append(line)
@@ -947,7 +953,7 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
             was_updated = True
         else:
             # Append at the end
-            updated_content = content.rstrip() + "\n\n" + COGNITIVE_PRINCIPLES_BLOCK + "\n"
+            updated_content = content.rstrip() + "\n\n" + COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n"
             was_updated = True
             
     # 3. Insert/update preferences block
@@ -992,6 +998,28 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
 
     green(f"  [ PASS ] {label} 工具規則與全域偏好為最新版本")
     return True
+
+
+def sync_all_rule_files(paths, fix: bool = True) -> int:
+    """Synchronize all global agent and registered project rule files to latest cognitive principles."""
+    count = 0
+    global_files = [
+        ("全域 ~/.claude/CLAUDE.md", Path.home() / ".claude" / "CLAUDE.md"),
+        ("全域 ~/.config/opencode/AGENTS.md", Path.home() / ".config" / "opencode" / "AGENTS.md"),
+    ]
+    for g_label, g_file in global_files:
+        if g_file.is_file():
+            if _fix_claude_md(g_label, g_file, paths, fix=fix):
+                count += 1
+
+    from .registry import get_all_projects
+    for proj in get_all_projects(paths):
+        for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md", "CLAUDE.md"):
+            md_path = proj / rel
+            if md_path.is_file():
+                if _fix_claude_md(f"[{proj.name}] {rel}", md_path, paths, fix=fix):
+                    count += 1
+    return count
 
 
 def _enable_claude_mem_plugin() -> int:
@@ -1814,7 +1842,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
 
     for proj in projects_to_check:
         short = proj.name
-        for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md"):
+        for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md", "CLAUDE.md"):
             md_path = proj / rel
             if md_path.is_file():
                 if not _fix_claude_md(f"[{short}] {rel}", md_path, paths, fix=fix):

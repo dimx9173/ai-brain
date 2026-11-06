@@ -216,7 +216,7 @@ class TestInstallKiloSkillStub(InTempDir):
         self.assertTrue(target.is_file())
         content = target.read_text(encoding="utf-8")
         self.assertIn("description:", content)
-        self.assertIn("mempalace", content)
+        self.assertIn("ai-memory", content)
 
     def test_returns_true_when_already_up_to_date(self):
         install_kilo_skill_stub()
