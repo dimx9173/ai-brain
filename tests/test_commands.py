@@ -1110,6 +1110,33 @@ class TestDoctorExtra(_CmdBase):
     @patch("ai_brain.verifier.run_all_checks")
     @patch("ai_brain.commands.subprocess.run")
     @patch("ai_brain.commands.shutil.which", return_value="/mock")
+    def test_doctor_agents_md_gets_memory_claude_md_skips_when_both_present(self, mock_which, mock_run,
+                                                                             mock_checks, mock_hooks):
+        self._minimal_git_repo()
+        proj_dir = Path(self.tmpdir)
+        agents_md = proj_dir / "AGENTS.md"
+        claude_md = proj_dir / "CLAUDE.md"
+        agents_md.write_text("# Project Agents\n\nSome instructions\n", encoding="utf-8")
+        claude_md.write_text("# Claude Guide\n\n## 🧠 Layered Memory & Cognitive Workflow (Mandatory Principles)\nLegacy memory text\n", encoding="utf-8")
+
+        mock_run.return_value = self._mk_subprocess_result(stdout="Gitignored: 0\nMissing: 0")
+        mock_checks.return_value = [CheckResult("Mock", VERIFY_PASS)]
+
+        out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
+        self.assertTrue(ok)
+
+        # AGENTS.md should have memory principles
+        agents_text = agents_md.read_text(encoding="utf-8")
+        self.assertIn("Layered Memory & Cognitive Workflow", agents_text)
+
+        # CLAUDE.md should NOT have memory principles (stripped)
+        claude_text = claude_md.read_text(encoding="utf-8")
+        self.assertNotIn("Layered Memory & Cognitive Workflow", claude_text)
+
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.verifier.run_all_checks")
+    @patch("ai_brain.commands.subprocess.run")
+    @patch("ai_brain.commands.shutil.which", return_value="/mock")
     def test_doctor_removes_global_graphify_plugin_file(self, mock_which, mock_run,
                                                         mock_checks, mock_hooks):
         self._minimal_git_repo()

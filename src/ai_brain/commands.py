@@ -903,7 +903,7 @@ def _strip_graphify_lines(content: str) -> tuple[str, bool]:
     return "\n".join(new_lines) + "\n" if new_lines else "", changed
 
 
-def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
+def _fix_claude_md(label: str, md_path: Path, paths, fix: bool, skip_memory_principles: bool = False) -> bool:
     """Return True if file is OK (or was fixed), False if needs user action."""
     from .constants import COGNITIVE_PRINCIPLES_BLOCK, COGNITIVE_PRINCIPLES_MARKER
     from .ui import print_green as green, print_red as red, print_yellow as yellow
@@ -919,42 +919,63 @@ def _fix_claude_md(label: str, md_path: Path, paths, fix: bool) -> bool:
     # 1. Strip graphify lines if present
     content, had_graphify = _strip_graphify_lines(content)
     
-    # 2. Check and insert/update cognitive principles
-    has_marker = COGNITIVE_PRINCIPLES_MARKER in content
-    has_freshness = (
-        freshness_marker in content
-        and ("ai-memory" in content)
-        and ("memory_search" in content)
-        and ("mempalace_search" not in content)
-    )
-    
     updated_content = content
     was_updated = False
-    
-    if not (has_marker and has_freshness):
-        if has_marker:
-            # Update stale block
-            lines = content.splitlines()
+
+    if skip_memory_principles:
+        # If project already has AGENTS.md, do NOT add memory constraints to CLAUDE.md,
+        # and strip any legacy/redundant memory sections from CLAUDE.md
+        if COGNITIVE_PRINCIPLES_MARKER in updated_content or "## 2. 記憶管理" in updated_content or "## 記憶管理" in updated_content:
+            lines = updated_content.splitlines()
             new_lines = []
             skip = False
             for line in lines:
-                if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
+                s_line = line.strip()
+                if s_line == COGNITIVE_PRINCIPLES_MARKER.strip() or s_line.startswith("## 2. 記憶管理") or s_line.startswith("## 記憶管理"):
                     skip = True
-                    new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.strip().splitlines())
                     continue
                 if skip:
-                    if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
+                    if s_line.startswith("## ") or s_line.startswith("# "):
                         skip = False
-                        new_lines.append("")
                         new_lines.append(line)
                 else:
                     new_lines.append(line)
-            updated_content = "\n".join(new_lines) + "\n"
+            updated_content = "\n".join(new_lines).rstrip() + "\n"
             was_updated = True
-        else:
-            # Append at the end
-            updated_content = content.rstrip() + "\n\n" + COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n"
-            was_updated = True
+    else:
+        # 2. Check and insert/update cognitive principles
+        has_marker = COGNITIVE_PRINCIPLES_MARKER in content
+        has_freshness = (
+            freshness_marker in content
+            and ("ai-memory" in content)
+            and ("memory_search" in content)
+            and ("mempalace_search" not in content)
+        )
+        
+        if not (has_marker and has_freshness):
+            if has_marker:
+                # Update stale block
+                lines = content.splitlines()
+                new_lines = []
+                skip = False
+                for line in lines:
+                    if line.strip() == COGNITIVE_PRINCIPLES_MARKER.strip():
+                        skip = True
+                        new_lines.extend(COGNITIVE_PRINCIPLES_BLOCK.strip().splitlines())
+                        continue
+                    if skip:
+                        if line.startswith("## ") and line.strip() != COGNITIVE_PRINCIPLES_MARKER.strip():
+                            skip = False
+                            new_lines.append("")
+                            new_lines.append(line)
+                    else:
+                        new_lines.append(line)
+                updated_content = "\n".join(new_lines) + "\n"
+                was_updated = True
+            else:
+                # Append at the end
+                updated_content = content.rstrip() + "\n\n" + COGNITIVE_PRINCIPLES_BLOCK.strip() + "\n"
+                was_updated = True
             
     # 3. Insert/update preferences block
     pref_block = _build_global_preferences_block(paths)
@@ -1014,10 +1035,12 @@ def sync_all_rule_files(paths, fix: bool = True) -> int:
 
     from .registry import get_all_projects
     for proj in get_all_projects(paths):
+        has_agents_md = (proj / "AGENTS.md").is_file() or (proj / ".agents" / "AGENTS.md").is_file()
         for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md", "CLAUDE.md"):
             md_path = proj / rel
             if md_path.is_file():
-                if _fix_claude_md(f"[{proj.name}] {rel}", md_path, paths, fix=fix):
+                skip_mem = has_agents_md and (rel in ("CLAUDE.md", ".claude/CLAUDE.md"))
+                if _fix_claude_md(f"[{proj.name}] {rel}", md_path, paths, fix=fix, skip_memory_principles=skip_mem):
                     count += 1
     return count
 
@@ -1859,10 +1882,12 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
 
     for proj in projects_to_check:
         short = proj.name
+        has_agents_md = (proj / "AGENTS.md").is_file() or (proj / ".agents" / "AGENTS.md").is_file()
         for rel in (".claude/CLAUDE.md", "AGENTS.md", ".agents/AGENTS.md", "CLAUDE.md"):
             md_path = proj / rel
             if md_path.is_file():
-                if not _fix_claude_md(f"[{short}] {rel}", md_path, paths, fix=fix):
+                skip_mem = has_agents_md and (rel in ("CLAUDE.md", ".claude/CLAUDE.md"))
+                if not _fix_claude_md(f"[{short}] {rel}", md_path, paths, fix=fix, skip_memory_principles=skip_mem):
                     rules_ok = False
                     if not fix:
                         all_pass = False
