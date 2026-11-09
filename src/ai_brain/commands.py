@@ -1148,6 +1148,9 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
     # Build simple names helper
     multiple = len(projects_to_check) > 1
 
+    from .migration import detect_environment_state, MigrationState
+    is_ai_mem_active = detect_environment_state() == MigrationState.READY
+
     print(blue(f"====== {APP_EMOJI} 開始執行 AI 大腦全面健康診斷 ======"))
     if target:
         print(yellow(f"🎯 目標模式：檢查單一專案 \"{projects_to_check[0].name}\" ({projects_to_check[0]})"))
@@ -1440,68 +1443,76 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
 
     # 4. Check stale drawers in mempalace (sync check)
     print(blue("4. 檢查 MemPalace 冗餘/過期記憶..."))
-    doctor_lock_fd = _acquire_brain_lock()
-    if doctor_lock_fd is None:
-        print(yellow("  [ WARN ] 無法取得全域鎖檔，跳過步驟 4（另一個 ai-brain 正在執行）"))
+    if is_ai_mem_active:
+        print(green("  [ PASS ] ai-memory 架構已接管記憶庫，無須執行舊版 MemPalace 抽屜同步"))
     else:
-        try:
-            for proj in projects_to_check:
-                prefix = f"  [{proj.name}] " if multiple else "  "
-                try:
-                    res = subprocess.run(
-                        [TOOL_MEMPALACE, "sync", str(proj)],
-                        capture_output=True, text=True, timeout=120,
-                    )
-                    gitignored = 0
-                    missing = 0
-                    for line in res.stdout.splitlines():
-                        if "Gitignored:" in line:
-                            parts = line.split(":")
-                            if len(parts) > 1:
-                                num = "".join(filter(str.isdigit, parts[1]))
-                                if num:
-                                    gitignored = int(num)
-                        elif "Missing:" in line:
-                            parts = line.split(":")
-                            if len(parts) > 1:
-                                num = "".join(filter(str.isdigit, parts[1]))
-                                if num:
-                                    missing = int(num)
+        doctor_lock_fd = _acquire_brain_lock()
+        if doctor_lock_fd is None:
+            print(yellow("  [ WARN ] 無法取得全域鎖檔，跳過步驟 4（另一個 ai-brain 正在執行）"))
+        else:
+            try:
+                for proj in projects_to_check:
+                    prefix = f"  [{proj.name}] " if multiple else "  "
+                    try:
+                        res = subprocess.run(
+                            [TOOL_MEMPALACE, "sync", str(proj)],
+                            capture_output=True, text=True, timeout=120,
+                        )
+                        gitignored = 0
+                        missing = 0
+                        for line in res.stdout.splitlines():
+                            if "Gitignored:" in line:
+                                parts = line.split(":")
+                                if len(parts) > 1:
+                                    num = "".join(filter(str.isdigit, parts[1]))
+                                    if num:
+                                        gitignored = int(num)
+                            elif "Missing:" in line:
+                                parts = line.split(":")
+                                if len(parts) > 1:
+                                    num = "".join(filter(str.isdigit, parts[1]))
+                                    if num:
+                                        missing = int(num)
 
-                    if gitignored > 0 or missing > 0:
-                        print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
-                        if fix:
-                            print(yellow(f"{prefix}  --> 正在自動執行 mempalace sync --apply {proj} 清理記憶庫..."))
-                            try:
-                                subprocess.run(
-                                    [TOOL_MEMPALACE, "sync", "--apply", str(proj)],
-                                    check=True, timeout=120,
-                                )
-                                print(green(f"{prefix}  [ FIXED ] 記憶庫清理完成！"))
-                            except subprocess.TimeoutExpired:
-                                print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync --apply 已逾時 (>120s)，繼續處理其他專案"))
-                            except Exception as e:
-                                print(red(f"{prefix}  [ ERROR ] 記憶庫清理失敗 ({e})"))
+                        if gitignored > 0 or missing > 0:
+                            print(red(f"{prefix}[ FAIL ] 發現 {gitignored} 個已忽略與 {missing} 個已遺失檔案的抽屜殘留在記憶庫中"))
+                            if fix:
+                                print(yellow(f"{prefix}  --> 正在自動執行 mempalace sync --apply {proj} 清理記憶庫..."))
+                                try:
+                                    subprocess.run(
+                                        [TOOL_MEMPALACE, "sync", "--apply", str(proj)],
+                                        check=True, timeout=120,
+                                    )
+                                    print(green(f"{prefix}  [ FIXED ] 記憶庫清理完成！"))
+                                except subprocess.TimeoutExpired:
+                                    print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync --apply 已逾時 (>120s)，繼續處理其他專案"))
+                                except Exception as e:
+                                    print(red(f"{prefix}  [ ERROR ] 記憶庫清理失敗 ({e})"))
+                                    all_pass = False
+                            else:
                                 all_pass = False
                         else:
-                            all_pass = False
-                    else:
-                        print(green(f"{prefix}[ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
-                except subprocess.TimeoutExpired:
-                    print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync 已逾時 (>120s)，繼續處理其他專案"))
-                except FileNotFoundError:
-                    print(yellow(f"{prefix}[ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
-                except Exception as e:
-                    print(red(f"{prefix}[ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
-        finally:
-            _release_brain_lock(doctor_lock_fd)
+                            print(green(f"{prefix}[ PASS ] 記憶庫無冗餘抽屜，狀態正常"))
+                    except subprocess.TimeoutExpired:
+                        print(yellow(f"{prefix}[ TIMEOUT ] mempalace sync 已逾時 (>120s)，繼續處理其他專案"))
+                    except FileNotFoundError:
+                        print(yellow(f"{prefix}[ WARN ] 未檢測到 mempalace CLI，跳過此項檢查"))
+                    except Exception as e:
+                        print(red(f"{prefix}[ ERROR ] 檢查記憶庫時發生錯誤 ({e})"))
+            finally:
+                _release_brain_lock(doctor_lock_fd)
 
     print()
 
     # 5. Check System CLIs & Plugins (Global Check - run once)
     print(blue("5. 檢查系統相依 CLI 工具與插件可用性..."))
     cli_ok = True
-    for tool_name, pkg in (("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")):
+    if is_ai_mem_active:
+        tools_to_check = [("ai-memory", "ai-memory"), ("codebase-memory-mcp", "codebase-memory-mcp")]
+    else:
+        tools_to_check = [("mempalace", "mempalace"), ("codebase-memory-mcp", "codebase-memory-mcp"), ("claude-mem", "claude-mem")]
+
+    for tool_name, pkg in tools_to_check:
         if tool_name == "claude-mem":
             from .platforms import get_all_claude_settings_files
             settings_files = get_all_claude_settings_files()
@@ -1675,11 +1686,17 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
     # 6c. MCP connectivity probe for all core servers (MemPalace / claude-mem / codebase-memory-mcp)
     print(blue("6c. 檢查核心 MCP 伺服器實時連線可用性..."))
     from .constants import MEMPALACE_MCP_COMMAND
-    mcp_servers_to_probe = [
-        ("MemPalace", MEMPALACE_MCP_COMMAND()),
-        ("claude-mem", ["claude-mem", "serve"] if shutil.which("claude-mem") else []),
-        ("codebase-memory-mcp", ["codebase-memory-mcp"] if shutil.which("codebase-memory-mcp") else []),
-    ]
+    if is_ai_mem_active:
+        mcp_servers_to_probe = [
+            ("ai-memory", ["ai-memory", "mcp", "--tier", "keyword"] if shutil.which("ai-memory") else []),
+            ("codebase-memory-mcp", ["codebase-memory-mcp"] if shutil.which("codebase-memory-mcp") else []),
+        ]
+    else:
+        mcp_servers_to_probe = [
+            ("MemPalace", MEMPALACE_MCP_COMMAND()),
+            ("claude-mem", ["claude-mem", "serve"] if shutil.which("claude-mem") else []),
+            ("codebase-memory-mcp", ["codebase-memory-mcp"] if shutil.which("codebase-memory-mcp") else []),
+        ]
 
     for s_name, s_cmd in mcp_servers_to_probe:
         if not s_cmd:

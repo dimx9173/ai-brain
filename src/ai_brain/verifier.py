@@ -271,6 +271,10 @@ def print_results(results: List[CheckResult]) -> int:
 def check_claude_mem_status() -> CheckResult:
     """Check if claude-mem is available via CLI binary and enabled in all Claude Code settings files."""
     name = "檢查 claude-mem CLI / 插件狀態"
+    from .migration import detect_environment_state, MigrationState
+    if detect_environment_state() == MigrationState.READY:
+        return CheckResult(name, PASS, "(已隨 ai-memory 遷移退休)")
+
     cli_installed = bool(shutil.which("claude-mem"))
 
     from .platforms import get_all_claude_settings_files
@@ -306,8 +310,14 @@ def run_all_checks(paths) -> List[CheckResult]:
     """Run the full 9-point health check and return all results."""
     results: List[CheckResult] = []
 
-    # 1. mempalace CLI
-    results.append(check_cli_available("MemPalace", "mempalace"))
+    from .migration import detect_environment_state, MigrationState
+    ai_mem_ready = detect_environment_state() == MigrationState.READY
+
+    # 1. mempalace / ai-memory CLI
+    if ai_mem_ready or bool(shutil.which("ai-memory")):
+        results.append(check_cli_available("ai-memory", "ai-memory"))
+    else:
+        results.append(check_cli_available("MemPalace", "mempalace"))
     # 2. claude-mem CLI / Plugin
     results.append(check_claude_mem_status())
     # 3. codebase-memory-mcp CLI
