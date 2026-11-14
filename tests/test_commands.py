@@ -1507,11 +1507,12 @@ class TestDoctorErrorPaths(_CmdBase):
         out, ok = self._capture(commands.run_doctor, MagicMock(), None, True)
         self.assertIn("失敗", out)
 
+    @patch("ai_brain.commands._is_ai_memory_active", return_value=False)
     @patch("ai_brain.commands._read_all_ignores", return_value=".codebase-memory")
     @patch("ai_brain.verifier.run_all_checks")
     @patch("ai_brain.commands.subprocess.run")
     @patch("ai_brain.commands.shutil.which")
-    def test_mempalace_sync_apply_failure(self, mock_which, mock_run, mock_checks, mock_ign):
+    def test_mempalace_sync_apply_failure(self, mock_which, mock_run, mock_checks, mock_ign, _mock_ai_mem):
         def run_side_effect(*args, **kwargs):
             cmd = args[0]
             if len(cmd) >= 2 and cmd[0] == "mempalace" and cmd[1] == "sync":
@@ -1742,11 +1743,12 @@ class TestMempalaceInitEdgeCases(_CmdBase):
 
 
 class TestDoctorMempalaceErrors(_CmdBase):
+    @patch("ai_brain.commands._is_ai_memory_active", return_value=False)
     @patch("ai_brain.commands._read_all_ignores")
     @patch("ai_brain.verifier.run_all_checks")
     @patch("ai_brain.commands.subprocess.run")
     @patch("ai_brain.commands.shutil.which")
-    def test_mempalace_sync_apply_failure(self, mock_which, mock_run, mock_checks, mock_ignores):
+    def test_mempalace_sync_apply_failure(self, mock_which, mock_run, mock_checks, mock_ignores, _mock_ai_mem):
         gi = commands._global_gitignore_path()
         gi.parent.mkdir(parents=True, exist_ok=True)
         gi.write_text(".codebase-memory/\n", encoding="utf-8")

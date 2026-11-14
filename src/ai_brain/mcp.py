@@ -377,7 +377,7 @@ def _filter_targets(targets: list[RegistrationTarget], target_agent: str | None)
 # --- Public API -----------------------------------------------------------------
 
 def register_all(paths, target_agent: str | None = None, force_create: bool = False) -> int:
-    """Register mempalace + codebase-memory-mcp across relevant IDE configs.
+    """Register ai-memory + codebase-memory-mcp across relevant IDE configs.
 
     If target_agent is specified or force_create is True, parent directories are created automatically.
     Returns the number of files successfully touched.
@@ -404,13 +404,13 @@ def register_all(paths, target_agent: str | None = None, force_create: bool = Fa
 
 
 def deregister_all(paths, target_agent: str | None = None) -> int:
-    """Remove mempalace + codebase-memory-mcp from relevant IDE configs."""
+    """Remove ai-memory / legacy memory + codebase-memory-mcp from relevant IDE configs."""
     touched = 0
     targets = _filter_targets(_all_targets(paths), target_agent)
     for target in targets:
         if not target.path or not target.path.is_file():
             continue
-        blue(f"---> 自 {target.label} 註銷 MemPalace / Codebase-Memory MCP 伺服器...")
+        blue(f"---> 自 {target.label} 註銷 AI-Memory / Codebase-Memory MCP 伺服器...")
         _deregister_in_file(target)
         touched += 1
     return touched

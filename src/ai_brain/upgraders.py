@@ -393,12 +393,13 @@ def print_summary(outcomes: list[UpgradeOutcome], self_version: str) -> None:
         else:
             print(line)
 
-    # Show which binary MCP actually uses
-    from .constants import MEMPALACE_MCP_COMMAND
-    mcp_cmd = MEMPALACE_MCP_COMMAND()
-    mcp_display = " ".join(mcp_cmd)
-    if "mempalace.mcp_server" in mcp_display:
-        yellow(f"\n  💡 MemPalace MCP 使用 pip 版 (python3 -m mempalace.mcp_server)")
-    else:
-        yellow(f"\n  💡 MemPalace MCP 使用 uv 版 ({mcp_display})")
+    # Show MemPalace MCP binary hint only when MemPalace was upgraded and ai-memory is not active
+    if any(o.tool.label == "MemPalace" for o in outcomes) and not shutil.which("ai-memory"):
+        from .constants import MEMPALACE_MCP_COMMAND
+        mcp_cmd = MEMPALACE_MCP_COMMAND()
+        mcp_display = " ".join(mcp_cmd)
+        if "mempalace.mcp_server" in mcp_display:
+            yellow(f"\n  💡 MemPalace MCP 使用 pip 版 (python3 -m mempalace.mcp_server)")
+        else:
+            yellow(f"\n  💡 MemPalace MCP 使用 uv 版 ({mcp_display})")
     print()

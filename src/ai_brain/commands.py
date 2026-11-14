@@ -1193,8 +1193,7 @@ def run_doctor(paths, target: str | None = None, fix: bool = False, target_agent
     # Build simple names helper
     multiple = len(projects_to_check) > 1
 
-    from .migration import detect_environment_state, MigrationState
-    is_ai_mem_active = detect_environment_state() == MigrationState.READY
+    is_ai_mem_active = _is_ai_memory_active()
 
     print(blue(f"====== {APP_EMOJI} 開始執行 AI 大腦全面健康診斷 ======"))
     if target:
