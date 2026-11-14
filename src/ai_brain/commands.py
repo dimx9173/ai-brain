@@ -125,12 +125,24 @@ def _another_stop_running() -> bool:
 
 # --- init / clean / full-init ---------------------------------------------------
 
+def _is_ai_memory_active() -> bool:
+    """Return True when ai-memory is active (migrated/ready or installed)."""
+    from .migration import MigrationState, detect_environment_state
+
+    return (
+        detect_environment_state() == MigrationState.READY
+        or bool(shutil.which("ai-memory"))
+    )
+
+
 def init_brain(create_project_rules: bool = False) -> bool:
     print(blue(f"====== {APP_EMOJI} 開始初始化專案 AI 大腦配置 ======"))
 
     _ensure_codebase_memory_ignored()
 
-    if not _run_mempalace_init():
+    if _is_ai_memory_active():
+        print(green("  [ PASS ] ai-memory 架構已啟用，跳過舊版 MemPalace 初始化"))
+    elif not _run_mempalace_init():
         return False
 
     if not _run_codebase_memory_init():
@@ -570,8 +582,11 @@ def run_gc(apply: bool = False, purge_wing: str | None = None) -> bool:
 
         print()
 
-        # -- Step 2: mempalace sync (skip if purge_wing already cleaned up) --
-        if purge_wing and apply:
+        # -- Step 2: mempalace sync (skip if ai-memory active or purge_wing already cleaned up) --
+        if _is_ai_memory_active():
+            print(blue("2. 執行記憶庫同步..."))
+            print(green("  [ PASS ] ai-memory 架構已接管記憶庫，跳過舊版 MemPalace 同步"))
+        elif purge_wing and apply:
             print(blue("2. 執行記憶庫同步..."))
             print(green("  已跳過（purge-wing 已直接清理 DB）"))
         else:
@@ -612,8 +627,11 @@ def run_gc(apply: bool = False, purge_wing: str | None = None) -> bool:
 
         print()
 
-        # -- Step 4: mempalace compress (skip if purge_wing already VACUUMed) --
-        if purge_wing and apply:
+        # -- Step 4: mempalace compress (skip if ai-memory active or purge_wing already VACUUMed) --
+        if _is_ai_memory_active():
+            print(blue("4. 執行 ChromaDB 壓縮..."))
+            print(green("  [ PASS ] ai-memory 架構已接管記憶庫，跳過舊版 MemPalace 壓縮"))
+        elif purge_wing and apply:
             print(blue("4. 執行 ChromaDB 壓縮..."))
             print(green("  已跳過（purge-wing 已執行 VACUUM）"))
         else:
@@ -702,6 +720,10 @@ def mine_to_palace(
         print(yellow("[ WARN ] 另一個 ai-brain 正在執行，跳過 mine"))
         return False
     try:
+        if _is_ai_memory_active():
+            print(green("  [ PASS ] ai-memory 架構已啟用，無須執行舊版 MemPalace mine（請改用 ai-memory MCP memory_store）"))
+            return True
+
         print(blue("====== 📥 歸檔內容至長期記憶宮殿 ======"))
 
         cmd = [TOOL_MEMPALACE, "mine"]
@@ -2592,6 +2614,11 @@ def _run_archive_sweep(*, silent: bool) -> None:
         if lock_fd is None:
             if not silent:
                 print(yellow("[ WARN ] 無法取得全域鎖檔，跳過 _run_archive_sweep"))
+            return
+
+        if _is_ai_memory_active():
+            if not silent:
+                print(green("--> ai-memory 架構已啟用，跳過舊版 MemPalace 自動歸檔"))
             return
 
         archived = registry.list_archived()

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 # --- Version & metadata ---------------------------------------------------------
-VERSION = "2.9.4"
+VERSION = "2.9.5"
 APP_NAME = "AI Brain Orchestrator"
 APP_EMOJI = "🧠"
 

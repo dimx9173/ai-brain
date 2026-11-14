@@ -472,13 +472,35 @@ class TestInitBrain(_CmdBase):
         self.assertTrue(mock_hooks.called)
         self.assertIn(str(Path.cwd().resolve()), registry.list_active())
 
+    @patch("ai_brain.commands._is_ai_memory_active", return_value=False)
     @patch("ai_brain.commands.subprocess.run")
-    def test_mempalace_missing(self, mock_run):
+    def test_mempalace_missing(self, mock_run, _mock_ai_mem):
         mock_run.side_effect = FileNotFoundError("no mempalace")
 
         out, ok = self._capture(commands.init_brain)
         self.assertFalse(ok)
         self.assertIn("未找到", out)
+
+    @patch("ai_brain.commands._is_ai_memory_active", return_value=True)
+    @patch("ai_brain.commands.git_hooks.install")
+    @patch("ai_brain.commands._run_mempalace_init")
+    @patch("ai_brain.commands.subprocess.run")
+    def test_init_brain_skips_mempalace_when_ai_memory_active(
+        self, mock_run, mock_mempalace_init, mock_hooks, _mock_ai_mem
+    ):
+        mock_run.return_value = self._mk_subprocess_result()
+
+        out, ok = self._capture(commands.init_brain)
+        self.assertTrue(ok)
+        self.assertFalse(mock_mempalace_init.called)
+        self.assertIn("ai-memory 架構已啟用，跳過舊版 MemPalace 初始化", out)
+
+    def test_is_ai_memory_active_via_which(self):
+        with patch("ai_brain.migration.detect_environment_state") as mock_state, \
+             patch("ai_brain.commands.shutil.which", return_value="/usr/local/bin/ai-memory"):
+            from ai_brain.migration import MigrationState
+            mock_state.return_value = MigrationState.CLEAN_INSTALL
+            self.assertTrue(commands._is_ai_memory_active())
 
     def test_ensure_codebase_memory_ignored(self):
         gi = commands._global_gitignore_path()
@@ -806,9 +828,10 @@ class TestRunMempalaceInit(_CmdBase):
         self.assertFalse(ok)
 
 
+@patch("ai_brain.commands._is_ai_memory_active", return_value=False)
 class TestMineToPalace(_CmdBase):
     @patch("ai_brain.commands.subprocess.run")
-    def test_mine_to_palace_success(self, mock_run):
+    def test_mine_to_palace_success(self, mock_run, _mock_ai_mem):
         mock_run.return_value = self._mk_subprocess_result()
         ok = commands.mine_to_palace(target=".", mode="default")
         self.assertTrue(ok)
@@ -818,7 +841,7 @@ class TestMineToPalace(_CmdBase):
         self.assertNotIn("timeout", mock_run.call_args[1])
 
     @patch("ai_brain.commands.subprocess.run")
-    def test_mine_to_palace_missing_tool(self, mock_run):
+    def test_mine_to_palace_missing_tool(self, mock_run, _mock_ai_mem):
         mock_run.side_effect = FileNotFoundError("no mempalace")
         out = io.StringIO()
         with redirect_stdout(out):
@@ -827,7 +850,7 @@ class TestMineToPalace(_CmdBase):
         self.assertIn("未找到", out.getvalue())
 
     @patch("ai_brain.commands.subprocess.run")
-    def test_mine_to_palace_command_failed(self, mock_run):
+    def test_mine_to_palace_command_failed(self, mock_run, _mock_ai_mem):
         mock_run.side_effect = subprocess.CalledProcessError(1, "mempalace")
         out = io.StringIO()
         with redirect_stdout(out):
@@ -1160,6 +1183,11 @@ class TestDoctorExtra(_CmdBase):
 # ============================================================================ #
 
 class TestArchiveSweep(_CmdBase):
+    def setUp(self):
+        super().setUp()
+        self._ai_mem_patcher = patch("ai_brain.commands._is_ai_memory_active", return_value=False)
+        self._ai_mem_patcher.start()
+        self.addCleanup(self._ai_mem_patcher.stop)
     @patch("ai_brain.commands.subprocess.run")
     def test_sweep_skips_when_no_archive(self, mock_run):
         out = io.StringIO()
@@ -1766,7 +1794,8 @@ class TestDoctorMempalaceErrors(_CmdBase):
 
 class TestInitBrainErrors(_CmdBase):
     def test_init_brain_when_mempalace_not_installed(self):
-        with patch("ai_brain.commands._run_mempalace_init", return_value=False):
+        with patch("ai_brain.commands._is_ai_memory_active", return_value=False), \
+             patch("ai_brain.commands._run_mempalace_init", return_value=False):
             out = io.StringIO()
             with redirect_stdout(out):
                 ok = commands.init_brain()

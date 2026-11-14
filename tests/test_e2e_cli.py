@@ -387,6 +387,11 @@ class TestStopSweepDirtySkip(_IsolatedHome):
 
     def setUp(self) -> None:
         super().setUp()
+        # Simulate a legacy mempalace-only host even when ai-memory is installed locally
+        os.environ["PATH"] = os.pathsep.join(
+            p for p in os.environ.get("PATH", "").split(os.pathsep)
+            if p and not (Path(p) / "ai-memory").is_file()
+        )
         # Each subprocess invocation appends to this log.
         self.call_log = self.home / "mempalace_calls.jsonl"
         os.environ["MEMPALACE_CALL_LOG"] = str(self.call_log)
